@@ -1,0 +1,21 @@
+# Environment
+.env
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+logfile.log
+uncaughtExceptions.log
+
+# Prisma
+prisma/migrations/
+
+# OS
+.DS_Store
+Thumbs.db
