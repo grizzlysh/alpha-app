@@ -270,6 +270,7 @@ model User {
   stockDisposals  StockDisposal[]
   sales           Sale[]
   stockMovements  StockMovement[]
+  tokens          UserToken[]
 
   @@map("mst_users")
 }
@@ -294,6 +295,23 @@ model UserPharmacy {
 
   @@unique([userId, pharmacyId])
   @@map("mst_user_pharmacies")
+}
+
+// ── USER TOKEN ────────────────────────────────────────
+model UserToken {
+  id           Int      @id @default(autoincrement())
+  uuid         String   @unique @default(uuid())
+  userId       Int      @map("user_id")
+  refreshToken String   @unique @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdBy    String?  @map("created_by")
+  updatedBy    String?  @map("updated_by")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("mst_user_tokens")
 }
 
 // ── MST MEDICINE ─────────────────────────────────────────

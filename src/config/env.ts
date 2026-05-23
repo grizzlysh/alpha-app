@@ -1,8 +1,9 @@
-import { z, ZodObject, ZodRawShape } from 'zod'
+import { z } from 'zod'
 
-const envSchema: ZodObject<ZodRawShape> = z.object({
+const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(10),
+  CLIENT_URL: z.string().url().default('http://localhost:3000'),
   PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })

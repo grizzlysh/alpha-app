@@ -1,16 +1,19 @@
-import './config/env'
 import express, { Application, Request, Response } from 'express'
 import cors, { CorsOptions } from 'cors'
 import helmet from 'helmet'
-// import { rateLimiter } from './middlewares/rateLimiter'
-// import { errorHandler } from './middlewares/errorHandler'
+import cookieParser from 'cookie-parser'
+
 import { env } from './config/env'
+import { rateLimiter } from './middlewares/rateLimiter'
+import { errorHandler } from './middlewares/errorHandler'
+
 
 const app: Application = express()
 const PORT: number = Number(env.PORT) || 5000
 
 const corsOptions: CorsOptions = {
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: env.CLIENT_URL,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }
@@ -18,9 +21,10 @@ const corsOptions: CorsOptions = {
 // ── Security Middlewares ─────────────────────
 app.use(helmet())
 app.use(cors(corsOptions))
-// app.use(rateLimiter)
+app.use(rateLimiter)
 
 // ── Body Parser ──────────────────────────────
+app.use(cookieParser()) 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -39,8 +43,9 @@ app.get('/', (req: Request, res: Response): void => {
 })
 
 // ── Global Error Handler ──────────────────────
-// app.use(errorHandler)
+app.use(errorHandler)
 
+// ── Server ──────────────────────
 app.listen(PORT, (): void => {
   console.log(`Server running on port ${PORT}`)
 })
