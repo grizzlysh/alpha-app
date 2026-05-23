@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { prisma } from '../config/db'
-import { env } from '../config/env'
-import { UnauthorizedException } from '../exceptions/UnauthorizedException'
-import { MESSAGE_CODES } from '../constants/messageCodes'
-import { MESSAGES } from '../constants/messages'
-import { HTTP_STATUS } from '../constants/httpStatus'
+import { prisma } from '@config/db'
+import { env } from '@config/env'
+import { UnauthorizedException } from '@exceptions/UnauthorizedException'
+import { MESSAGE_CODES } from '@constants/messageCodes'
+import { MESSAGES } from '@constants/messages'
+import { HTTP_STATUS } from '@constants/httpStatus'
 
 interface JwtPayload {
   id: number

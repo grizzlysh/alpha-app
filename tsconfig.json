@@ -8,6 +8,23 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@modules/*": ["src/modules/*"],
+      "@interfaces": ["src/interfaces/index.ts"],
+      "@interfaces/*": ["src/interfaces/*"],
+      "@config/*": ["src/config/*"],
+      "@constants": ["src/constants/index.ts"],
+      "@constants/*": ["src/constants/*"],
+      "@exceptions": ["src/exceptions/index.ts"],
+      "@exceptions/*": ["src/exceptions/*"],
+      "@middlewares/*": ["src/middlewares/*"],
+      "@utils": ["src/utils/index.ts"],
+      "@utils/*": ["src/utils/*"],
+      "@entity/*": ["src/entity/*"],
+      "@types/*": ["src/types/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": [

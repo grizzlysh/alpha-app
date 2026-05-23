@@ -3,9 +3,12 @@ import cors, { CorsOptions } from 'cors'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 
-import { env } from './config/env'
-import { rateLimiter } from './middlewares/rateLimiter'
-import { errorHandler } from './middlewares/errorHandler'
+import { env } from '@config/env'
+import { rateLimiter } from '@middlewares/rateLimiter'
+import { errorHandler } from '@middlewares/errorHandler'
+
+import medicineRoutes from '@modules/medicines/medicines.routes'
+import authRoutes from '@modules/auth/auth.routes'
 
 
 const app: Application = express()
@@ -29,8 +32,8 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // ── Routes ───────────────────────────────────
-// app.use('/api/auth', authRoutes)
-// app.use('/api/medicines', medicineRoutes)
+app.use('/api/auth', authRoutes)
+app.use('/api/medicines', medicineRoutes)
 // app.use('/api/distributors', distributorRoutes)
 // app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)

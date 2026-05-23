@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import * as AuthController from './auth.controller'
-import { authenticate } from '../../middlewares/auth'
-import { authRateLimiter } from '../../middlewares/rateLimiter'
+import * as AuthController from '@modules/auth/auth.controller'
+import { authenticate } from '@middlewares/auth'
+import { authRateLimiter } from '@middlewares/rateLimiter'
 
 const router: Router = Router()
 

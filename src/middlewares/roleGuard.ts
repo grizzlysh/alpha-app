@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express'
 import { PlatformRole } from '@prisma/client'
-import { ForbiddenException } from '../exceptions/ForbiddenException'
-import { UnauthorizedException } from '../exceptions/UnauthorizedException'
-import { HTTP_STATUS } from '../constants/httpStatus'
-import { MESSAGE_CODES } from '../constants/messageCodes'
-import { MESSAGES } from '../constants/messages'
+import { ForbiddenException } from '@exceptions/ForbiddenException'
+import { UnauthorizedException } from '@exceptions/UnauthorizedException'
+import { HTTP_STATUS } from '@constants/httpStatus'
+import { MESSAGE_CODES } from '@constants/messageCodes'
+import { MESSAGES } from '@constants/messages'
 
 // ── Permission Guard ──────────────────────────────────
 // checks if user has specific permission in JWT

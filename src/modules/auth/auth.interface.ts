@@ -1,5 +1,5 @@
 import { PlatformRole } from '@prisma/client'
-import { PharmacyItem } from '../../interfaces/pharmacy.interface'
+import { PharmacyItem } from '@interfaces/pharmacy.interface'
 
 // ── Internal Types ────────────────────────────────────
 export interface JwtPayload {

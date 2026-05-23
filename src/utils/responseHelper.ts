@@ -1,7 +1,7 @@
 import { Response } from 'express'
-import { HTTP_STATUS, HttpStatus } from '../constants/httpStatus'
-import { MessageCode } from '../constants/messageCodes'
-import { MESSAGES } from '../constants/messages'
+import { HTTP_STATUS, HttpStatus } from '@constants/httpStatus'
+import { MessageCode } from '@constants/messageCodes'
+import { MESSAGES } from '@constants/messages'
 
 interface BilingualMessage {
   en: string

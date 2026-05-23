@@ -1,7 +1,7 @@
 import rateLimit, { RateLimitRequestHandler } from 'express-rate-limit'
-import { HTTP_STATUS } from '../constants/httpStatus'
-import { MESSAGE_CODES } from '../constants/messageCodes'
-import { MESSAGES } from '../constants/messages'
+import { HTTP_STATUS } from '@constants/httpStatus'
+import { MESSAGE_CODES } from '@constants/messageCodes'
+import { MESSAGES } from '@constants/messages'
 
 // ── General API Rate Limiter ──────────────────────────
 export const rateLimiter: RateLimitRequestHandler = rateLimit({

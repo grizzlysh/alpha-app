@@ -2,20 +2,20 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { PlatformRole } from '@prisma/client'
-import { prisma } from '../../config/db'
-import { env } from '../../config/env'
-import { LoginInput, SelectPharmacyInput } from './auth.validation'
+import { prisma } from '@config/db'
+import { env } from '@config/env'
+import { LoginInput, SelectPharmacyInput } from '@modules/auth/auth.validation'
 import {
   JwtPayload,
   LoginResult,
   SelectPharmacyResponse,
   RefreshTokenResponse,
-} from './auth.interface'
-import { PharmacyItem } from '../../interfaces/pharmacy.interface'
-import { UnauthorizedException } from '../../exceptions/UnauthorizedException'
-import { NotFoundException } from '../../exceptions/NotFoundException'
-import { ForbiddenException } from '../../exceptions/ForbiddenException'
-import { PERMISSIONS } from '../../constants/permissions'
+} from '@modules/auth/auth.interface'
+import { PharmacyItem } from '@interfaces/pharmacy.interface'
+import { UnauthorizedException } from '@exceptions/UnauthorizedException'
+import { NotFoundException } from '@exceptions/NotFoundException'
+import { ForbiddenException } from '@exceptions/ForbiddenException'
+import { PERMISSIONS } from '@constants/permissions'
 
 // ── Token Helpers ─────────────────────────────────────
 

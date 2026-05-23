@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -122,26 +116,31 @@ model SystemParameter {
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  createdBy   String?  @map("created_by")
-  updatedBy   String?  @map("updated_by")
+  createdById Int?     @map("created_by_id")
+  updatedById Int?     @map("updated_by_id")
+
+  createdByUser User? @relation("SystemParameterCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User? @relation("SystemParameterUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("mst_system_parameters")
 }
 
 model BusinessParameter {
-  id          Int          @id @default(autoincrement())
-  uuid        String       @unique @default(uuid())
-  pharmacyId  Int          @map("pharmacy_id")
+  id          Int      @id @default(autoincrement())
+  uuid        String   @unique @default(uuid())
+  pharmacyId  Int      @map("pharmacy_id")
   key         String
   value       String
-  dataType    DataType     @map("data_type")
+  dataType    DataType @map("data_type")
   description String?
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  createdBy   String?      @map("created_by")
-  updatedBy   String?      @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById Int?     @map("created_by_id")
+  updatedById Int?     @map("updated_by_id")
 
-  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
+  pharmacy      Pharmacy @relation(fields: [pharmacyId], references: [id])
+  createdByUser User?    @relation("BusinessParameterCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?    @relation("BusinessParameterUpdatedBy", fields: [updatedById], references: [id])
 
   @@unique([pharmacyId, key])
   @@map("mst_business_parameters")
@@ -158,13 +157,16 @@ model Role {
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   deletedAt   DateTime?    @map("deleted_at")
-  createdBy   String?      @map("created_by")
-  updatedBy   String?      @map("updated_by")
-  deletedBy   String?      @map("deleted_by")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
   pharmacy        Pharmacy?        @relation(fields: [pharmacyId], references: [id])
   rolePermissions RolePermission[]
   userPharmacies  UserPharmacy[]
+  createdByUser   User?            @relation("RoleCreatedBy", fields: [createdById], references: [id])
+  updatedByUser   User?            @relation("RoleUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser   User?            @relation("RoleDeletedBy", fields: [deletedById], references: [id])
 
   @@unique([pharmacyId, name])
   @@map("mst_roles")
@@ -178,10 +180,12 @@ model Permission {
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-  createdBy   String?  @map("created_by")
-  updatedBy   String?  @map("updated_by")
+  createdById Int?     @map("created_by_id")
+  updatedById Int?     @map("updated_by_id")
 
   rolePermissions RolePermission[]
+  createdByUser   User?            @relation("PermissionCreatedBy", fields: [createdById], references: [id])
+  updatedByUser   User?            @relation("PermissionUpdatedBy", fields: [updatedById], references: [id])
 
   @@unique([module, action])
   @@map("mst_permissions")
@@ -196,12 +200,14 @@ model RolePermission {
   isEnabled    Boolean  @default(true) @map("is_enabled")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
-  createdBy    String?  @map("created_by")
-  updatedBy    String?  @map("updated_by")
+  createdById  Int?     @map("created_by_id")
+  updatedById  Int?     @map("updated_by_id")
 
-  role       Role       @relation(fields: [roleId], references: [id])
-  permission Permission @relation(fields: [permissionId], references: [id])
-  pharmacy   Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  role          Role       @relation(fields: [roleId], references: [id])
+  permission    Permission @relation(fields: [permissionId], references: [id])
+  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  createdByUser User?      @relation("RolePermissionCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?      @relation("RolePermissionUpdatedBy", fields: [updatedById], references: [id])
 
   @@unique([roleId, permissionId, pharmacyId])
   @@map("mst_role_permissions")
@@ -210,22 +216,25 @@ model RolePermission {
 // ── MST PHARMACY & USER ──────────────────────────────────
 
 model Pharmacy {
-  id        Int          @id @default(autoincrement())
-  uuid      String       @unique @default(uuid())
-  ownerId   Int          @map("owner_id")
-  name      String
-  address   String
-  phone     String
-  email     String?
-  status    RecordStatus @default(ACTIVE)
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
-  deletedAt DateTime?    @map("deleted_at")
-  createdBy String?      @map("created_by")
-  updatedBy String?      @map("updated_by")
-  deletedBy String?      @map("deleted_by")
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  ownerId     Int          @map("owner_id")
+  name        String
+  address     String
+  phone       String
+  email       String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
   owner              User                @relation("PharmacyOwner", fields: [ownerId], references: [id])
+  createdByUser      User?               @relation("PharmacyCreatedBy", fields: [createdById], references: [id])
+  updatedByUser      User?               @relation("PharmacyUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser      User?               @relation("PharmacyDeletedBy", fields: [deletedById], references: [id])
   userPharmacies     UserPharmacy[]
   medicines          Medicine[]
   distributors       Distributor[]
@@ -258,46 +267,174 @@ model User {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
   deletedAt    DateTime?     @map("deleted_at")
-  createdBy    String?       @map("created_by")
-  updatedBy    String?       @map("updated_by")
-  deletedBy    String?       @map("deleted_by")
+  createdById  Int?          @map("created_by_id")
+  updatedById  Int?          @map("updated_by_id")
+  deletedById  Int?          @map("deleted_by_id")
 
+  // ── Self Relations ────────────────────────────────
+  createdByUser User?  @relation("UserCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?  @relation("UserUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?  @relation("UserDeletedBy", fields: [deletedById], references: [id])
+  usersCreated  User[] @relation("UserCreatedBy")
+  usersUpdated  User[] @relation("UserUpdatedBy")
+  usersDeleted  User[] @relation("UserDeletedBy")
+
+  // ── Business Relations ────────────────────────────
   userPharmacies  UserPharmacy[]
-  ownedPharmacies Pharmacy[]     @relation("PharmacyOwner")
-  purchaseOrders  PurchaseOrder[]
-  invoices        Invoice[]
-  stockReturns    StockReturn[]
-  stockDisposals  StockDisposal[]
-  sales           Sale[]
-  stockMovements  StockMovement[]
   tokens          UserToken[]
+  ownedPharmacies Pharmacy[]     @relation("PharmacyOwner")
+  // purchaseOrders  PurchaseOrder[]
+  // invoices        Invoice[]
+  // stockReturns    StockReturn[]
+  // stockDisposals  StockDisposal[]
+  // sales           Sale[]
+  // stockMovements  StockMovement[]
+
+  // ── Audit: SystemParameter ────────────────────────
+  systemParametersCreated SystemParameter[] @relation("SystemParameterCreatedBy")
+  systemParametersUpdated SystemParameter[] @relation("SystemParameterUpdatedBy")
+
+  // ── Audit: BusinessParameter ──────────────────────
+  businessParametersCreated BusinessParameter[] @relation("BusinessParameterCreatedBy")
+  businessParametersUpdated BusinessParameter[] @relation("BusinessParameterUpdatedBy")
+
+  // ── Audit: Role ───────────────────────────────────
+  rolesCreated Role[] @relation("RoleCreatedBy")
+  rolesUpdated Role[] @relation("RoleUpdatedBy")
+  rolesDeleted Role[] @relation("RoleDeletedBy")
+
+  // ── Audit: Permission ─────────────────────────────
+  permissionsCreated Permission[] @relation("PermissionCreatedBy")
+  permissionsUpdated Permission[] @relation("PermissionUpdatedBy")
+
+  // ── Audit: RolePermission ─────────────────────────
+  rolePermissionsCreated RolePermission[] @relation("RolePermissionCreatedBy")
+  rolePermissionsUpdated RolePermission[] @relation("RolePermissionUpdatedBy")
+
+  // ── Audit: Pharmacy ───────────────────────────────
+  pharmaciesCreated Pharmacy[] @relation("PharmacyCreatedBy")
+  pharmaciesUpdated Pharmacy[] @relation("PharmacyUpdatedBy")
+  pharmaciesDeleted Pharmacy[] @relation("PharmacyDeletedBy")
+
+  // ── Audit: UserToken ──────────────────────────────
+  userTokensCreated UserToken[] @relation("UserTokenCreatedBy")
+  userTokensUpdated UserToken[] @relation("UserTokenUpdatedBy")
+
+  // ── Audit: UserPharmacy ───────────────────────────
+  userPharmaciesCreated UserPharmacy[] @relation("UserPharmacyCreatedBy")
+  userPharmaciesUpdated UserPharmacy[] @relation("UserPharmacyUpdatedBy")
+  userPharmaciesDeleted UserPharmacy[] @relation("UserPharmacyDeletedBy")
+
+  // ── Audit: MedicineShape ──────────────────────────
+  medicineShapesCreated MedicineShape[] @relation("MedicineShapeCreatedBy")
+  medicineShapesUpdated MedicineShape[] @relation("MedicineShapeUpdatedBy")
+  medicineShapesDeleted MedicineShape[] @relation("MedicineShapeDeletedBy")
+
+  // ── Audit: MedicineType ───────────────────────────
+  medicineTypesCreated MedicineType[] @relation("MedicineTypeCreatedBy")
+  medicineTypesUpdated MedicineType[] @relation("MedicineTypeUpdatedBy")
+  medicineTypesDeleted MedicineType[] @relation("MedicineTypeDeletedBy")
+
+  // ── Audit: MedicineClass ──────────────────────────
+  medicineClassesCreated MedicineClass[] @relation("MedicineClassCreatedBy")
+  medicineClassesUpdated MedicineClass[] @relation("MedicineClassUpdatedBy")
+  medicineClassesDeleted MedicineClass[] @relation("MedicineClassDeletedBy")
+
+  // ── Audit: Medicine ───────────────────────────────
+  medicinesCreated Medicine[] @relation("MedicineCreatedBy")
+  medicinesUpdated Medicine[] @relation("MedicineUpdatedBy")
+  medicinesDeleted Medicine[] @relation("MedicineDeletedBy")
+
+  // ── Audit: MedicineIngredient ─────────────────────
+  medicineIngredientsCreated MedicineIngredient[] @relation("MedicineIngredientCreatedBy")
+  medicineIngredientsUpdated MedicineIngredient[] @relation("MedicineIngredientUpdatedBy")
+
+  // ── Audit: Distributor ────────────────────────────
+  distributorsCreated Distributor[] @relation("DistributorCreatedBy")
+  distributorsUpdated Distributor[] @relation("DistributorUpdatedBy")
+  distributorsDeleted Distributor[] @relation("DistributorDeletedBy")
+
+  // ── Audit: Customer ───────────────────────────────
+  customersCreated Customer[] @relation("CustomerCreatedBy")
+  customersUpdated Customer[] @relation("CustomerUpdatedBy")
+  customersDeleted Customer[] @relation("CustomerDeletedBy")
+
+  // ── Audit: PurchaseOrder ──────────────────────────
+  purchaseOrdersCreated PurchaseOrder[] @relation("PurchaseOrderCreatedBy")
+  purchaseOrdersUpdated PurchaseOrder[] @relation("PurchaseOrderUpdatedBy")
+  purchaseOrdersDeleted PurchaseOrder[] @relation("PurchaseOrderDeletedBy")
+
+  // ── Audit: PurchaseOrderDetail ────────────────────
+  purchaseOrderDetailsCreated PurchaseOrderDetail[] @relation("PurchaseOrderDetailCreatedBy")
+  purchaseOrderDetailsUpdated PurchaseOrderDetail[] @relation("PurchaseOrderDetailUpdatedBy")
+
+  // ── Audit: Invoice ────────────────────────────────
+  invoicesCreated Invoice[] @relation("InvoiceCreatedBy")
+  invoicesUpdated Invoice[] @relation("InvoiceUpdatedBy")
+  invoicesDeleted Invoice[] @relation("InvoiceDeletedBy")
+
+  // ── Audit: InvoiceDetail ──────────────────────────
+  invoiceDetailsCreated InvoiceDetail[] @relation("InvoiceDetailCreatedBy")
+  invoiceDetailsUpdated InvoiceDetail[] @relation("InvoiceDetailUpdatedBy")
+
+  // ── Audit: InvoicePayment ─────────────────────────
+  invoicePaymentsCreated InvoicePayment[] @relation("InvoicePaymentCreatedBy")
+  invoicePaymentsUpdated InvoicePayment[] @relation("InvoicePaymentUpdatedBy")
+
+  // ── Audit: InvoicePaymentHistory ──────────────────
+  invoicePaymentHistoriesCreated InvoicePaymentHistory[] @relation("InvoicePaymentHistoryCreatedBy")
+  invoicePaymentHistoriesUpdated InvoicePaymentHistory[] @relation("InvoicePaymentHistoryUpdatedBy")
+
+  // ── Audit: Stock ──────────────────────────────────
+  stocksCreated Stock[] @relation("StockCreatedBy")
+  stocksUpdated Stock[] @relation("StockUpdatedBy")
+
+  // ── Audit: StockDetail ────────────────────────────
+  stockDetailsCreated StockDetail[] @relation("StockDetailCreatedBy")
+  stockDetailsUpdated StockDetail[] @relation("StockDetailUpdatedBy")
+
+  // ── Audit: StockMovement ──────────────────────────
+  stockMovementsCreated StockMovement[] @relation("StockMovementCreatedBy")
+  stockMovementsUpdated StockMovement[] @relation("StockMovementUpdatedBy")
+
+  // ── Audit: StockReturn ────────────────────────────
+  stockReturnsCreated StockReturn[] @relation("StockReturnCreatedBy")
+  stockReturnsUpdated StockReturn[] @relation("StockReturnUpdatedBy")
+  stockReturnsDeleted StockReturn[] @relation("StockReturnDeletedBy")
+
+  // ── Audit: StockReturnDetail ──────────────────────
+  stockReturnDetailsCreated StockReturnDetail[] @relation("StockReturnDetailCreatedBy")
+  stockReturnDetailsUpdated StockReturnDetail[] @relation("StockReturnDetailUpdatedBy")
+
+  // ── Audit: StockDisposal ──────────────────────────
+  stockDisposalsCreated StockDisposal[] @relation("StockDisposalCreatedBy")
+  stockDisposalsUpdated StockDisposal[] @relation("StockDisposalUpdatedBy")
+  stockDisposalsDeleted StockDisposal[] @relation("StockDisposalDeletedBy")
+
+  // ── Audit: StockDisposalDetail ────────────────────
+  stockDisposalDetailsCreated StockDisposalDetail[] @relation("StockDisposalDetailCreatedBy")
+  stockDisposalDetailsUpdated StockDisposalDetail[] @relation("StockDisposalDetailUpdatedBy")
+
+  // ── Audit: Sale ───────────────────────────────────
+  salesCreated Sale[] @relation("SaleCreatedBy")
+  salesUpdated Sale[] @relation("SaleUpdatedBy")
+  salesDeleted Sale[] @relation("SaleDeletedBy")
+
+  // ── Audit: SaleDetail ─────────────────────────────
+  saleDetailsCreated SaleDetail[] @relation("SaleDetailCreatedBy")
+  saleDetailsUpdated SaleDetail[] @relation("SaleDetailUpdatedBy")
+
+  // ── Audit: SalePayment ────────────────────────────
+  salePaymentsCreated SalePayment[] @relation("SalePaymentCreatedBy")
+  salePaymentsUpdated SalePayment[] @relation("SalePaymentUpdatedBy")
+
+  // ── Audit: SalePaymentHistory ─────────────────────
+  salePaymentHistoriesCreated SalePaymentHistory[] @relation("SalePaymentHistoryCreatedBy")
+  salePaymentHistoriesUpdated SalePaymentHistory[] @relation("SalePaymentHistoryUpdatedBy")
 
   @@map("mst_users")
 }
 
-model UserPharmacy {
-  id         Int          @id @default(autoincrement())
-  uuid       String       @unique @default(uuid())
-  userId     Int          @map("user_id")
-  pharmacyId Int          @map("pharmacy_id")
-  roleId     Int          @map("role_id")
-  status     RecordStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  deletedAt  DateTime?    @map("deleted_at")
-  createdBy  String?      @map("created_by")
-  updatedBy  String?      @map("updated_by")
-  deletedBy  String?      @map("deleted_by")
-
-  user     User     @relation(fields: [userId], references: [id])
-  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
-  role     Role     @relation(fields: [roleId], references: [id])
-
-  @@unique([userId, pharmacyId])
-  @@map("mst_user_pharmacies")
-}
-
-// ── USER TOKEN ────────────────────────────────────────
 model UserToken {
   id           Int      @id @default(autoincrement())
   uuid         String   @unique @default(uuid())
@@ -306,71 +443,107 @@ model UserToken {
   expiresAt    DateTime @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
-  createdBy    String?  @map("created_by")
-  updatedBy    String?  @map("updated_by")
+  createdById  Int?     @map("created_by_id")
+  updatedById  Int?     @map("updated_by_id")
 
-  user User @relation(fields: [userId], references: [id])
+  user          User  @relation(fields: [userId], references: [id])
+  createdByUser User? @relation("UserTokenCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User? @relation("UserTokenUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("mst_user_tokens")
+}
+
+model UserPharmacy {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  userId      Int          @map("user_id")
+  pharmacyId  Int          @map("pharmacy_id")
+  roleId      Int          @map("role_id")
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
+
+  user          User     @relation(fields: [userId], references: [id])
+  pharmacy      Pharmacy @relation(fields: [pharmacyId], references: [id])
+  role          Role     @relation(fields: [roleId], references: [id])
+  createdByUser User?    @relation("UserPharmacyCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?    @relation("UserPharmacyUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?    @relation("UserPharmacyDeletedBy", fields: [deletedById], references: [id])
+
+  @@unique([userId, pharmacyId])
+  @@map("mst_user_pharmacies")
 }
 
 // ── MST MEDICINE ─────────────────────────────────────────
 
 model MedicineShape {
-  id         Int          @id @default(autoincrement())
-  uuid       String       @unique @default(uuid())
-  pharmacyId Int?         @map("pharmacy_id")
-  name       String
-  status     RecordStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  deletedAt  DateTime?    @map("deleted_at")
-  createdBy  String?      @map("created_by")
-  updatedBy  String?      @map("updated_by")
-  deletedBy  String?      @map("deleted_by")
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  pharmacyId  Int?         @map("pharmacy_id")
+  name        String
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
-  pharmacy  Pharmacy?  @relation(fields: [pharmacyId], references: [id])
-  medicines Medicine[]
+  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  medicines     Medicine[]
+  createdByUser User?      @relation("MedicineShapeCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?      @relation("MedicineShapeUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?      @relation("MedicineShapeDeletedBy", fields: [deletedById], references: [id])
 
   @@unique([pharmacyId, name])
   @@map("mst_medicine_shapes")
 }
 
 model MedicineType {
-  id         Int          @id @default(autoincrement())
-  uuid       String       @unique @default(uuid())
-  pharmacyId Int?         @map("pharmacy_id")
-  name       String
-  status     RecordStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  deletedAt  DateTime?    @map("deleted_at")
-  createdBy  String?      @map("created_by")
-  updatedBy  String?      @map("updated_by")
-  deletedBy  String?      @map("deleted_by")
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  pharmacyId  Int?         @map("pharmacy_id")
+  name        String
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
-  pharmacy  Pharmacy?  @relation(fields: [pharmacyId], references: [id])
-  medicines Medicine[]
+  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  medicines     Medicine[]
+  createdByUser User?      @relation("MedicineTypeCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?      @relation("MedicineTypeUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?      @relation("MedicineTypeDeletedBy", fields: [deletedById], references: [id])
 
   @@unique([pharmacyId, name])
   @@map("mst_medicine_types")
 }
 
 model MedicineClass {
-  id         Int          @id @default(autoincrement())
-  uuid       String       @unique @default(uuid())
-  pharmacyId Int?         @map("pharmacy_id")
-  name       String
-  status     RecordStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  deletedAt  DateTime?    @map("deleted_at")
-  createdBy  String?      @map("created_by")
-  updatedBy  String?      @map("updated_by")
-  deletedBy  String?      @map("deleted_by")
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  pharmacyId  Int?         @map("pharmacy_id")
+  name        String
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
-  pharmacy  Pharmacy?  @relation(fields: [pharmacyId], references: [id])
-  medicines Medicine[]
+  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  medicines     Medicine[]
+  createdByUser User?      @relation("MedicineClassCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?      @relation("MedicineClassUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?      @relation("MedicineClassDeletedBy", fields: [deletedById], references: [id])
 
   @@unique([pharmacyId, name])
   @@map("mst_medicine_classes")
@@ -381,24 +554,26 @@ model Medicine {
   uuid            String       @unique @default(uuid())
   pharmacyId      Int          @map("pharmacy_id")
   name            String
-  genericName     String       @map("generic_name")
   shapeId         Int          @map("shape_id")
   typeId          Int          @map("type_id")
   medicineClassId Int          @map("medicine_class_id")
   unit            String
-  reorderLevel    Int          @default(0) @map("reorder_level")
   status          RecordStatus @default(ACTIVE)
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
   deletedAt       DateTime?    @map("deleted_at")
-  createdBy       String?      @map("created_by")
-  updatedBy       String?      @map("updated_by")
-  deletedBy       String?      @map("deleted_by")
+  createdById     Int?         @map("created_by_id")
+  updatedById     Int?         @map("updated_by_id")
+  deletedById     Int?         @map("deleted_by_id")
 
   pharmacy             Pharmacy              @relation(fields: [pharmacyId], references: [id])
   shape                MedicineShape         @relation(fields: [shapeId], references: [id])
   type                 MedicineType          @relation(fields: [typeId], references: [id])
   medicineClass        MedicineClass         @relation(fields: [medicineClassId], references: [id])
+  createdByUser        User?                 @relation("MedicineCreatedBy", fields: [createdById], references: [id])
+  updatedByUser        User?                 @relation("MedicineUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser        User?                 @relation("MedicineDeletedBy", fields: [deletedById], references: [id])
+  ingredients          MedicineIngredient[]
   purchaseOrderDetails PurchaseOrderDetail[]
   invoiceDetails       InvoiceDetail[]
   stocks               Stock[]
@@ -407,28 +582,49 @@ model Medicine {
   stockDisposalDetails StockDisposalDetail[]
   saleDetails          SaleDetail[]
 
+  @@unique([pharmacyId, name])
   @@map("mst_medicines")
+}
+
+model MedicineIngredient {
+  id          Int      @id @default(autoincrement())
+  uuid        String   @unique @default(uuid())
+  medicineId  Int      @map("medicine_id")
+  name        String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById Int?     @map("created_by_id")
+  updatedById Int?     @map("updated_by_id")
+
+  medicine      Medicine @relation(fields: [medicineId], references: [id])
+  createdByUser User?    @relation("MedicineIngredientCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?    @relation("MedicineIngredientUpdatedBy", fields: [updatedById], references: [id])
+
+  @@map("mst_medicine_ingredients")
 }
 
 // ── MST DISTRIBUTOR & CUSTOMER ───────────────────────────
 
 model Distributor {
-  id         Int          @id @default(autoincrement())
-  uuid       String       @unique @default(uuid())
-  pharmacyId Int          @map("pharmacy_id")
-  name       String
-  phone      String
-  email      String?
-  address    String?
-  status     RecordStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  deletedAt  DateTime?    @map("deleted_at")
-  createdBy  String?      @map("created_by")
-  updatedBy  String?      @map("updated_by")
-  deletedBy  String?      @map("deleted_by")
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  pharmacyId  Int          @map("pharmacy_id")
+  name        String
+  phone       String
+  email       String?
+  address     String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
   pharmacy       Pharmacy        @relation(fields: [pharmacyId], references: [id])
+  createdByUser  User?           @relation("DistributorCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?           @relation("DistributorUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser  User?           @relation("DistributorDeletedBy", fields: [deletedById], references: [id])
   purchaseOrders PurchaseOrder[]
   invoices       Invoice[]
   stockDetails   StockDetail[]
@@ -438,23 +634,26 @@ model Distributor {
 }
 
 model Customer {
-  id         Int          @id @default(autoincrement())
-  uuid       String       @unique @default(uuid())
-  pharmacyId Int          @map("pharmacy_id")
-  name       String
-  phone      String?
-  address    String?
-  isWalkIn   Boolean      @default(false) @map("is_walk_in")
-  status     RecordStatus @default(ACTIVE)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  updatedAt  DateTime     @updatedAt @map("updated_at")
-  deletedAt  DateTime?    @map("deleted_at")
-  createdBy  String?      @map("created_by")
-  updatedBy  String?      @map("updated_by")
-  deletedBy  String?      @map("deleted_by")
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  pharmacyId  Int          @map("pharmacy_id")
+  name        String
+  phone       String?
+  address     String?
+  isWalkIn    Boolean      @default(false) @map("is_walk_in")
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
 
-  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id])
-  sales    Sale[]
+  pharmacy      Pharmacy @relation(fields: [pharmacyId], references: [id])
+  createdByUser User?    @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?    @relation("CustomerUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?    @relation("CustomerDeletedBy", fields: [deletedById], references: [id])
+  sales         Sale[]
 
   @@map("mst_customers")
 }
@@ -466,7 +665,6 @@ model PurchaseOrder {
   uuid          String              @unique @default(uuid())
   pharmacyId    Int                 @map("pharmacy_id")
   distributorId Int                 @map("distributor_id")
-  createdById   Int                 @map("created_by_id")
   orderNumber   String              @unique @map("order_number")
   status        PurchaseOrderStatus @default(DRAFT)
   notes         String?
@@ -474,15 +672,17 @@ model PurchaseOrder {
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
   deletedAt     DateTime?           @map("deleted_at")
-  createdBy     String?             @map("created_by")
-  updatedBy     String?             @map("updated_by")
-  deletedBy     String?             @map("deleted_by")
+  createdById   Int?                @map("created_by_id")
+  updatedById   Int?                @map("updated_by_id")
+  deletedById   Int?                @map("deleted_by_id")
 
-  pharmacy    Pharmacy              @relation(fields: [pharmacyId], references: [id])
-  distributor Distributor           @relation(fields: [distributorId], references: [id])
-  creator     User                  @relation(fields: [createdById], references: [id])
-  details     PurchaseOrderDetail[]
-  invoices    Invoice[]
+  pharmacy      Pharmacy              @relation(fields: [pharmacyId], references: [id])
+  distributor   Distributor           @relation(fields: [distributorId], references: [id])
+  createdByUser User?                 @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?                 @relation("PurchaseOrderUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?                 @relation("PurchaseOrderDeletedBy", fields: [deletedById], references: [id])
+  details       PurchaseOrderDetail[]
+  invoices      Invoice[]
 
   @@map("trx_purchase_orders")
 }
@@ -497,11 +697,13 @@ model PurchaseOrderDetail {
   notes           String?
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
-  createdBy       String?  @map("created_by")
-  updatedBy       String?  @map("updated_by")
+  createdById     Int?     @map("created_by_id")
+  updatedById     Int?     @map("updated_by_id")
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   medicine      Medicine      @relation(fields: [medicineId], references: [id])
+  createdByUser User?         @relation("PurchaseOrderDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?         @relation("PurchaseOrderDetailUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("trx_purchase_order_details")
 }
@@ -513,27 +715,28 @@ model Invoice {
   uuid            String        @unique @default(uuid())
   pharmacyId      Int           @map("pharmacy_id")
   distributorId   Int           @map("distributor_id")
-  createdById     Int           @map("created_by_id")
   purchaseOrderId Int?          @map("purchase_order_id")
   invoiceNumber   String        @unique @map("invoice_number")
   status          InvoiceStatus @default(PENDING)
   paymentStatus   PaymentStatus @default(UNPAID) @map("payment_status")
   invoiceDate     DateTime      @map("invoice_date")
   dueDate         DateTime?     @map("due_date")
-  totalAmount     Decimal       @db.Decimal(12, 2) @map("total_amount")
-  paidAmount      Decimal       @default(0) @db.Decimal(12, 2) @map("paid_amount")
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(12, 2)
+  paidAmount      Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
   notes           String?
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
   deletedAt       DateTime?     @map("deleted_at")
-  createdBy       String?       @map("created_by")
-  updatedBy       String?       @map("updated_by")
-  deletedBy       String?       @map("deleted_by")
+  createdById     Int?          @map("created_by_id")
+  updatedById     Int?          @map("updated_by_id")
+  deletedById     Int?          @map("deleted_by_id")
 
   pharmacy       Pharmacy         @relation(fields: [pharmacyId], references: [id])
   distributor    Distributor      @relation(fields: [distributorId], references: [id])
-  creator        User             @relation(fields: [createdById], references: [id])
   purchaseOrder  PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  createdByUser  User?            @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?            @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser  User?            @relation("InvoiceDeletedBy", fields: [deletedById], references: [id])
   details        InvoiceDetail[]
   stockMovements StockMovement[]
   payments       InvoicePayment[]
@@ -552,18 +755,20 @@ model InvoiceDetail {
   quantityPerBox     Int      @map("quantity_per_box")
   quantityPieces     Int      @map("quantity_pieces")
   price              Decimal  @db.Decimal(12, 2)
-  discountPercentage Decimal  @default(0) @db.Decimal(5, 2) @map("discount_percentage")
-  discountAmount     Decimal  @default(0) @db.Decimal(12, 2) @map("discount_amount")
-  finalPrice         Decimal  @db.Decimal(12, 2) @map("final_price")
-  totalAmount        Decimal  @db.Decimal(12, 2) @map("total_amount")
+  discountPercentage Decimal  @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  discountAmount     Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  finalPrice         Decimal  @map("final_price") @db.Decimal(12, 2)
+  totalAmount        Decimal  @map("total_amount") @db.Decimal(12, 2)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
-  createdBy          String?  @map("created_by")
-  updatedBy          String?  @map("updated_by")
+  createdById        Int?     @map("created_by_id")
+  updatedById        Int?     @map("updated_by_id")
 
-  invoice     Invoice      @relation(fields: [invoiceId], references: [id])
-  medicine    Medicine     @relation(fields: [medicineId], references: [id])
-  stockDetail StockDetail?
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id])
+  medicine      Medicine     @relation(fields: [medicineId], references: [id])
+  createdByUser User?        @relation("InvoiceDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?        @relation("InvoiceDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockDetail   StockDetail?
 
   @@map("trx_invoice_details")
 }
@@ -572,16 +777,18 @@ model InvoicePayment {
   id            Int           @id @default(autoincrement())
   uuid          String        @unique @default(uuid())
   invoiceId     Int           @map("invoice_id")
-  totalAmount   Decimal       @db.Decimal(12, 2) @map("total_amount")
-  paidAmount    Decimal       @default(0) @db.Decimal(12, 2) @map("paid_amount")
+  totalAmount   Decimal       @map("total_amount") @db.Decimal(12, 2)
+  paidAmount    Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
   paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
-  createdBy     String?       @map("created_by")
-  updatedBy     String?       @map("updated_by")
+  createdById   Int?          @map("created_by_id")
+  updatedById   Int?          @map("updated_by_id")
 
-  invoice Invoice                 @relation(fields: [invoiceId], references: [id])
-  history InvoicePaymentHistory[]
+  invoice       Invoice                 @relation(fields: [invoiceId], references: [id])
+  createdByUser User?                   @relation("InvoicePaymentCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?                   @relation("InvoicePaymentUpdatedBy", fields: [updatedById], references: [id])
+  history       InvoicePaymentHistory[]
 
   @@map("trx_invoice_payments")
 }
@@ -596,10 +803,12 @@ model InvoicePaymentHistory {
   notes            String?
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
-  createdBy        String?       @map("created_by")
-  updatedBy        String?       @map("updated_by")
+  createdById      Int?          @map("created_by_id")
+  updatedById      Int?          @map("updated_by_id")
 
   invoicePayment InvoicePayment @relation(fields: [invoicePaymentId], references: [id])
+  createdByUser  User?          @relation("InvoicePaymentHistoryCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?          @relation("InvoicePaymentHistoryUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("trx_invoice_payment_history")
 }
@@ -612,17 +821,20 @@ model Stock {
   pharmacyId      Int      @map("pharmacy_id")
   medicineId      Int      @map("medicine_id")
   totalPieces     Int      @map("total_pieces")
-  basePrice       Decimal  @db.Decimal(12, 2) @map("base_price")
-  calculatedPrice Decimal  @db.Decimal(12, 2) @map("calculated_price")
-  sellingPrice    Decimal? @db.Decimal(12, 2) @map("selling_price")
+  reorderLevel    Int      @default(0) @map("reorder_level")
+  basePrice       Decimal  @map("base_price") @db.Decimal(12, 2)
+  calculatedPrice Decimal  @map("calculated_price") @db.Decimal(12, 2)
+  sellingPrice    Decimal? @map("selling_price") @db.Decimal(12, 2)
   isManualPrice   Boolean  @default(false) @map("is_manual_price")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
-  createdBy       String?  @map("created_by")
-  updatedBy       String?  @map("updated_by")
+  createdById     Int?     @map("created_by_id")
+  updatedById     Int?     @map("updated_by_id")
 
   pharmacy       Pharmacy        @relation(fields: [pharmacyId], references: [id])
   medicine       Medicine        @relation(fields: [medicineId], references: [id])
+  createdByUser  User?           @relation("StockCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?           @relation("StockUpdatedBy", fields: [updatedById], references: [id])
   details        StockDetail[]
   stockMovements StockMovement[]
 
@@ -644,12 +856,14 @@ model StockDetail {
   quantityPerBox  Int      @map("quantity_per_box")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
-  createdBy       String?  @map("created_by")
-  updatedBy       String?  @map("updated_by")
+  createdById     Int?     @map("created_by_id")
+  updatedById     Int?     @map("updated_by_id")
 
   stock                Stock                 @relation(fields: [stockId], references: [id])
   distributor          Distributor           @relation(fields: [distributorId], references: [id])
   invoiceDetail        InvoiceDetail         @relation(fields: [invoiceDetailId], references: [id])
+  createdByUser        User?                 @relation("StockDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser        User?                 @relation("StockDetailUpdatedBy", fields: [updatedById], references: [id])
   stockMovements       StockMovement[]
   stockReturnDetails   StockReturnDetail[]
   stockDisposalDetails StockDisposalDetail[]
@@ -666,22 +880,22 @@ model StockMovement {
   stockId       Int                 @map("stock_id")
   stockDetailId Int                 @map("stock_detail_id")
   invoiceId     Int?                @map("invoice_id")
-  createdById   Int                 @map("created_by_id")
   type          StockMovementType
   reason        StockMovementReason
   quantity      Int
   notes         String?
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
-  createdBy     String?             @map("created_by")
-  updatedBy     String?             @map("updated_by")
+  createdById   Int?                @map("created_by_id")
+  updatedById   Int?                @map("updated_by_id")
 
-  pharmacy    Pharmacy    @relation(fields: [pharmacyId], references: [id])
-  medicine    Medicine    @relation(fields: [medicineId], references: [id])
-  stock       Stock       @relation(fields: [stockId], references: [id])
-  stockDetail StockDetail @relation(fields: [stockDetailId], references: [id])
-  invoice     Invoice?    @relation(fields: [invoiceId], references: [id])
-  creator     User        @relation(fields: [createdById], references: [id])
+  pharmacy      Pharmacy    @relation(fields: [pharmacyId], references: [id])
+  medicine      Medicine    @relation(fields: [medicineId], references: [id])
+  stock         Stock       @relation(fields: [stockId], references: [id])
+  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
+  invoice       Invoice?    @relation(fields: [invoiceId], references: [id])
+  createdByUser User?       @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?       @relation("StockMovementUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("inv_stock_movements")
 }
@@ -693,7 +907,6 @@ model StockReturn {
   uuid          String            @unique @default(uuid())
   pharmacyId    Int               @map("pharmacy_id")
   distributorId Int               @map("distributor_id")
-  createdById   Int               @map("created_by_id")
   returnNumber  String            @unique @map("return_number")
   status        StockReturnStatus @default(DRAFT)
   notes         String?
@@ -701,14 +914,16 @@ model StockReturn {
   createdAt     DateTime          @default(now()) @map("created_at")
   updatedAt     DateTime          @updatedAt @map("updated_at")
   deletedAt     DateTime?         @map("deleted_at")
-  createdBy     String?           @map("created_by")
-  updatedBy     String?           @map("updated_by")
-  deletedBy     String?           @map("deleted_by")
+  createdById   Int?              @map("created_by_id")
+  updatedById   Int?              @map("updated_by_id")
+  deletedById   Int?              @map("deleted_by_id")
 
-  pharmacy    Pharmacy            @relation(fields: [pharmacyId], references: [id])
-  distributor Distributor         @relation(fields: [distributorId], references: [id])
-  creator     User                @relation(fields: [createdById], references: [id])
-  details     StockReturnDetail[]
+  pharmacy      Pharmacy            @relation(fields: [pharmacyId], references: [id])
+  distributor   Distributor         @relation(fields: [distributorId], references: [id])
+  createdByUser User?               @relation("StockReturnCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?               @relation("StockReturnUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?               @relation("StockReturnDeletedBy", fields: [deletedById], references: [id])
+  details       StockReturnDetail[]
 
   @@map("trx_stock_returns")
 }
@@ -724,12 +939,14 @@ model StockReturnDetail {
   reason         String?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
-  createdBy      String?  @map("created_by")
-  updatedBy      String?  @map("updated_by")
+  createdById    Int?     @map("created_by_id")
+  updatedById    Int?     @map("updated_by_id")
 
-  stockReturn StockReturn @relation(fields: [stockReturnId], references: [id])
-  medicine    Medicine    @relation(fields: [medicineId], references: [id])
-  stockDetail StockDetail @relation(fields: [stockDetailId], references: [id])
+  stockReturn   StockReturn @relation(fields: [stockReturnId], references: [id])
+  medicine      Medicine    @relation(fields: [medicineId], references: [id])
+  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
+  createdByUser User?       @relation("StockReturnDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?       @relation("StockReturnDetailUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("trx_stock_return_details")
 }
@@ -740,7 +957,6 @@ model StockDisposal {
   id             Int                 @id @default(autoincrement())
   uuid           String              @unique @default(uuid())
   pharmacyId     Int                 @map("pharmacy_id")
-  createdById    Int                 @map("created_by_id")
   disposalNumber String              @unique @map("disposal_number")
   status         StockDisposalStatus @default(DRAFT)
   notes          String?
@@ -748,13 +964,15 @@ model StockDisposal {
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
   deletedAt      DateTime?           @map("deleted_at")
-  createdBy      String?             @map("created_by")
-  updatedBy      String?             @map("updated_by")
-  deletedBy      String?             @map("deleted_by")
+  createdById    Int?                @map("created_by_id")
+  updatedById    Int?                @map("updated_by_id")
+  deletedById    Int?                @map("deleted_by_id")
 
-  pharmacy Pharmacy              @relation(fields: [pharmacyId], references: [id])
-  creator  User                  @relation(fields: [createdById], references: [id])
-  details  StockDisposalDetail[]
+  pharmacy      Pharmacy              @relation(fields: [pharmacyId], references: [id])
+  createdByUser User?                 @relation("StockDisposalCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?                 @relation("StockDisposalUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?                 @relation("StockDisposalDeletedBy", fields: [deletedById], references: [id])
+  details       StockDisposalDetail[]
 
   @@map("trx_stock_disposals")
 }
@@ -770,12 +988,14 @@ model StockDisposalDetail {
   reason          DisposalReason
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
-  createdBy       String?        @map("created_by")
-  updatedBy       String?        @map("updated_by")
+  createdById     Int?           @map("created_by_id")
+  updatedById     Int?           @map("updated_by_id")
 
   stockDisposal StockDisposal @relation(fields: [stockDisposalId], references: [id])
   medicine      Medicine      @relation(fields: [medicineId], references: [id])
   stockDetail   StockDetail   @relation(fields: [stockDetailId], references: [id])
+  createdByUser User?         @relation("StockDisposalDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?         @relation("StockDisposalDetailUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("trx_stock_disposal_details")
 }
@@ -787,26 +1007,27 @@ model Sale {
   uuid        String     @unique @default(uuid())
   pharmacyId  Int        @map("pharmacy_id")
   customerId  Int        @map("customer_id")
-  createdById Int        @map("created_by_id")
   saleNumber  String     @unique @map("sale_number")
   saleType    SaleType   @default(CASH) @map("sale_type")
   status      SaleStatus @default(COMPLETED)
-  totalAmount Decimal    @db.Decimal(12, 2) @map("total_amount")
-  paidAmount  Decimal    @default(0) @db.Decimal(12, 2) @map("paid_amount")
+  totalAmount Decimal    @map("total_amount") @db.Decimal(12, 2)
+  paidAmount  Decimal    @default(0) @map("paid_amount") @db.Decimal(12, 2)
   notes       String?
   soldAt      DateTime   @default(now()) @map("sold_at")
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
   deletedAt   DateTime?  @map("deleted_at")
-  createdBy   String?    @map("created_by")
-  updatedBy   String?    @map("updated_by")
-  deletedBy   String?    @map("deleted_by")
+  createdById Int?       @map("created_by_id")
+  updatedById Int?       @map("updated_by_id")
+  deletedById Int?       @map("deleted_by_id")
 
-  pharmacy Pharmacy     @relation(fields: [pharmacyId], references: [id])
-  customer Customer     @relation(fields: [customerId], references: [id])
-  creator  User         @relation(fields: [createdById], references: [id])
-  details  SaleDetail[]
-  payment  SalePayment?
+  pharmacy      Pharmacy     @relation(fields: [pharmacyId], references: [id])
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  createdByUser User?        @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?        @relation("SaleUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?        @relation("SaleDeletedBy", fields: [deletedById], references: [id])
+  details       SaleDetail[]
+  payment       SalePayment?
 
   @@map("trx_sales")
 }
@@ -819,17 +1040,19 @@ model SaleDetail {
   stockDetailId  Int      @map("stock_detail_id")
   quantityPieces Int      @map("quantity_pieces")
   quantityBox    Int      @map("quantity_box")
-  sellingPrice   Decimal  @db.Decimal(12, 2) @map("selling_price")
+  sellingPrice   Decimal  @map("selling_price") @db.Decimal(12, 2)
   discount       Decimal  @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal  @db.Decimal(12, 2) @map("total_amount")
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(12, 2)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
-  createdBy      String?  @map("created_by")
-  updatedBy      String?  @map("updated_by")
+  createdById    Int?     @map("created_by_id")
+  updatedById    Int?     @map("updated_by_id")
 
-  sale        Sale        @relation(fields: [saleId], references: [id])
-  medicine    Medicine    @relation(fields: [medicineId], references: [id])
-  stockDetail StockDetail @relation(fields: [stockDetailId], references: [id])
+  sale          Sale        @relation(fields: [saleId], references: [id])
+  medicine      Medicine    @relation(fields: [medicineId], references: [id])
+  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
+  createdByUser User?       @relation("SaleDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?       @relation("SaleDetailUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("trx_sale_details")
 }
@@ -838,16 +1061,18 @@ model SalePayment {
   id            Int           @id @default(autoincrement())
   uuid          String        @unique @default(uuid())
   saleId        Int           @unique @map("sale_id")
-  totalAmount   Decimal       @db.Decimal(12, 2) @map("total_amount")
-  paidAmount    Decimal       @default(0) @db.Decimal(12, 2) @map("paid_amount")
+  totalAmount   Decimal       @map("total_amount") @db.Decimal(12, 2)
+  paidAmount    Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
   paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
-  createdBy     String?       @map("created_by")
-  updatedBy     String?       @map("updated_by")
+  createdById   Int?          @map("created_by_id")
+  updatedById   Int?          @map("updated_by_id")
 
-  sale    Sale                 @relation(fields: [saleId], references: [id])
-  history SalePaymentHistory[]
+  sale          Sale                 @relation(fields: [saleId], references: [id])
+  createdByUser User?                @relation("SalePaymentCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?                @relation("SalePaymentUpdatedBy", fields: [updatedById], references: [id])
+  history       SalePaymentHistory[]
 
   @@map("trx_sale_payments")
 }
@@ -862,10 +1087,12 @@ model SalePaymentHistory {
   notes         String?
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
-  createdBy     String?       @map("created_by")
-  updatedBy     String?       @map("updated_by")
+  createdById   Int?          @map("created_by_id")
+  updatedById   Int?          @map("updated_by_id")
 
-  salePayment SalePayment @relation(fields: [salePaymentId], references: [id])
+  salePayment   SalePayment @relation(fields: [salePaymentId], references: [id])
+  createdByUser User?       @relation("SalePaymentHistoryCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?       @relation("SalePaymentHistoryUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("trx_sale_payment_history")
 }

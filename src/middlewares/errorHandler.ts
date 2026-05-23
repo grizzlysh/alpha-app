@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express'
-import { AppError } from '../exceptions/AppError'
-import { ValidationException } from '../exceptions/ValidationException'
-import { MESSAGE_CODES } from '../constants/messageCodes'
-import { HTTP_STATUS } from '../constants/httpStatus'
-import { MESSAGES } from '../constants/messages'
+import { AppError } from '@exceptions/AppError'
+import { ValidationException } from '@exceptions/ValidationException'
+import { MESSAGE_CODES } from '@constants/messageCodes'
+import { HTTP_STATUS } from '@constants/httpStatus'
+import { MESSAGES } from '@constants/messages'
 
 export const errorHandler = (
   err: Error,
