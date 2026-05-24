@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import * as MedicineController from '@modules/medicines/medicines.controller'
+import * as MedicineController from './medicines.controller'
 import { authenticate } from '@middlewares/auth'
 import { requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard'
 import { PERMISSIONS } from '@constants/permissions'
@@ -18,7 +18,7 @@ router.get(
 router.get(
   '/:medicine_uuid',
   requirePermission(PERMISSIONS.MEDICINES_VIEW),
-  MedicineController.getMedicineByUuid
+  MedicineController.getMedicine
 )
 
 router.post(

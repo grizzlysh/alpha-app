@@ -9,6 +9,7 @@ import { errorHandler } from '@middlewares/errorHandler'
 
 import medicineRoutes from '@modules/medicines/medicines.routes'
 import authRoutes from '@modules/auth/auth.routes'
+import distributorRoutes from '@modules/distributors/distributors.routes'
 
 
 const app: Application = express()
@@ -34,7 +35,7 @@ app.use(express.urlencoded({ extended: true }))
 // ── Routes ───────────────────────────────────
 app.use('/api/auth', authRoutes)
 app.use('/api/medicines', medicineRoutes)
-// app.use('/api/distributors', distributorRoutes)
+app.use('/api/distributors', distributorRoutes)
 // app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)
 // app.use('/api/restock', restockRoutes)

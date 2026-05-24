@@ -1,7 +1,48 @@
+import { Request } from 'express'
 import { PlatformRole } from '@prisma/client'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 
+// ── Param/Body Types ──────────────────────────────────
+
+export interface LoginBody {
+  email: string
+  password: string
+}
+
+export interface SelectPharmacyBody {
+  pharmacyUuid: string
+}
+
+// ── Typed Request Aliases ─────────────────────────────
+
+export type LoginRequest = Request<
+  {},
+  {},
+  LoginBody,
+  {}
+>
+
+export type SelectPharmacyRequest = Request<
+  {},
+  {},
+  SelectPharmacyBody,
+  {}
+>
+
+export type RefreshRequest = Request<
+  {}, {}, {}, {}
+>
+
+export type LogoutRequest = Request<
+  {}, {}, {}, {}
+>
+
+export type MeRequest = Request<
+  {}, {}, {}, {}
+>
+
 // ── Internal Types ────────────────────────────────────
+
 export interface JwtPayload {
   id: number
   uuid: string
@@ -25,17 +66,8 @@ export interface LoginUserData {
   pharmacies: PharmacyItem[]
 }
 
-// ── Request Types ─────────────────────────────────────
-export interface LoginRequest {
-  email: string
-  password: string
-}
-
-export interface SelectPharmacyRequest {
-  pharmacyUuid: string
-}
-
 // ── Response Types ────────────────────────────────────
+
 export interface LoginResponse {
   accessToken: string
   user: LoginUserData

@@ -1,13 +1,18 @@
-import { Request, Response, NextFunction } from 'express'
+import { Response, NextFunction } from 'express'
 import { env } from '@config/env'
-import * as AuthService from '@modules/auth/auth.service'
-import { loginSchema, selectPharmacySchema } from '@modules/auth/auth.validation'
+import * as AuthService from './auth.service'
+import { loginSchema, selectPharmacySchema } from './auth.validation'
 import {
+  LoginRequest,
+  SelectPharmacyRequest,
+  RefreshRequest,
+  LogoutRequest,
+  MeRequest,
   LoginResponse,
   SelectPharmacyResponse,
   RefreshTokenResponse,
   MeResponse,
-} from '@modules/auth/auth.interface'
+} from './auth.interface'
 import { ValidationException } from '@exceptions/ValidationException'
 import { UnauthorizedException } from '@exceptions/UnauthorizedException'
 import { sendSuccess } from '@utils/responseHelper'
@@ -21,7 +26,7 @@ const COOKIE_OPTIONS = {
 }
 
 export const login = async (
-  req: Request,
+  req: LoginRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -49,7 +54,7 @@ export const login = async (
 }
 
 export const selectPharmacy = async (
-  req: Request,
+  req: SelectPharmacyRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -77,7 +82,7 @@ export const selectPharmacy = async (
 }
 
 export const refresh = async (
-  req: Request,
+  req: RefreshRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -98,7 +103,7 @@ export const refresh = async (
 }
 
 export const logout = async (
-  req: Request,
+  req: LogoutRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -119,7 +124,7 @@ export const logout = async (
 }
 
 export const me = async (
-  req: Request,
+  req: MeRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

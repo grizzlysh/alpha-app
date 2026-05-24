@@ -3,10 +3,10 @@ import {
   CreateMedicineInput,
   UpdateMedicineInput,
   MedicineQueryInput,
-} from '@modules/medicines/medicines.validation'
+} from './medicines.validation'
 import {
   MedicineResponse,
-} from '@modules/medicines/medicines.interface'
+} from './medicines.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'

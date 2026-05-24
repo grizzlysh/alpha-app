@@ -4,13 +4,13 @@ import crypto from 'crypto'
 import { PlatformRole } from '@prisma/client'
 import { prisma } from '@config/db'
 import { env } from '@config/env'
-import { LoginInput, SelectPharmacyInput } from '@modules/auth/auth.validation'
+import { LoginInput, SelectPharmacyInput } from './auth.validation'
 import {
   JwtPayload,
   LoginResult,
   SelectPharmacyResponse,
   RefreshTokenResponse,
-} from '@modules/auth/auth.interface'
+} from './auth.interface'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 import { UnauthorizedException } from '@exceptions/UnauthorizedException'
 import { NotFoundException } from '@exceptions/NotFoundException'

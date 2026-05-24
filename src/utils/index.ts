@@ -1,1 +1,1 @@
-export * from '@utils/responseHelper'
+export * from './responseHelper'

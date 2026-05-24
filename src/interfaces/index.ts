@@ -1,2 +1,2 @@
-export * from '@interfaces/common.interface'
-export * from '@interfaces/pharmacy.interface'
+export * from './common.interface'
+export * from './pharmacy.interface'

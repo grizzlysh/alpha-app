@@ -1,10 +1,18 @@
-import { Request, Response, NextFunction } from 'express'
-import * as MedicineService from '@modules/medicines/medicines.service'
+import { Response, NextFunction } from 'express'
+import * as MedicineService from './medicines.service'
 import {
   createMedicineSchema,
   updateMedicineSchema,
   medicineQuerySchema,
-} from '@modules/medicines/medicines.validation'
+} from './medicines.validation'
+import {
+  GetMedicinesRequest,
+  GetMedicineRequest,
+  CreateMedicineRequest,
+  UpdateMedicineRequest,
+  DeleteMedicineRequest,
+  MedicineResponse,
+} from './medicines.interface'
 import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
@@ -13,10 +21,9 @@ import {
   sendPaginated,
 } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
-import { DeleteMedicineRequest, GetMedicineByUuidRequest, GetMedicineRequest, UpdateMedicineRequest } from '@modules/medicines/medicines.interface'
 
 export const getMedicines = async (
-  req: GetMedicineRequest,
+  req: GetMedicinesRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -39,8 +46,8 @@ export const getMedicines = async (
   }
 }
 
-export const getMedicineByUuid = async (
-  req: GetMedicineByUuidRequest,
+export const getMedicine = async (
+  req: GetMedicineRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -57,7 +64,7 @@ export const getMedicineByUuid = async (
 }
 
 export const createMedicine = async (
-  req: Request,
+  req: CreateMedicineRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

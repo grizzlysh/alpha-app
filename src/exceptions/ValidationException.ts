@@ -1,4 +1,4 @@
-import { AppError } from '@exceptions/AppError'
+import { AppError } from './AppError'
 import { HTTP_STATUS } from '@constants'
 
 interface BilingualMessage {

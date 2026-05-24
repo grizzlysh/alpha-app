@@ -1,9 +1,26 @@
-import { RecordStatus } from '@prisma/client'
 import { Request } from 'express'
+import { RecordStatus } from '@prisma/client'
+import { ParamsDictionary } from 'express-serve-static-core'
 
-// ── Request Types ─────────────────────────────────────
+// ── Query/Param/Body Types ────────────────────────────
 
-export interface CreateMedicineRequest {
+export interface MedicineQueryParams {
+  search?: string
+  shapeId?: string
+  typeId?: string
+  medicineClassId?: string
+  status?: RecordStatus
+  sortBy?: 'name' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+  page?: string
+  limit?: string
+}
+
+export interface MedicineUuidParam extends ParamsDictionary {
+  medicine_uuid: string
+}
+
+export interface CreateMedicineBody {
   name: string
   shapeId: number
   typeId: number
@@ -12,7 +29,7 @@ export interface CreateMedicineRequest {
   ingredients: string[]
 }
 
-export interface UpdateMedicineRequest {
+export interface UpdateMedicineBody {
   name?: string
   shapeId?: number
   typeId?: number
@@ -22,43 +39,38 @@ export interface UpdateMedicineRequest {
   status?: RecordStatus
 }
 
-export interface GetMedicineRequest extends Request {
-  params : {
-    medicine_uuid: string
-  }
-}
+// ── Typed Request Aliases ─────────────────────────────
 
-export interface GetMedicineByUuidRequest extends Request {
-  params : {
-    medicine_uuid: string
-  }
-}
+export type GetMedicinesRequest = Request<
+  {},
+  {},
+  {},
+  MedicineQueryParams
+>
 
-export interface UpdateMedicineRequest extends Request {
-  params : {
-    medicine_uuid: string
-  }
-}
+export type GetMedicineRequest = Request<
+  MedicineUuidParam,
+  {}, {}, {}
+>
 
-export interface DeleteMedicineRequest extends Request {
-  params : {
-    medicine_uuid: string
-  }
-}
+export type CreateMedicineRequest = Request<
+  {},
+  {},
+  CreateMedicineBody,
+  {}
+>
 
-export interface GetMedicinesRequest extends Request{
-  query: {
-    search?: string
-    shapeId?: string
-    typeId?: string
-    medicineClassId?: string
-    status?: RecordStatus
-    sortBy?: 'name' | 'createdAt'
-    sortOrder?: 'asc' | 'desc'
-    page?: string
-    limit?: string
-  }
-}
+export type UpdateMedicineRequest = Request<
+  MedicineUuidParam,
+  {},
+  UpdateMedicineBody,
+  {}
+>
+
+export type DeleteMedicineRequest = Request<
+  MedicineUuidParam,
+  {}, {}, {}
+>
 
 // ── Response Types ────────────────────────────────────
 
