@@ -643,6 +643,7 @@ model Customer {
   name        String
   phone       String?
   address     String?
+  description String?
   isWalkIn    Boolean      @default(false) @map("is_walk_in")
   status      RecordStatus @default(ACTIVE)
   createdAt   DateTime     @default(now()) @map("created_at")

@@ -48,6 +48,14 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Internal server error',
     id: 'Terjadi kesalahan pada server'
   },
+  TOO_MANY_REQUESTS: {
+    en: 'Too many requests, please try again later',
+    id: 'Terlalu banyak permintaan, coba lagi nanti',
+  },
+  PHARMACY_NOT_SELECTED: {
+    en: 'Please select a pharmacy first',
+    id: 'Silakan pilih apotek terlebih dahulu',
+  },
 
   // auth
   LOGIN_SUCCESS: {
@@ -208,12 +216,30 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock disposal created successfully',
     id: 'Pemusnahan stok berhasil dibuat'
   },
-  TOO_MANY_REQUESTS: {
-    en: 'Too many requests, please try again later',
-    id: 'Terlalu banyak permintaan, coba lagi nanti',
+
+  // customers
+  CUSTOMER_FETCHED: {
+    en: 'Customer fetched successfully',
+    id: 'Data pelanggan berhasil diambil',
   },
-  PHARMACY_NOT_SELECTED: {
-    en: 'Please select a pharmacy first',
-    id: 'Silakan pilih apotek terlebih dahulu',
+  CUSTOMERS_FETCHED: {
+    en: 'Customers fetched successfully',
+    id: 'Data pelanggan berhasil diambil',
+  },
+  CUSTOMER_CREATED: {
+    en: 'Customer created successfully',
+    id: 'Pelanggan berhasil dibuat',
+  },
+  CUSTOMER_UPDATED: {
+    en: 'Customer updated successfully',
+    id: 'Pelanggan berhasil diperbarui',
+  },
+  CUSTOMER_DELETED: {
+    en: 'Customer deleted successfully',
+    id: 'Pelanggan berhasil dihapus',
+  },
+  CUSTOMER_NOT_FOUND: {
+    en: 'Customer not found',
+    id: 'Pelanggan tidak ditemukan',
   },
 }
