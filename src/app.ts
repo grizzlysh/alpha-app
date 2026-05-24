@@ -14,6 +14,8 @@ import medicineRoutes from '@modules/medicines/medicines.routes'
 import medicineShapeRoutes from '@modules/medicine-shapes/medicine-shapes.routes'
 import medicineTypeRoutes from '@modules/medicine-types/medicine-types.routes'
 import medicineClassRoutes from '@modules/medicine-classes/medicine-classes.routes'
+import purchaseOrderRoutes from '@modules/purchase-orders/purchase-orders.routes'
+
 
 
 
@@ -45,6 +47,7 @@ app.use('/api/medicines', medicineRoutes)
 app.use('/api/medicine-shapes', medicineShapeRoutes)
 app.use('/api/medicine-types', medicineTypeRoutes)
 app.use('/api/medicine-classes', medicineClassRoutes)
+app.use('/api/purchase-orders', purchaseOrderRoutes)
 
 // app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)

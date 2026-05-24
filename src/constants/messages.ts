@@ -201,6 +201,40 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Distributor tidak ditemukan'
   },
 
+  // purchase orders
+  PURCHASE_ORDERS_FETCHED: {
+    en: 'Purchase orders fetched successfully',
+    id: 'Data purchase order berhasil diambil',
+  },
+  PURCHASE_ORDER_FETCHED: {
+    en: 'Purchase order fetched successfully',
+    id: 'Data purchase order berhasil diambil',
+  },
+  PURCHASE_ORDER_CREATED: {
+    en: 'Purchase order created successfully',
+    id: 'Purchase order berhasil dibuat',
+  },
+  PURCHASE_ORDER_UPDATED: {
+    en: 'Purchase order updated successfully',
+    id: 'Purchase order berhasil diperbarui',
+  },
+  PURCHASE_ORDER_SUBMITTED: {
+    en: 'Purchase order submitted successfully',
+    id: 'Purchase order berhasil disubmit',
+  },
+  PURCHASE_ORDER_CANCELLED: {
+    en: 'Purchase order cancelled successfully',
+    id: 'Purchase order berhasil dibatalkan',
+  },
+  PURCHASE_ORDER_DELETED: {
+    en: 'Purchase order deleted successfully',
+    id: 'Purchase order berhasil dihapus',
+  },
+  PURCHASE_ORDER_NOT_FOUND: {
+    en: 'Purchase order not found',
+    id: 'Purchase order tidak ditemukan',
+  },
+
   // invoices
   INVOICE_FETCHED: {
     en: 'Invoice fetched successfully',
