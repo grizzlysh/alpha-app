@@ -7,10 +7,14 @@ import { env } from '@config/env'
 import { rateLimiter } from '@middlewares/rateLimiter'
 import { errorHandler } from '@middlewares/errorHandler'
 
-import medicineRoutes from '@modules/medicines/medicines.routes'
 import authRoutes from '@modules/auth/auth.routes'
 import distributorRoutes from '@modules/distributors/distributors.routes'
 import customerRoutes from '@modules/customers/customers.routes'
+import medicineRoutes from '@modules/medicines/medicines.routes'
+import medicineShapeRoutes from '@modules/medicine-shapes/medicine-shapes.routes'
+import medicineTypeRoutes from '@modules/medicine-types/medicine-types.routes'
+import medicineClassRoutes from '@modules/medicine-classes/medicine-classes.routes'
+
 
 
 const app: Application = express()
@@ -35,9 +39,13 @@ app.use(express.urlencoded({ extended: true }))
 
 // ── Routes ───────────────────────────────────
 app.use('/api/auth', authRoutes)
-app.use('/api/medicines', medicineRoutes)
 app.use('/api/distributors', distributorRoutes)
 app.use('/api/customers', customerRoutes)
+app.use('/api/medicines', medicineRoutes)
+app.use('/api/medicine-shapes', medicineShapeRoutes)
+app.use('/api/medicine-types', medicineTypeRoutes)
+app.use('/api/medicine-classes', medicineClassRoutes)
+
 // app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)
 // app.use('/api/restock', restockRoutes)

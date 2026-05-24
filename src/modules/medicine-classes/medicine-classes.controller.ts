@@ -1,0 +1,137 @@
+import { Response, NextFunction } from 'express'
+import * as MedicineClassService from './medicine-classes.service'
+import {
+  createMedicineClassSchema,
+  updateMedicineClassSchema,
+  medicineClassQuerySchema,
+} from './medicine-classes.validation'
+import {
+  GetMedicineClassesRequest,
+  GetMedicineClassRequest,
+  CreateMedicineClassRequest,
+  UpdateMedicineClassRequest,
+  DeleteMedicineClassRequest,
+} from './medicine-classes.interface'
+import { ValidationException } from '@exceptions/ValidationException'
+import {
+  sendSuccess,
+  sendCreated,
+  sendNoContent,
+  sendPaginated,
+} from '@utils/responseHelper'
+import { MESSAGE_CODES } from '@constants/messageCodes'
+
+export const getMedicineClasses = async (
+  req: GetMedicineClassesRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = medicineClassQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const { data, meta } = await MedicineClassService.getMedicineClasses(
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      parsed.data
+    )
+
+    sendPaginated(res, MESSAGE_CODES.MEDICINE_CLASSES_FETCHED, data, meta)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicineClass = async (
+  req: GetMedicineClassRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const medicine_class = await MedicineClassService.getMedicineClassByUuid(
+      req.params.medicine_class_uuid,
+      req.user!.pharmacyId,
+      req.user!.platformRole
+    )
+
+    sendSuccess(res, MESSAGE_CODES.MEDICINE_CLASS_FETCHED, medicine_class)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const createMedicineClass = async (
+  req: CreateMedicineClassRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = createMedicineClassSchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const medicine_class = await MedicineClassService.createMedicineClass(
+      parsed.data,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.user!.id
+    )
+
+    sendCreated(res, MESSAGE_CODES.MEDICINE_CLASS_CREATED, medicine_class)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const updateMedicineClass = async (
+  req: UpdateMedicineClassRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = updateMedicineClassSchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const medicine_class = await MedicineClassService.updateMedicineClass(
+      req.params.medicine_class_uuid,
+      parsed.data,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.MEDICINE_CLASS_UPDATED, medicine_class)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const deleteMedicineClass = async (
+  req: DeleteMedicineClassRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    await MedicineClassService.deleteMedicineClass(
+      req.params.medicine_class_uuid,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.user!.id
+    )
+
+    sendNoContent(res, MESSAGE_CODES.MEDICINE_CLASS_DELETED)
+  } catch (err) {
+    next(err)
+  }
+}

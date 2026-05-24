@@ -79,6 +79,72 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Token tidak valid'
   },
 
+  // medicine shapes
+  MEDICINE_SHAPES_FETCHED: {
+    en: 'Medicine shapes fetched successfully',
+    id: 'Data bentuk obat berhasil diambil',
+  },
+  MEDICINE_SHAPE_FETCHED: {
+    en: 'Medicine shape fetched successfully',
+    id: 'Data bentuk obat berhasil diambil',
+  },
+  MEDICINE_SHAPE_CREATED: {
+    en: 'Medicine shape created successfully',
+    id: 'Bentuk obat berhasil dibuat',
+  },
+  MEDICINE_SHAPE_UPDATED: {
+    en: 'Medicine shape updated successfully',
+    id: 'Bentuk obat berhasil diperbarui',
+  },
+  MEDICINE_SHAPE_DELETED: {
+    en: 'Medicine shape deleted successfully',
+    id: 'Bentuk obat berhasil dihapus',
+  },
+
+  // medicine types
+  MEDICINE_TYPES_FETCHED: {
+    en: 'Medicine types fetched successfully',
+    id: 'Data jenis obat berhasil diambil',
+  },
+  MEDICINE_TYPE_FETCHED: {
+    en: 'Medicine type fetched successfully',
+    id: 'Data jenis obat berhasil diambil',
+  },
+  MEDICINE_TYPE_CREATED: {
+    en: 'Medicine type created successfully',
+    id: 'Jenis obat berhasil dibuat',
+  },
+  MEDICINE_TYPE_UPDATED: {
+    en: 'Medicine type updated successfully',
+    id: 'Jenis obat berhasil diperbarui',
+  },
+  MEDICINE_TYPE_DELETED: {
+    en: 'Medicine type deleted successfully',
+    id: 'Jenis obat berhasil dihapus',
+  },
+  
+  // medicine classes
+  MEDICINE_CLASSES_FETCHED: {
+    en: 'Medicine classes fetched successfully',
+    id: 'Data kelas obat berhasil diambil',
+  },
+  MEDICINE_CLASS_FETCHED: {
+    en: 'Medicine class fetched successfully',
+    id: 'Data kelas obat berhasil diambil',
+  },
+  MEDICINE_CLASS_CREATED: {
+    en: 'Medicine class created successfully',
+    id: 'Kelas obat berhasil dibuat',
+  },
+  MEDICINE_CLASS_UPDATED: {
+    en: 'Medicine class updated successfully',
+    id: 'Kelas obat berhasil diperbarui',
+  },
+  MEDICINE_CLASS_DELETED: {
+    en: 'Medicine class deleted successfully',
+    id: 'Kelas obat berhasil dihapus',
+  },
+
   // medicines
   MEDICINE_FETCHED: {
     en: 'Medicine fetched successfully',

@@ -1,4 +1,23 @@
 export const PERMISSIONS = {
+
+  // medicine shapes
+  MEDICINE_SHAPES_VIEW: 'medicine_shapes.view',
+  MEDICINE_SHAPES_CREATE: 'medicine_shapes.create',
+  MEDICINE_SHAPES_EDIT: 'medicine_shapes.edit',
+  MEDICINE_SHAPES_DELETE: 'medicine_shapes.delete',
+
+  // medicine types
+  MEDICINE_TYPES_VIEW: 'medicine_types.view',
+  MEDICINE_TYPES_CREATE: 'medicine_types.create',
+  MEDICINE_TYPES_EDIT: 'medicine_types.edit',
+  MEDICINE_TYPES_DELETE: 'medicine_types.delete',
+
+  // medicine classes
+  MEDICINE_CLASSES_VIEW: 'medicine_classes.view',
+  MEDICINE_CLASSES_CREATE: 'medicine_classes.create',
+  MEDICINE_CLASSES_EDIT: 'medicine_classes.edit',
+  MEDICINE_CLASSES_DELETE: 'medicine_classes.delete',
+
   // medicines
   MEDICINES_VIEW: 'medicines.view',
   MEDICINES_CREATE: 'medicines.create',
@@ -63,6 +82,7 @@ export const PERMISSIONS = {
   // settings
   SETTINGS_VIEW: 'settings.view',
   SETTINGS_EDIT: 'settings.edit',
+  
 } as const
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]
