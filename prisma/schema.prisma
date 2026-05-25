@@ -56,24 +56,20 @@ enum StockMovementType {
 enum StockMovementReason {
   PURCHASE
   SALE
+  RETURN
   DISPOSAL
-  STOCK_RETURN
+  DAMAGED
+  TRANSFER
   ADJUSTMENT
 }
 
 enum PurchaseOrderStatus {
   DRAFT
   SENT
-  PARTIAL
+  // PARTIAL
   COMPLETED
   CANCELLED
-  DELETED
-}
-
-enum InvoiceStatus {
-  PENDING
-  VERIFIED
-  CANCELLED
+  // DELETED
 }
 
 enum PaymentStatus {
@@ -403,6 +399,7 @@ model User {
   // ── Audit: PurchaseOrderDetail ────────────────────
   purchaseOrderDetailsCreated PurchaseOrderDetail[] @relation("PurchaseOrderDetailCreatedBy")
   purchaseOrderDetailsUpdated PurchaseOrderDetail[] @relation("PurchaseOrderDetailUpdatedBy")
+  purchaseOrderDetailsDeleted PurchaseOrderDetail[] @relation("PurchaseOrderDetailDeletedBy")
 
   // ── Audit: Invoice ────────────────────────────────
   invoicesCreated Invoice[] @relation("InvoiceCreatedBy")
@@ -818,22 +815,25 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderDetail {
-  id              Int      @id @default(autoincrement())
-  uuid            String   @unique @default(uuid())
-  purchaseOrderId Int      @map("purchase_order_id")
-  medicineId      Int      @map("medicine_id")
+  id              Int       @id @default(autoincrement())
+  uuid            String    @unique @default(uuid())
+  purchaseOrderId Int       @map("purchase_order_id")
+  medicineId      Int       @map("medicine_id")
   quantity        Int
   unit            String
   description     String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  createdById     Int?     @map("created_by_id")
-  updatedById     Int?     @map("updated_by_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  createdById     Int?      @map("created_by_id")
+  updatedById     Int?      @map("updated_by_id")
+  deletedById     Int?      @map("deleted_by_id")
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   medicine      Medicine      @relation(fields: [medicineId], references: [id])
   createdByUser User?         @relation("PurchaseOrderDetailCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?         @relation("PurchaseOrderDetailUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?         @relation("PurchaseOrderDetailDeletedBy", fields: [deletedById], references: [id])
 
   @@map("trx_purchase_order_details")
 }
@@ -848,7 +848,6 @@ model Invoice {
   purchaseOrderId Int?          @map("purchase_order_id")
   signedById      Int?          @map("signed_by_id")
   invoiceNumber   String        @unique @map("invoice_number")
-  status          InvoiceStatus @default(PENDING)
   paymentStatus   PaymentStatus @default(UNPAID) @map("payment_status")
   invoiceDate     DateTime      @map("invoice_date")
   dueDate         DateTime?     @map("due_date")
@@ -870,7 +869,6 @@ model Invoice {
   updatedByUser    User?            @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser    User?            @relation("InvoiceDeletedBy", fields: [deletedById], references: [id])
   details          InvoiceDetail[]
-  stockMovements   StockMovement[]
   payments         InvoicePayment[]
 
   @@map("trx_invoices")
@@ -896,11 +894,12 @@ model InvoiceDetail {
   createdById        Int?     @map("created_by_id")
   updatedById        Int?     @map("updated_by_id")
 
-  invoice       Invoice      @relation(fields: [invoiceId], references: [id])
-  medicine      Medicine     @relation(fields: [medicineId], references: [id])
-  createdByUser User?        @relation("InvoiceDetailCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?        @relation("InvoiceDetailUpdatedBy", fields: [updatedById], references: [id])
-  stockDetail   StockDetail?
+  invoice        Invoice         @relation(fields: [invoiceId], references: [id])
+  medicine       Medicine        @relation(fields: [medicineId], references: [id])
+  createdByUser  User?           @relation("InvoiceDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?           @relation("InvoiceDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockDetail    StockDetail?
+  stockMovements StockMovement[]
 
   @@map("trx_invoice_details")
 }
@@ -1005,29 +1004,37 @@ model StockDetail {
 }
 
 model StockMovement {
-  id            Int                 @id @default(autoincrement())
-  uuid          String              @unique @default(uuid())
-  pharmacyId    Int                 @map("pharmacy_id")
-  medicineId    Int                 @map("medicine_id")
-  stockId       Int                 @map("stock_id")
-  stockDetailId Int                 @map("stock_detail_id")
-  invoiceId     Int?                @map("invoice_id")
-  type          StockMovementType
-  reason        StockMovementReason
-  quantity      Int
-  description   String?
-  createdAt     DateTime            @default(now()) @map("created_at")
-  updatedAt     DateTime            @updatedAt @map("updated_at")
-  createdById   Int?                @map("created_by_id")
-  updatedById   Int?                @map("updated_by_id")
+  id                    Int                 @id @default(autoincrement())
+  uuid                  String              @unique @default(uuid())
+  pharmacyId            Int                 @map("pharmacy_id")
+  medicineId            Int                 @map("medicine_id")
+  stockId               Int                 @map("stock_id")
+  stockDetailId         Int                 @map("stock_detail_id")
+  type                  StockMovementType
+  reason                StockMovementReason
+  quantity              Int
+  quantityBefore        Int                 @map("quantity_before")
+  quantityAfter         Int                 @map("quantity_after")
+  description           String?
+  invoiceDetailId       Int?                @map("invoice_detail_id")
+  saleDetailId          Int?                @map("sale_detail_id")
+  stockReturnDetailId   Int?                @map("stock_return_detail_id")
+  stockDisposalDetailId Int?                @map("stock_disposal_detail_id")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+  createdById           Int?                @map("created_by_id")
+  updatedById           Int?                @map("updated_by_id")
 
-  pharmacy      Pharmacy    @relation(fields: [pharmacyId], references: [id])
-  medicine      Medicine    @relation(fields: [medicineId], references: [id])
-  stock         Stock       @relation(fields: [stockId], references: [id])
-  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
-  invoice       Invoice?    @relation(fields: [invoiceId], references: [id])
-  createdByUser User?       @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?       @relation("StockMovementUpdatedBy", fields: [updatedById], references: [id])
+  pharmacy            Pharmacy             @relation(fields: [pharmacyId], references: [id])
+  medicine            Medicine             @relation(fields: [medicineId], references: [id])
+  stock               Stock                @relation(fields: [stockId], references: [id])
+  stockDetail         StockDetail          @relation(fields: [stockDetailId], references: [id])
+  invoiceDetail       InvoiceDetail?       @relation(fields: [invoiceDetailId], references: [id])
+  saleDetail          SaleDetail?          @relation(fields: [saleDetailId], references: [id])
+  stockReturnDetail   StockReturnDetail?   @relation(fields: [stockReturnDetailId], references: [id])
+  stockDisposalDetail StockDisposalDetail? @relation(fields: [stockDisposalDetailId], references: [id])
+  createdByUser       User?                @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
+  updatedByUser       User?                @relation("StockMovementUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("inv_stock_movements")
 }
@@ -1077,11 +1084,12 @@ model StockReturnDetail {
   createdById    Int?     @map("created_by_id")
   updatedById    Int?     @map("updated_by_id")
 
-  stockReturn   StockReturn @relation(fields: [stockReturnId], references: [id])
-  medicine      Medicine    @relation(fields: [medicineId], references: [id])
-  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
-  createdByUser User?       @relation("StockReturnDetailCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?       @relation("StockReturnDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockReturn    StockReturn     @relation(fields: [stockReturnId], references: [id])
+  medicine       Medicine        @relation(fields: [medicineId], references: [id])
+  stockDetail    StockDetail     @relation(fields: [stockDetailId], references: [id])
+  createdByUser  User?           @relation("StockReturnDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?           @relation("StockReturnDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockMovements StockMovement[]
 
   @@map("trx_stock_return_details")
 }
@@ -1129,11 +1137,12 @@ model StockDisposalDetail {
   createdById     Int?           @map("created_by_id")
   updatedById     Int?           @map("updated_by_id")
 
-  stockDisposal StockDisposal @relation(fields: [stockDisposalId], references: [id])
-  medicine      Medicine      @relation(fields: [medicineId], references: [id])
-  stockDetail   StockDetail   @relation(fields: [stockDetailId], references: [id])
-  createdByUser User?         @relation("StockDisposalDetailCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?         @relation("StockDisposalDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockDisposal  StockDisposal   @relation(fields: [stockDisposalId], references: [id])
+  medicine       Medicine        @relation(fields: [medicineId], references: [id])
+  stockDetail    StockDetail     @relation(fields: [stockDetailId], references: [id])
+  createdByUser  User?           @relation("StockDisposalDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?           @relation("StockDisposalDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockMovements StockMovement[]
 
   @@map("trx_stock_disposal_details")
 }
@@ -1186,11 +1195,12 @@ model SaleDetail {
   createdById    Int?     @map("created_by_id")
   updatedById    Int?     @map("updated_by_id")
 
-  sale          Sale        @relation(fields: [saleId], references: [id])
-  medicine      Medicine    @relation(fields: [medicineId], references: [id])
-  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
-  createdByUser User?       @relation("SaleDetailCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?       @relation("SaleDetailUpdatedBy", fields: [updatedById], references: [id])
+  sale           Sale            @relation(fields: [saleId], references: [id])
+  medicine       Medicine        @relation(fields: [medicineId], references: [id])
+  stockDetail    StockDetail     @relation(fields: [stockDetailId], references: [id])
+  createdByUser  User?           @relation("SaleDetailCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?           @relation("SaleDetailUpdatedBy", fields: [updatedById], references: [id])
+  stockMovements StockMovement[]
 
   @@map("trx_sale_details")
 }

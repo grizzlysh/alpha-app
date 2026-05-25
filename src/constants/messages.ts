@@ -248,10 +248,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Invoice created successfully',
     id: 'Invoice berhasil dibuat'
   },
-  INVOICE_UPDATED: {
-    en: 'Invoice updated successfully',
-    id: 'Invoice berhasil diperbarui'
-  },
   INVOICE_DELETED: {
     en: 'Invoice deleted successfully',
     id: 'Invoice berhasil dihapus'
@@ -259,10 +255,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   INVOICE_NOT_FOUND: {
     en: 'Invoice not found',
     id: 'Invoice tidak ditemukan'
-  },
-  INVOICE_VERIFIED: {
-    en: 'Invoice verified successfully',
-    id: 'Invoice berhasil diverifikasi'
   },
 
   // sales
