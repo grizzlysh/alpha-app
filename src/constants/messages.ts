@@ -290,10 +290,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Insufficient stock',
     id: 'Stok tidak mencukupi'
   },
-  STOCK_RETURN_CREATED: {
-    en: 'Stock return created successfully',
-    id: 'Retur stok berhasil dibuat'
-  },
+  // STOCK_RETURN_CREATED: {
+  //   en: 'Stock return created successfully',
+  //   id: 'Retur stok berhasil dibuat'
+  // },
   STOCK_DISPOSAL_CREATED: {
     en: 'Stock disposal created successfully',
     id: 'Pemusnahan stok berhasil dibuat'
@@ -361,5 +361,39 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   CUSTOMER_NOT_FOUND: {
     en: 'Customer not found',
     id: 'Pelanggan tidak ditemukan',
+  },
+
+  // stock return
+  STOCK_RETURNS_FETCHED: {
+    en: 'Stock returns fetched successfully',
+    id: 'Data retur stok berhasil diambil',
+  },
+  STOCK_RETURN_FETCHED: {
+    en: 'Stock return fetched successfully',
+    id: 'Data retur stok berhasil diambil',
+  },
+  STOCK_RETURN_CREATED: {
+    en: 'Stock return created successfully',
+    id: 'Retur stok berhasil dibuat',
+  },
+  STOCK_RETURN_UPDATED: {
+    en: 'Stock return updated successfully',
+    id: 'Retur stok berhasil diperbarui',
+  },
+  STOCK_RETURN_COMPLETED: {
+    en: 'Stock return completed successfully',
+    id: 'Retur stok berhasil diselesaikan',
+  },
+  STOCK_RETURN_CANCELLED: {
+    en: 'Stock return cancelled successfully',
+    id: 'Retur stok berhasil dibatalkan',
+  },
+  STOCK_RETURN_DELETED: {
+    en: 'Stock return deleted successfully',
+    id: 'Retur stok berhasil dihapus',
+  },
+  STOCK_RETURN_NOT_FOUND: {
+    en: 'Stock return not found',
+    id: 'Retur stok tidak ditemukan',
   },
 }

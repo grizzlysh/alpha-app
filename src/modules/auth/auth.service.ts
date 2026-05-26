@@ -167,7 +167,7 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
       userId: user.id,
       refreshToken: hashedRefreshToken,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      createdBy: user.uuid,
+      createdById: user.id,
     },
   })
 

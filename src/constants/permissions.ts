@@ -63,6 +63,7 @@ export const PERMISSIONS = {
   STOCK_RETURN_VIEW: 'stock_return.view',
   STOCK_RETURN_CREATE: 'stock_return.create',
   STOCK_RETURN_EDIT: 'stock_return.edit',
+  STOCK_RETURN_DELETE: 'stock_return.delete',
 
   // stock disposal
   STOCK_DISPOSAL_VIEW: 'stock_disposal.view',

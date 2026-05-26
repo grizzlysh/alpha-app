@@ -17,7 +17,7 @@ import medicineClassRoutes from '@modules/medicine-classes/medicine-classes.rout
 import purchaseOrderRoutes from '@modules/purchase-orders/purchase-orders.routes'
 import invoiceRoutes from '@modules/invoices/invoices.routes'
 import inventoryRoutes from '@modules/inventory/inventory.routes'
-
+import stockReturnRoutes from '@modules/stock-returns/stock-returns.routes'
 
 
 
@@ -27,17 +27,18 @@ const PORT: number = Number(env.PORT) || 5000
 const corsOptions: CorsOptions = {
   origin: env.CLIENT_URL,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }
 
 // ── Security Middlewares ─────────────────────
-app.use(helmet())
 app.use(cors(corsOptions))
+app.options('/{*path}', cors(corsOptions))
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
 app.use(rateLimiter)
 
 // ── Body Parser ──────────────────────────────
-app.use(cookieParser()) 
+// app.use(cookieParser()) 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -52,6 +53,7 @@ app.use('/api/medicine-classes', medicineClassRoutes)
 app.use('/api/purchase-orders', purchaseOrderRoutes)
 app.use('/api/invoices', invoiceRoutes)
 app.use('/api/inventory', inventoryRoutes)
+app.use('/api/stock-returns', stockReturnRoutes)
 
 // app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)

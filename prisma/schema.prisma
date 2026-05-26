@@ -87,11 +87,10 @@ enum PaymentMethod {
 
 enum StockReturnStatus {
   DRAFT
-  SUBMITTED
   COMPLETED
   CANCELLED
 }
-
+f
 enum StockDisposalStatus {
   DRAFT
   SUBMITTED
