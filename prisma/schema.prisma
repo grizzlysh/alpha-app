@@ -57,10 +57,11 @@ enum StockMovementReason {
   PURCHASE
   SALE
   RETURN
+  ADJUSTMENT
   DISPOSAL
   DAMAGED
   TRANSFER
-  ADJUSTMENT
+  DONATION
 }
 
 enum PurchaseOrderStatus {
@@ -1187,6 +1188,7 @@ model SaleDetail {
   stockDetailId  Int      @map("stock_detail_id")
   quantityPieces Int      @map("quantity_pieces")
   quantityBox    Int      @map("quantity_box")
+  isFefoOverride Boolean  @default(false) @map("is_fefo_override")
   sellingPrice   Decimal  @map("selling_price") @db.Decimal(12, 2)
   discount       Decimal  @default(0) @db.Decimal(12, 2)
   totalAmount    Decimal  @map("total_amount") @db.Decimal(12, 2)

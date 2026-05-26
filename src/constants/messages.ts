@@ -300,17 +300,17 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   },
 
   // sales
-  SALE_FETCHED: {
-    en: 'Sale fetched successfully',
-    id: 'Data penjualan berhasil diambil'
-  },
   SALES_FETCHED: {
     en: 'Sales fetched successfully',
-    id: 'Data penjualan berhasil diambil'
+    id: 'Data penjualan berhasil diambil',
+  },
+  SALE_FETCHED: {
+    en: 'Sale fetched successfully',
+    id: 'Data penjualan berhasil diambil',
   },
   SALE_CREATED: {
     en: 'Sale created successfully',
-    id: 'Penjualan berhasil dibuat'
+    id: 'Penjualan berhasil dibuat',
   },
   SALE_UPDATED: {
     en: 'Sale updated successfully',
@@ -320,9 +320,21 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Sale deleted successfully',
     id: 'Penjualan berhasil dihapus'
   },
+  SALE_CANCELLED: {
+    en: 'Sale cancelled successfully',
+    id: 'Penjualan berhasil dibatalkan',
+  },
+  SALE_REFUNDED: {
+    en: 'Sale refunded successfully',
+    id: 'Penjualan berhasil direfund',
+  },
+  SALE_PAYMENT_ADDED: {
+    en: 'Payment added successfully',
+    id: 'Pembayaran berhasil ditambahkan',
+  },
   SALE_NOT_FOUND: {
     en: 'Sale not found',
-    id: 'Penjualan tidak ditemukan'
+    id: 'Penjualan tidak ditemukan',
   },
 
   // customers
