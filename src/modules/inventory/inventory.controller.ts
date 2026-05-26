@@ -1,0 +1,202 @@
+import { Response, NextFunction } from 'express'
+import * as InventoryService from './inventory.service'
+import {
+  stockQuerySchema,
+  stockMovementQuerySchema,
+  updatePriceSchema,
+  updateReorderLevelSchema,
+  adjustStockSchema,
+} from './inventory.validation'
+import {
+  GetStocksRequest,
+  GetStockRequest,
+  GetStockMovementsRequest,
+  UpdatePriceRequest,
+  UpdateReorderLevelRequest,
+  AdjustStockRequest,
+  GetCrossPharmacyStockRequest,
+} from './inventory.interface'
+import { ValidationException } from '@exceptions/ValidationException'
+import {
+  sendSuccess,
+  sendPaginated,
+} from '@utils/responseHelper'
+import { MESSAGE_CODES } from '@constants/messageCodes'
+
+export const getStocks = async (
+  req: GetStocksRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = stockQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const { data, meta } = await InventoryService.getStocks(
+      req.user!.pharmacyId!,
+      parsed.data
+    )
+
+    sendPaginated(res, MESSAGE_CODES.STOCKS_FETCHED, data, meta)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getStock = async (
+  req: GetStockRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const stock = await InventoryService.getStockByUuid(
+      req.params.stock_uuid,
+      req.user!.pharmacyId!
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, stock)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getStockAlerts = async (
+  req: GetStocksRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const alerts = await InventoryService.getStockAlerts(
+      req.user!.pharmacyId!
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, alerts)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getStockMovements = async (
+  req: GetStockMovementsRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = stockMovementQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const { data, meta } = await InventoryService.getStockMovements(
+      req.user!.pharmacyId!,
+      parsed.data
+    )
+
+    sendPaginated(res, MESSAGE_CODES.STOCK_MOVEMENTS_FETCHED, data, meta)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const updateSellingPrice = async (
+  req: UpdatePriceRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = updatePriceSchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const stock = await InventoryService.updateSellingPrice(
+      req.params.stock_uuid,
+      parsed.data,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_PRICE_UPDATED, stock)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const updateReorderLevel = async (
+  req: UpdateReorderLevelRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = updateReorderLevelSchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const stock = await InventoryService.updateReorderLevel(
+      req.params.stock_uuid,
+      parsed.data,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_UPDATED, stock)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const adjustStock = async (
+  req: AdjustStockRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = adjustStockSchema.safeParse(req.body)
+    if (!parsed.success) {
+      throw new ValidationException(
+        parsed.error.flatten().fieldErrors as Record<string, any>
+      )
+    }
+
+    const stock = await InventoryService.adjustStock(
+      req.params.stock_detail_uuid,
+      parsed.data,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_ADJUSTED, stock)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getCrossPharmacyStock = async (
+  req: GetCrossPharmacyStockRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const stocks = await InventoryService.getCrossPharmacyStock(
+      req.params.medicine_uuid,
+      req.user!.id,
+      req.user!.pharmacyId!,
+      req.user!.platformRole
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, stocks)
+  } catch (err) {
+    next(err)
+  }
+}

@@ -257,6 +257,48 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Invoice tidak ditemukan'
   },
 
+  // stocks
+  STOCKS_FETCHED: {
+    en: 'Stocks fetched successfully',
+    id: 'Data stok berhasil diambil',
+  },
+  STOCK_FETCHED: {
+    en: 'Stock fetched successfully',
+    id: 'Data stok berhasil diambil',
+  },
+  STOCK_UPDATED: {
+    en: 'Stock updated successfully',
+    id: 'Stok berhasil diperbarui',
+  },
+  STOCK_ADJUSTED: {
+    en: 'Stock adjusted successfully',
+    id: 'Stok berhasil disesuaikan',
+  },
+  STOCK_PRICE_UPDATED: {
+    en: 'Stock price updated successfully',
+    id: 'Harga stok berhasil diperbarui',
+  },
+  STOCK_MOVEMENTS_FETCHED: {
+    en: 'Stock movements fetched successfully',
+    id: 'Data pergerakan stok berhasil diambil',
+  },
+  STOCK_NOT_FOUND: {
+    en: 'Stock not found',
+    id: 'Stok tidak ditemukan',
+  },
+  STOCK_INSUFFICIENT: {
+    en: 'Insufficient stock',
+    id: 'Stok tidak mencukupi'
+  },
+  STOCK_RETURN_CREATED: {
+    en: 'Stock return created successfully',
+    id: 'Retur stok berhasil dibuat'
+  },
+  STOCK_DISPOSAL_CREATED: {
+    en: 'Stock disposal created successfully',
+    id: 'Pemusnahan stok berhasil dibuat'
+  },
+
   // sales
   SALE_FETCHED: {
     en: 'Sale fetched successfully',
@@ -281,32 +323,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   SALE_NOT_FOUND: {
     en: 'Sale not found',
     id: 'Penjualan tidak ditemukan'
-  },
-
-  // stock
-  STOCK_FETCHED: {
-    en: 'Stock fetched successfully',
-    id: 'Data stok berhasil diambil'
-  },
-  STOCK_ADJUSTED: {
-    en: 'Stock adjusted successfully',
-    id: 'Stok berhasil disesuaikan'
-  },
-  STOCK_NOT_FOUND: {
-    en: 'Stock not found',
-    id: 'Stok tidak ditemukan'
-  },
-  STOCK_INSUFFICIENT: {
-    en: 'Insufficient stock',
-    id: 'Stok tidak mencukupi'
-  },
-  STOCK_RETURN_CREATED: {
-    en: 'Stock return created successfully',
-    id: 'Retur stok berhasil dibuat'
-  },
-  STOCK_DISPOSAL_CREATED: {
-    en: 'Stock disposal created successfully',
-    id: 'Pemusnahan stok berhasil dibuat'
   },
 
   // customers
