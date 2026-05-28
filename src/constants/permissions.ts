@@ -69,6 +69,7 @@ export const PERMISSIONS = {
   STOCK_DISPOSAL_VIEW: 'stock_disposal.view',
   STOCK_DISPOSAL_CREATE: 'stock_disposal.create',
   STOCK_DISPOSAL_EDIT: 'stock_disposal.edit',
+  STOCK_DISPOSAL_DELETE: 'stock_disposal.delete',
 
   // reports
   REPORTS_VIEW: 'reports.view',

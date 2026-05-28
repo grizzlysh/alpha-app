@@ -294,10 +294,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   //   en: 'Stock return created successfully',
   //   id: 'Retur stok berhasil dibuat'
   // },
-  STOCK_DISPOSAL_CREATED: {
-    en: 'Stock disposal created successfully',
-    id: 'Pemusnahan stok berhasil dibuat'
-  },
+  // STOCK_DISPOSAL_CREATED: {
+  //   en: 'Stock disposal created successfully',
+  //   id: 'Pemusnahan stok berhasil dibuat'
+  // },
 
   // sales
   SALES_FETCHED: {
@@ -395,5 +395,39 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   STOCK_RETURN_NOT_FOUND: {
     en: 'Stock return not found',
     id: 'Retur stok tidak ditemukan',
+  },
+
+  // stock disposals
+  STOCK_DISPOSALS_FETCHED: {
+    en: 'Stock disposals fetched successfully',
+    id: 'Data pemusnahan stok berhasil diambil',
+  },
+  STOCK_DISPOSAL_FETCHED: {
+    en: 'Stock disposal fetched successfully',
+    id: 'Data pemusnahan stok berhasil diambil',
+  },
+  STOCK_DISPOSAL_CREATED: {
+    en: 'Stock disposal created successfully',
+    id: 'Pemusnahan stok berhasil dibuat',
+  },
+  STOCK_DISPOSAL_UPDATED: {
+    en: 'Stock disposal updated successfully',
+    id: 'Pemusnahan stok berhasil diperbarui',
+  },
+  STOCK_DISPOSAL_COMPLETED: {
+    en: 'Stock disposal completed successfully',
+    id: 'Pemusnahan stok berhasil diselesaikan',
+  },
+  STOCK_DISPOSAL_CANCELLED: {
+    en: 'Stock disposal cancelled successfully',
+    id: 'Pemusnahan stok berhasil dibatalkan',
+  },
+  STOCK_DISPOSAL_DELETED: {
+    en: 'Stock disposal deleted successfully',
+    id: 'Pemusnahan stok berhasil dihapus',
+  },
+  STOCK_DISPOSAL_NOT_FOUND: {
+    en: 'Stock disposal not found',
+    id: 'Pemusnahan stok tidak ditemukan',
   },
 }

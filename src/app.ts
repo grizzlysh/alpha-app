@@ -18,6 +18,7 @@ import purchaseOrderRoutes from '@modules/purchase-orders/purchase-orders.routes
 import invoiceRoutes from '@modules/invoices/invoices.routes'
 import inventoryRoutes from '@modules/inventory/inventory.routes'
 import stockReturnRoutes from '@modules/stock-returns/stock-returns.routes'
+import stockDisposalRoutes from '@modules/stock-disposals/stock-disposals.routes'
 
 
 
@@ -38,7 +39,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
 app.use(rateLimiter)
 
 // ── Body Parser ──────────────────────────────
-// app.use(cookieParser()) 
+app.use(cookieParser()) 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -54,6 +55,7 @@ app.use('/api/purchase-orders', purchaseOrderRoutes)
 app.use('/api/invoices', invoiceRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/stock-returns', stockReturnRoutes)
+app.use('/api/stock-disposals', stockDisposalRoutes)
 
 // app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)
