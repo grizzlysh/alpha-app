@@ -130,10 +130,10 @@ export const me = async (
 ): Promise<void> => {
   try {
     const response: MeResponse = {
-      id: req.user!.id,
+      // id: req.user!.id,
       uuid: req.user!.uuid,
       platformRole: req.user!.platformRole,
-      pharmacyId: req.user!.pharmacyId,
+      // pharmacyId: req.user!.pharmacyId,
       pharmacyUuid: req.user!.pharmacyUuid,
       permissions: req.user!.permissions,
     }

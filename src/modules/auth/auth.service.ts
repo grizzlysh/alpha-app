@@ -10,6 +10,7 @@ import {
   LoginResult,
   SelectPharmacyResponse,
   RefreshTokenResponse,
+  PharmacyRoleItem,
 } from './auth.interface'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 import { UnauthorizedException } from '@exceptions/UnauthorizedException'
@@ -200,18 +201,28 @@ export const selectPharmacy = async (
   }
 
   let hasAccess: boolean = false
+  let pharmacyRole: PharmacyRoleItem | null = null
 
   if (platformRole === PlatformRole.PLATFORM_ADMIN) {
     hasAccess = true
   } else if (pharmacy.ownerId === userId) {
     hasAccess = true
+    const userPharmacy = await prisma.userPharmacy.findUnique({
+      where: { userId_pharmacyId: { userId, pharmacyId: pharmacy.id } },
+      include: { role: { select: { uuid: true, name: true, type: true } } },
+    })
+    if (userPharmacy) {
+      pharmacyRole = userPharmacy.role
+    }
   } else {
     const userPharmacy = await prisma.userPharmacy.findUnique({
-      where: {
-        userId_pharmacyId: { userId, pharmacyId: pharmacy.id },
-      },
+      where: { userId_pharmacyId: { userId, pharmacyId: pharmacy.id } },
+      include: { role: { select: { uuid: true, name: true, type: true } } },
     })
     hasAccess = !!userPharmacy && userPharmacy.status === 'ACTIVE'
+    if (hasAccess && userPharmacy) {
+      pharmacyRole = userPharmacy.role
+    }
   }
 
   if (!hasAccess) {
@@ -243,6 +254,7 @@ export const selectPharmacy = async (
       uuid: pharmacy.uuid,
       name: pharmacy.name,
     },
+    role: pharmacyRole,
   }
 }
 

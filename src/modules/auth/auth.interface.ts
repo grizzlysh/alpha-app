@@ -1,5 +1,5 @@
 import { Request } from 'express'
-import { PlatformRole } from '@prisma/client'
+import { PlatformRole, PharmacyRole } from '@prisma/client'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 
 // ── Param/Body Types ──────────────────────────────────
@@ -73,12 +73,19 @@ export interface LoginResponse {
   user: LoginUserData
 }
 
+export interface PharmacyRoleItem {
+  uuid: string
+  name: string
+  type: PharmacyRole
+}
+
 export interface SelectPharmacyResponse {
   accessToken: string
   pharmacy: {
     uuid: string
     name: string
   }
+  role: PharmacyRoleItem | null
 }
 
 export interface RefreshTokenResponse {
@@ -86,10 +93,8 @@ export interface RefreshTokenResponse {
 }
 
 export interface MeResponse {
-  id: number
   uuid: string
   platformRole: PlatformRole | null
-  pharmacyId: number | null
   pharmacyUuid: string | null
   permissions: string[]
 }
