@@ -23,7 +23,7 @@ export interface CreateDistributorBody {
   address?: string
   contactPerson?: string
   permitNumber?: string
-  notes?: string
+  description?: string
 }
 
 export interface UpdateDistributorBody {
@@ -33,7 +33,7 @@ export interface UpdateDistributorBody {
   address?: string
   contactPerson?: string
   permitNumber?: string
-  notes?: string
+  description?: string
   status?: RecordStatus
 }
 
@@ -80,7 +80,7 @@ export interface DistributorResponse {
   address: string | null
   contactPerson: string | null
   permitNumber: string | null
-  notes: string | null
+  description: string | null
   status: RecordStatus
   createdAt: Date
   updatedAt: Date

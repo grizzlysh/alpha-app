@@ -56,6 +56,7 @@ export interface LoginResult {
   accessToken: string
   refreshToken: string
   user: LoginUserData
+  currentPharmacy: null
 }
 
 export interface LoginUserData {
@@ -63,15 +64,10 @@ export interface LoginUserData {
   name: string
   email: string
   platformRole: PlatformRole | null
-  pharmacies: PharmacyItem[]
+  accessiblePharmacies: PharmacyItem[]
 }
 
 // ── Response Types ────────────────────────────────────
-
-export interface LoginResponse {
-  accessToken: string
-  user: LoginUserData
-}
 
 export interface PharmacyRoleItem {
   uuid: string
@@ -79,13 +75,23 @@ export interface PharmacyRoleItem {
   type: PharmacyRole
 }
 
+export interface CurrentPharmacyData {
+  uuid: string
+  name: string
+  role: PharmacyRoleItem | null
+  permissions: string[]
+}
+
+export interface LoginResponse {
+  accessToken: string
+  user: LoginUserData
+  currentPharmacy: CurrentPharmacyData | null
+}
+
 export interface SelectPharmacyResponse {
   accessToken: string
-  pharmacy: {
-    uuid: string
-    name: string
-  }
-  role: PharmacyRoleItem | null
+  user: LoginUserData
+  currentPharmacy: CurrentPharmacyData
 }
 
 export interface RefreshTokenResponse {
@@ -93,8 +99,6 @@ export interface RefreshTokenResponse {
 }
 
 export interface MeResponse {
-  uuid: string
-  platformRole: PlatformRole | null
-  pharmacyUuid: string | null
-  permissions: string[]
+  user: LoginUserData
+  currentPharmacy: CurrentPharmacyData | null
 }

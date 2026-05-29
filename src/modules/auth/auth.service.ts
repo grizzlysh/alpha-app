@@ -8,9 +8,12 @@ import { LoginInput, SelectPharmacyInput } from './auth.validation'
 import {
   JwtPayload,
   LoginResult,
+  LoginUserData,
+  CurrentPharmacyData,
   SelectPharmacyResponse,
   RefreshTokenResponse,
   PharmacyRoleItem,
+  MeResponse,
 } from './auth.interface'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 import { UnauthorizedException } from '@exceptions/UnauthorizedException'
@@ -148,7 +151,7 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
     throw new UnauthorizedException('Invalid email or password')
   }
 
-  const pharmacies = await getPharmaciesForUser(user.id, user.platformRole)
+  const accessiblePharmacies = await getPharmaciesForUser(user.id, user.platformRole)
 
   const accessTokenPayload: JwtPayload = {
     id: user.id,
@@ -180,8 +183,9 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
       name: user.name,
       email: user.email,
       platformRole: user.platformRole,
-      pharmacies,
+      accessiblePharmacies,
     },
+    currentPharmacy: null,
   }
 }
 
@@ -248,13 +252,32 @@ export const selectPharmacy = async (
 
   const accessToken = generateAccessToken(accessTokenPayload)
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { uuid: true, name: true, email: true, platformRole: true },
+  })
+
+  if (!user) throw new UnauthorizedException('User not found')
+
+  const accessiblePharmacies = await getPharmaciesForUser(userId, platformRole)
+
+  const currentPharmacy: CurrentPharmacyData = {
+    uuid: pharmacy.uuid,
+    name: pharmacy.name,
+    role: pharmacyRole,
+    permissions,
+  }
+
   return {
     accessToken,
-    pharmacy: {
-      uuid: pharmacy.uuid,
-      name: pharmacy.name,
+    user: {
+      uuid: user.uuid,
+      name: user.name,
+      email: user.email,
+      platformRole: user.platformRole,
+      accessiblePharmacies,
     },
-    role: pharmacyRole,
+    currentPharmacy,
   }
 }
 
@@ -306,6 +329,66 @@ export const refreshAccessToken = async (
   const accessToken = generateAccessToken(accessTokenPayload)
 
   return { accessToken }
+}
+
+export const getMe = async (
+  userId: number,
+  platformRole: PlatformRole | null,
+  pharmacyId: number | null,
+  permissions: string[]
+): Promise<MeResponse> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { uuid: true, name: true, email: true, platformRole: true },
+  })
+
+  if (!user) {
+    throw new UnauthorizedException('User not found')
+  }
+
+  const accessiblePharmacies = await getPharmaciesForUser(userId, platformRole)
+
+  const userData: LoginUserData = {
+    uuid: user.uuid,
+    name: user.name,
+    email: user.email,
+    platformRole: user.platformRole,
+    accessiblePharmacies,
+  }
+
+  if (!pharmacyId) {
+    return { user: userData, currentPharmacy: null }
+  }
+
+  const pharmacy = await prisma.pharmacy.findUnique({
+    where: { id: pharmacyId },
+    select: { uuid: true, name: true },
+  })
+
+  if (!pharmacy) {
+    return { user: userData, currentPharmacy: null }
+  }
+
+  let role: PharmacyRoleItem | null = null
+
+  if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
+    const userPharmacy = await prisma.userPharmacy.findUnique({
+      where: { userId_pharmacyId: { userId, pharmacyId } },
+      include: { role: { select: { uuid: true, name: true, type: true } } },
+    })
+    if (userPharmacy) {
+      role = userPharmacy.role
+    }
+  }
+
+  const currentPharmacy: CurrentPharmacyData = {
+    uuid: pharmacy.uuid,
+    name: pharmacy.name,
+    role,
+    permissions,
+  }
+
+  return { user: userData, currentPharmacy }
 }
 
 export const logout = async (

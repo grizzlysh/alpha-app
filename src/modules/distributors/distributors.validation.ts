@@ -3,22 +3,22 @@ import { RecordStatus } from '@prisma/client'
 
 export const createDistributorSchema = z.object({
   name: z.string().min(1, { message: 'Name is required' }),
-  phone: z.string().min(1, { message: 'Phone is required' }),
+  phone: z.coerce.number().int().positive().min(1, { message: 'Phone is required' }),
   email: z.string().email({ message: 'Invalid email format' }).optional(),
   address: z.string().optional(),
   contactPerson: z.string().optional(),
   permitNumber: z.string().optional(),
-  notes: z.string().optional(),
+  description: z.string().optional(),
 })
 
 export const updateDistributorSchema = z.object({
   name: z.string().min(1).optional(),
-  phone: z.string().min(1).optional(),
+  phone: z.coerce.number().int().positive().min(1).optional(),
   email: z.string().email().optional(),
   address: z.string().optional(),
   contactPerson: z.string().optional(),
   permitNumber: z.string().optional(),
-  notes: z.string().optional(),
+  description: z.string().optional(),
   status: z.nativeEnum(RecordStatus).optional(),
 })
 

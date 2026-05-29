@@ -45,6 +45,7 @@ export const login = async (
     const response: LoginResponse = {
       accessToken: result.accessToken,
       user: result.user,
+      currentPharmacy: null,
     }
 
     sendSuccess(res, MESSAGE_CODES.LOGIN_SUCCESS, response)
@@ -129,14 +130,14 @@ export const me = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const response: MeResponse = {
-      // id: req.user!.id,
-      uuid: req.user!.uuid,
-      platformRole: req.user!.platformRole,
-      // pharmacyId: req.user!.pharmacyId,
-      pharmacyUuid: req.user!.pharmacyUuid,
-      permissions: req.user!.permissions,
-    }
+    const result = await AuthService.getMe(
+      req.user!.id,
+      req.user!.platformRole,
+      req.user!.pharmacyId,
+      req.user!.permissions
+    )
+
+    const response: MeResponse = result
 
     sendSuccess(res, MESSAGE_CODES.SUCCESS, response)
   } catch (err) {
