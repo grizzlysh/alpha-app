@@ -16,7 +16,7 @@ import medicineTypeRoutes from '@modules/medicine-types/medicine-types.routes'
 import medicineClassRoutes from '@modules/medicine-classes/medicine-classes.routes'
 import purchaseOrderRoutes from '@modules/purchase-orders/purchase-orders.routes'
 import invoiceRoutes from '@modules/invoices/invoices.routes'
-import inventoryRoutes from '@modules/inventory/inventory.routes'
+import stockRoutes from '@modules/stock/stock.routes'
 import stockReturnRoutes from '@modules/stock-returns/stock-returns.routes'
 import stockDisposalRoutes from '@modules/stock-disposals/stock-disposals.routes'
 
@@ -53,11 +53,10 @@ app.use('/api/medicine-types', medicineTypeRoutes)
 app.use('/api/medicine-classes', medicineClassRoutes)
 app.use('/api/purchase-orders', purchaseOrderRoutes)
 app.use('/api/invoices', invoiceRoutes)
-app.use('/api/inventory', inventoryRoutes)
+app.use('/api/stock', stockRoutes)
 app.use('/api/stock-returns', stockReturnRoutes)
 app.use('/api/stock-disposals', stockDisposalRoutes)
 
-// app.use('/api/inventory', inventoryRoutes)
 // app.use('/api/sales', salesRoutes)
 // app.use('/api/restock', restockRoutes)
 // app.use('/api/reports', reportRoutes)

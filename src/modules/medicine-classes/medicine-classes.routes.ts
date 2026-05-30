@@ -14,31 +14,31 @@ router.use(authenticate)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_VIEW),
   MedicineClassController.getMedicineClasses
 )
 
 router.get(
   '/:medicine_class_uuid',
-  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_VIEW),
   MedicineClassController.getMedicineClass
 )
 
 router.post(
   '/',
-  requirePermission(PERMISSIONS.MEDICINES_CREATE),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_CREATE),
   MedicineClassController.createMedicineClass
 )
 
 router.put(
   '/:medicine_class_uuid',
-  requirePermission(PERMISSIONS.MEDICINES_EDIT),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_EDIT),
   MedicineClassController.updateMedicineClass
 )
 
 router.delete(
   '/:medicine_class_uuid',
-  requirePermission(PERMISSIONS.MEDICINES_DELETE),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_DELETE),
   MedicineClassController.deleteMedicineClass
 )
 

@@ -76,7 +76,7 @@ export const selectPharmacy = async (
 
     const response: SelectPharmacyResponse = result
 
-    sendSuccess(res, MESSAGE_CODES.SUCCESS, response)
+    sendSuccess(res, MESSAGE_CODES.PHARMACY_SELECTED, response)
   } catch (err) {
     next(err)
   }
@@ -97,7 +97,7 @@ export const refresh = async (
 
     const response: RefreshTokenResponse = result
 
-    sendSuccess(res, MESSAGE_CODES.SUCCESS, response)
+    sendSuccess(res, MESSAGE_CODES.TOKEN_REFRESHED, response)
   } catch (err) {
     next(err)
   }
@@ -139,7 +139,7 @@ export const me = async (
 
     const response: MeResponse = result
 
-    sendSuccess(res, MESSAGE_CODES.SUCCESS, response)
+    sendSuccess(res, MESSAGE_CODES.ME_FETCHED, response)
   } catch (err) {
     next(err)
   }

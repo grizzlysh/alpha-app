@@ -6,13 +6,13 @@ import {
   UpdatePriceInput,
   UpdateReorderLevelInput,
   AdjustStockInput,
-} from './inventory.validation'
+} from './stock.validation'
 import {
   StockResponse,
   StockAlertResponse,
   StockMovementResponse,
   CrossPharmacyStockResponse,
-} from './inventory.interface'
+} from './stock.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'

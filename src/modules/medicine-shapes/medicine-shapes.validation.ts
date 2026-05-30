@@ -3,6 +3,7 @@ import { RecordStatus } from '@prisma/client'
 
 export const createMedicineShapeSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name is required' }),
+  status: z.nativeEnum(RecordStatus),
   pharmacyUuid: z.string().trim().uuid().optional(),
 })
 

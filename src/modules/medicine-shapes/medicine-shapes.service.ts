@@ -199,6 +199,7 @@ export const createMedicineShape = async (
   const medicine_shape = await prisma.medicineShape.create({
     data: {
       name: data.name,
+      status: data.status,
       pharmacyId: resolvedPharmacyId,
       createdById: userId,
     },

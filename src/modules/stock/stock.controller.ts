@@ -1,12 +1,12 @@
 import { Response, NextFunction } from 'express'
-import * as InventoryService from './inventory.service'
+import * as StockService from './stock.service'
 import {
   stockQuerySchema,
   stockMovementQuerySchema,
   updatePriceSchema,
   updateReorderLevelSchema,
   adjustStockSchema,
-} from './inventory.validation'
+} from './stock.validation'
 import {
   GetStocksRequest,
   GetStockRequest,
@@ -15,7 +15,7 @@ import {
   UpdateReorderLevelRequest,
   AdjustStockRequest,
   GetCrossPharmacyStockRequest,
-} from './inventory.interface'
+} from './stock.interface'
 import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
@@ -36,7 +36,7 @@ export const getStocks = async (
       )
     }
 
-    const { data, meta } = await InventoryService.getStocks(
+    const { data, meta } = await StockService.getStocks(
       req.user!.pharmacyId!,
       parsed.data
     )
@@ -53,7 +53,7 @@ export const getStock = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const stock = await InventoryService.getStockByUuid(
+    const stock = await StockService.getStockByUuid(
       req.params.stock_uuid,
       req.user!.pharmacyId!
     )
@@ -70,7 +70,7 @@ export const getStockAlerts = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const alerts = await InventoryService.getStockAlerts(
+    const alerts = await StockService.getStockAlerts(
       req.user!.pharmacyId!
     )
 
@@ -93,7 +93,7 @@ export const getStockMovements = async (
       )
     }
 
-    const { data, meta } = await InventoryService.getStockMovements(
+    const { data, meta } = await StockService.getStockMovements(
       req.user!.pharmacyId!,
       parsed.data
     )
@@ -117,7 +117,7 @@ export const updateSellingPrice = async (
       )
     }
 
-    const stock = await InventoryService.updateSellingPrice(
+    const stock = await StockService.updateSellingPrice(
       req.params.stock_uuid,
       parsed.data,
       req.user!.pharmacyId!,
@@ -143,7 +143,7 @@ export const updateReorderLevel = async (
       )
     }
 
-    const stock = await InventoryService.updateReorderLevel(
+    const stock = await StockService.updateReorderLevel(
       req.params.stock_uuid,
       parsed.data,
       req.user!.pharmacyId!,
@@ -169,7 +169,7 @@ export const adjustStock = async (
       )
     }
 
-    const stock = await InventoryService.adjustStock(
+    const stock = await StockService.adjustStock(
       req.params.stock_detail_uuid,
       parsed.data,
       req.user!.pharmacyId!,
@@ -188,7 +188,7 @@ export const getCrossPharmacyStock = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const stocks = await InventoryService.getCrossPharmacyStock(
+    const stocks = await StockService.getCrossPharmacyStock(
       req.params.medicine_uuid,
       req.user!.id,
       req.user!.pharmacyId!,

@@ -1,4 +1,3 @@
-// src/constants/messages.ts
 import { MessageCode } from './messageCodes'
 
 interface BilingualMessage {
@@ -7,79 +6,166 @@ interface BilingualMessage {
 }
 
 export const MESSAGES: Record<MessageCode, BilingualMessage> = {
-  // general
-  SUCCESS: {
-    en: 'Success',
-    id: 'Berhasil'
+
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+  LOGIN_SUCCESS: {
+    en: 'Login successful',
+    id: 'Login berhasil',
   },
-  CREATED: {
-    en: 'Created successfully',
-    id: 'Berhasil dibuat'
+  LOGOUT_SUCCESS: {
+    en: 'Logout successful',
+    id: 'Logout berhasil',
   },
-  UPDATED: {
-    en: 'Updated successfully',
-    id: 'Berhasil diperbarui'
+  TOKEN_REFRESHED: {
+    en: 'Token refreshed successfully',
+    id: 'Token berhasil diperbarui',
   },
-  DELETED: {
-    en: 'Deleted successfully',
-    id: 'Berhasil dihapus'
-  },
-  VALIDATION_ERROR: {
-    en: 'Validation failed',
-    id: 'Validasi gagal'
-  },
-  NOT_FOUND: {
-    en: 'Resource not found',
-    id: 'Data tidak ditemukan'
-  },
-  UNAUTHORIZED: {
-    en: 'Unauthorized',
-    id: 'Tidak terautentikasi'
-  },
-  FORBIDDEN: {
-    en: 'Forbidden',
-    id: 'Akses ditolak'
-  },
-  CONFLICT: {
-    en: 'Resource already exists',
-    id: 'Data sudah ada'
-  },
-  INTERNAL_ERROR: {
-    en: 'Internal server error',
-    id: 'Terjadi kesalahan pada server'
-  },
-  TOO_MANY_REQUESTS: {
-    en: 'Too many requests, please try again later',
-    id: 'Terlalu banyak permintaan, coba lagi nanti',
+  PHARMACY_SELECTED: {
+    en: 'Pharmacy selected successfully',
+    id: 'Apotek berhasil dipilih',
   },
   PHARMACY_NOT_SELECTED: {
     en: 'Please select a pharmacy first',
     id: 'Silakan pilih apotek terlebih dahulu',
   },
-
-  // auth
-  LOGIN_SUCCESS: {
-    en: 'Login successful',
-    id: 'Login berhasil'
+  ME_FETCHED: {
+    en: 'Profile fetched successfully',
+    id: 'Data profil berhasil diambil',
   },
-  LOGOUT_SUCCESS: {
-    en: 'Logout successful',
-    id: 'Logout berhasil'
+  UNAUTHORIZED: {
+    en: 'Unauthorized',
+    id: 'Tidak terautentikasi',
   },
   INVALID_CREDENTIALS: {
     en: 'Invalid email or password',
-    id: 'Email atau kata sandi salah'
+    id: 'Email atau kata sandi salah',
   },
   TOKEN_EXPIRED: {
     en: 'Token has expired',
-    id: 'Token telah kadaluarsa'
+    id: 'Token telah kadaluarsa',
   },
   TOKEN_INVALID: {
     en: 'Invalid token',
-    id: 'Token tidak valid'
+    id: 'Token tidak valid',
   },
 
-  // medicine shapes
+  // ─── Common errors ─────────────────────────────────────────────────────────
+  FORBIDDEN: {
+    en: 'Forbidden',
+    id: 'Akses ditolak',
+  },
+  NOT_FOUND: {
+    en: 'Resource not found',
+    id: 'Data tidak ditemukan',
+  },
+  VALIDATION_ERROR: {
+    en: 'Validation failed',
+    id: 'Validasi gagal',
+  },
+  INTERNAL_SERVER_ERROR: {
+    en: 'Internal server error',
+    id: 'Terjadi kesalahan pada server',
+  },
+  PHARMACY_CONTEXT_REQUIRED: {
+    en: 'Pharmacy context is required',
+    id: 'Konteks apotek diperlukan',
+  },
+  CONFLICT: {
+    en: 'Resource already exists',
+    id: 'Data sudah ada',
+  },
+  INTERNAL_ERROR: {
+    en: 'Internal server error',
+    id: 'Terjadi kesalahan pada server',
+  },
+  TOO_MANY_REQUESTS: {
+    en: 'Too many requests, please try again later',
+    id: 'Terlalu banyak permintaan, coba lagi nanti',
+  },
+
+  // ─── Medicines ─────────────────────────────────────────────────────────────
+  MEDICINES_FETCHED: {
+    en: 'Medicines fetched successfully',
+    id: 'Data obat berhasil diambil',
+  },
+  MEDICINE_FETCHED: {
+    en: 'Medicine fetched successfully',
+    id: 'Data obat berhasil diambil',
+  },
+  MEDICINE_CREATED: {
+    en: 'Medicine created successfully',
+    id: 'Obat berhasil dibuat',
+  },
+  MEDICINE_UPDATED: {
+    en: 'Medicine updated successfully',
+    id: 'Obat berhasil diperbarui',
+  },
+  MEDICINE_DELETED: {
+    en: 'Medicine deleted successfully',
+    id: 'Obat berhasil dihapus',
+  },
+  MEDICINE_NOT_FOUND: {
+    en: 'Medicine not found',
+    id: 'Obat tidak ditemukan',
+  },
+  MEDICINE_ALREADY_EXISTS: {
+    en: 'Medicine already exists',
+    id: 'Obat sudah ada',
+  },
+
+  // ─── Distributors ──────────────────────────────────────────────────────────
+  DISTRIBUTORS_FETCHED: {
+    en: 'Distributors fetched successfully',
+    id: 'Data distributor berhasil diambil',
+  },
+  DISTRIBUTOR_FETCHED: {
+    en: 'Distributor fetched successfully',
+    id: 'Data distributor berhasil diambil',
+  },
+  DISTRIBUTOR_CREATED: {
+    en: 'Distributor created successfully',
+    id: 'Distributor berhasil dibuat',
+  },
+  DISTRIBUTOR_UPDATED: {
+    en: 'Distributor updated successfully',
+    id: 'Distributor berhasil diperbarui',
+  },
+  DISTRIBUTOR_DELETED: {
+    en: 'Distributor deleted successfully',
+    id: 'Distributor berhasil dihapus',
+  },
+  DISTRIBUTOR_NOT_FOUND: {
+    en: 'Distributor not found',
+    id: 'Distributor tidak ditemukan',
+  },
+
+  // ─── Customers ─────────────────────────────────────────────────────────────
+  CUSTOMERS_FETCHED: {
+    en: 'Customers fetched successfully',
+    id: 'Data pelanggan berhasil diambil',
+  },
+  CUSTOMER_FETCHED: {
+    en: 'Customer fetched successfully',
+    id: 'Data pelanggan berhasil diambil',
+  },
+  CUSTOMER_CREATED: {
+    en: 'Customer created successfully',
+    id: 'Pelanggan berhasil dibuat',
+  },
+  CUSTOMER_UPDATED: {
+    en: 'Customer updated successfully',
+    id: 'Pelanggan berhasil diperbarui',
+  },
+  CUSTOMER_DELETED: {
+    en: 'Customer deleted successfully',
+    id: 'Pelanggan berhasil dihapus',
+  },
+  CUSTOMER_NOT_FOUND: {
+    en: 'Customer not found',
+    id: 'Pelanggan tidak ditemukan',
+  },
+
+  // ─── Medicine shapes ───────────────────────────────────────────────────────
   MEDICINE_SHAPES_FETCHED: {
     en: 'Medicine shapes fetched successfully',
     id: 'Data bentuk obat berhasil diambil',
@@ -100,8 +186,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Medicine shape deleted successfully',
     id: 'Bentuk obat berhasil dihapus',
   },
+  MEDICINE_SHAPE_NOT_FOUND: {
+    en: 'Medicine shape not found',
+    id: 'Bentuk obat tidak ditemukan',
+  },
 
-  // medicine types
+  // ─── Medicine types ────────────────────────────────────────────────────────
   MEDICINE_TYPES_FETCHED: {
     en: 'Medicine types fetched successfully',
     id: 'Data jenis obat berhasil diambil',
@@ -122,8 +212,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Medicine type deleted successfully',
     id: 'Jenis obat berhasil dihapus',
   },
-  
-  // medicine classes
+  MEDICINE_TYPE_NOT_FOUND: {
+    en: 'Medicine type not found',
+    id: 'Jenis obat tidak ditemukan',
+  },
+
+  // ─── Medicine classes ──────────────────────────────────────────────────────
   MEDICINE_CLASSES_FETCHED: {
     en: 'Medicine classes fetched successfully',
     id: 'Data kelas obat berhasil diambil',
@@ -144,64 +238,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Medicine class deleted successfully',
     id: 'Kelas obat berhasil dihapus',
   },
-
-  // medicines
-  MEDICINE_FETCHED: {
-    en: 'Medicine fetched successfully',
-    id: 'Data obat berhasil diambil'
-  },
-  MEDICINES_FETCHED: {
-    en: 'Medicines fetched successfully',
-    id: 'Data obat berhasil diambil'
-  },
-  MEDICINE_CREATED: {
-    en: 'Medicine created successfully',
-    id: 'Obat berhasil dibuat'
-  },
-  MEDICINE_UPDATED: {
-    en: 'Medicine updated successfully',
-    id: 'Obat berhasil diperbarui'
-  },
-  MEDICINE_DELETED: {
-    en: 'Medicine deleted successfully',
-    id: 'Obat berhasil dihapus'
-  },
-  MEDICINE_NOT_FOUND: {
-    en: 'Medicine not found',
-    id: 'Obat tidak ditemukan'
-  },
-  MEDICINE_ALREADY_EXISTS: {
-    en: 'Medicine already exists',
-    id: 'Obat sudah ada'
+  MEDICINE_CLASS_NOT_FOUND: {
+    en: 'Medicine class not found',
+    id: 'Kelas obat tidak ditemukan',
   },
 
-  // distributors
-  DISTRIBUTOR_FETCHED: {
-    en: 'Distributor fetched successfully',
-    id: 'Data distributor berhasil diambil'
-  },
-  DISTRIBUTORS_FETCHED: {
-    en: 'Distributors fetched successfully',
-    id: 'Data distributor berhasil diambil'
-  },
-  DISTRIBUTOR_CREATED: {
-    en: 'Distributor created successfully',
-    id: 'Distributor berhasil dibuat'
-  },
-  DISTRIBUTOR_UPDATED: {
-    en: 'Distributor updated successfully',
-    id: 'Distributor berhasil diperbarui'
-  },
-  DISTRIBUTOR_DELETED: {
-    en: 'Distributor deleted successfully',
-    id: 'Distributor berhasil dihapus'
-  },
-  DISTRIBUTOR_NOT_FOUND: {
-    en: 'Distributor not found',
-    id: 'Distributor tidak ditemukan'
-  },
-
-  // purchase orders
+  // ─── Purchase orders ───────────────────────────────────────────────────────
   PURCHASE_ORDERS_FETCHED: {
     en: 'Purchase orders fetched successfully',
     id: 'Data purchase order berhasil diambil',
@@ -218,46 +260,46 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Purchase order updated successfully',
     id: 'Purchase order berhasil diperbarui',
   },
+  PURCHASE_ORDER_DELETED: {
+    en: 'Purchase order deleted successfully',
+    id: 'Purchase order berhasil dihapus',
+  },
   PURCHASE_ORDER_SUBMITTED: {
     en: 'Purchase order submitted successfully',
-    id: 'Purchase order berhasil disubmit',
+    id: 'Purchase order berhasil diajukan',
   },
   PURCHASE_ORDER_CANCELLED: {
     en: 'Purchase order cancelled successfully',
     id: 'Purchase order berhasil dibatalkan',
-  },
-  PURCHASE_ORDER_DELETED: {
-    en: 'Purchase order deleted successfully',
-    id: 'Purchase order berhasil dihapus',
   },
   PURCHASE_ORDER_NOT_FOUND: {
     en: 'Purchase order not found',
     id: 'Purchase order tidak ditemukan',
   },
 
-  // invoices
-  INVOICE_FETCHED: {
-    en: 'Invoice fetched successfully',
-    id: 'Data invoice berhasil diambil'
-  },
+  // ─── Invoices ──────────────────────────────────────────────────────────────
   INVOICES_FETCHED: {
     en: 'Invoices fetched successfully',
-    id: 'Data invoice berhasil diambil'
+    id: 'Data invoice berhasil diambil',
+  },
+  INVOICE_FETCHED: {
+    en: 'Invoice fetched successfully',
+    id: 'Data invoice berhasil diambil',
   },
   INVOICE_CREATED: {
     en: 'Invoice created successfully',
-    id: 'Invoice berhasil dibuat'
+    id: 'Invoice berhasil dibuat',
   },
   INVOICE_DELETED: {
     en: 'Invoice deleted successfully',
-    id: 'Invoice berhasil dihapus'
+    id: 'Invoice berhasil dihapus',
   },
   INVOICE_NOT_FOUND: {
     en: 'Invoice not found',
-    id: 'Invoice tidak ditemukan'
+    id: 'Invoice tidak ditemukan',
   },
 
-  // stocks
+  // ─── Stock ─────────────────────────────────────────────────────────────────
   STOCKS_FETCHED: {
     en: 'Stocks fetched successfully',
     id: 'Data stok berhasil diambil',
@@ -266,9 +308,17 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock fetched successfully',
     id: 'Data stok berhasil diambil',
   },
-  STOCK_UPDATED: {
-    en: 'Stock updated successfully',
-    id: 'Stok berhasil diperbarui',
+  STOCK_DETAIL_FETCHED: {
+    en: 'Stock detail fetched successfully',
+    id: 'Detail stok berhasil diambil',
+  },
+  STOCK_MOVEMENTS_FETCHED: {
+    en: 'Stock movements fetched successfully',
+    id: 'Data pergerakan stok berhasil diambil',
+  },
+  STOCK_ALERTS_FETCHED: {
+    en: 'Stock alerts fetched successfully',
+    id: 'Peringatan stok berhasil diambil',
   },
   STOCK_ADJUSTED: {
     en: 'Stock adjusted successfully',
@@ -278,28 +328,20 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock price updated successfully',
     id: 'Harga stok berhasil diperbarui',
   },
-  STOCK_MOVEMENTS_FETCHED: {
-    en: 'Stock movements fetched successfully',
-    id: 'Data pergerakan stok berhasil diambil',
-  },
   STOCK_NOT_FOUND: {
     en: 'Stock not found',
     id: 'Stok tidak ditemukan',
   },
+  STOCK_UPDATED: {
+    en: 'Stock updated successfully',
+    id: 'Stok berhasil diperbarui',
+  },
   STOCK_INSUFFICIENT: {
     en: 'Insufficient stock',
-    id: 'Stok tidak mencukupi'
+    id: 'Stok tidak mencukupi',
   },
-  // STOCK_RETURN_CREATED: {
-  //   en: 'Stock return created successfully',
-  //   id: 'Retur stok berhasil dibuat'
-  // },
-  // STOCK_DISPOSAL_CREATED: {
-  //   en: 'Stock disposal created successfully',
-  //   id: 'Pemusnahan stok berhasil dibuat'
-  // },
 
-  // sales
+  // ─── Sales ─────────────────────────────────────────────────────────────────
   SALES_FETCHED: {
     en: 'Sales fetched successfully',
     id: 'Data penjualan berhasil diambil',
@@ -311,14 +353,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   SALE_CREATED: {
     en: 'Sale created successfully',
     id: 'Penjualan berhasil dibuat',
-  },
-  SALE_UPDATED: {
-    en: 'Sale updated successfully',
-    id: 'Penjualan berhasil diperbarui'
-  },
-  SALE_DELETED: {
-    en: 'Sale deleted successfully',
-    id: 'Penjualan berhasil dihapus'
   },
   SALE_CANCELLED: {
     en: 'Sale cancelled successfully',
@@ -337,33 +371,7 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Penjualan tidak ditemukan',
   },
 
-  // customers
-  CUSTOMER_FETCHED: {
-    en: 'Customer fetched successfully',
-    id: 'Data pelanggan berhasil diambil',
-  },
-  CUSTOMERS_FETCHED: {
-    en: 'Customers fetched successfully',
-    id: 'Data pelanggan berhasil diambil',
-  },
-  CUSTOMER_CREATED: {
-    en: 'Customer created successfully',
-    id: 'Pelanggan berhasil dibuat',
-  },
-  CUSTOMER_UPDATED: {
-    en: 'Customer updated successfully',
-    id: 'Pelanggan berhasil diperbarui',
-  },
-  CUSTOMER_DELETED: {
-    en: 'Customer deleted successfully',
-    id: 'Pelanggan berhasil dihapus',
-  },
-  CUSTOMER_NOT_FOUND: {
-    en: 'Customer not found',
-    id: 'Pelanggan tidak ditemukan',
-  },
-
-  // stock return
+  // ─── Stock returns ─────────────────────────────────────────────────────────
   STOCK_RETURNS_FETCHED: {
     en: 'Stock returns fetched successfully',
     id: 'Data retur stok berhasil diambil',
@@ -380,6 +388,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock return updated successfully',
     id: 'Retur stok berhasil diperbarui',
   },
+  STOCK_RETURN_DELETED: {
+    en: 'Stock return deleted successfully',
+    id: 'Retur stok berhasil dihapus',
+  },
   STOCK_RETURN_COMPLETED: {
     en: 'Stock return completed successfully',
     id: 'Retur stok berhasil diselesaikan',
@@ -388,16 +400,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock return cancelled successfully',
     id: 'Retur stok berhasil dibatalkan',
   },
-  STOCK_RETURN_DELETED: {
-    en: 'Stock return deleted successfully',
-    id: 'Retur stok berhasil dihapus',
-  },
   STOCK_RETURN_NOT_FOUND: {
     en: 'Stock return not found',
     id: 'Retur stok tidak ditemukan',
   },
 
-  // stock disposals
+  // ─── Stock disposals ───────────────────────────────────────────────────────
   STOCK_DISPOSALS_FETCHED: {
     en: 'Stock disposals fetched successfully',
     id: 'Data pemusnahan stok berhasil diambil',
@@ -414,6 +422,14 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock disposal updated successfully',
     id: 'Pemusnahan stok berhasil diperbarui',
   },
+  STOCK_DISPOSAL_DELETED: {
+    en: 'Stock disposal deleted successfully',
+    id: 'Pemusnahan stok berhasil dihapus',
+  },
+  STOCK_DISPOSAL_SUBMITTED: {
+    en: 'Stock disposal submitted successfully',
+    id: 'Pemusnahan stok berhasil diajukan',
+  },
   STOCK_DISPOSAL_COMPLETED: {
     en: 'Stock disposal completed successfully',
     id: 'Pemusnahan stok berhasil diselesaikan',
@@ -422,12 +438,255 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock disposal cancelled successfully',
     id: 'Pemusnahan stok berhasil dibatalkan',
   },
-  STOCK_DISPOSAL_DELETED: {
-    en: 'Stock disposal deleted successfully',
-    id: 'Pemusnahan stok berhasil dihapus',
-  },
   STOCK_DISPOSAL_NOT_FOUND: {
     en: 'Stock disposal not found',
     id: 'Pemusnahan stok tidak ditemukan',
   },
+
+  // ─── Permissions ───────────────────────────────────────────────────────────
+  PERMISSIONS_FETCHED: {
+    en: 'Permissions fetched successfully',
+    id: 'Data izin berhasil diambil',
+  },
+  PERMISSION_FETCHED: {
+    en: 'Permission fetched successfully',
+    id: 'Data izin berhasil diambil',
+  },
+  PERMISSION_NOT_FOUND: {
+    en: 'Permission not found',
+    id: 'Izin tidak ditemukan',
+  },
+
+  // ─── Roles ─────────────────────────────────────────────────────────────────
+  ROLES_FETCHED: {
+    en: 'Roles fetched successfully',
+    id: 'Data peran berhasil diambil',
+  },
+  ROLE_FETCHED: {
+    en: 'Role fetched successfully',
+    id: 'Data peran berhasil diambil',
+  },
+  ROLE_CREATED: {
+    en: 'Role created successfully',
+    id: 'Peran berhasil dibuat',
+  },
+  ROLE_UPDATED: {
+    en: 'Role updated successfully',
+    id: 'Peran berhasil diperbarui',
+  },
+  ROLE_DELETED: {
+    en: 'Role deleted successfully',
+    id: 'Peran berhasil dihapus',
+  },
+  ROLE_PERMISSIONS_UPDATED: {
+    en: 'Role permissions updated successfully',
+    id: 'Izin peran berhasil diperbarui',
+  },
+  ROLE_NOT_FOUND: {
+    en: 'Role not found',
+    id: 'Peran tidak ditemukan',
+  },
+  ROLE_NAME_ALREADY_EXISTS: {
+    en: 'Role name already exists',
+    id: 'Nama peran sudah ada',
+  },
+  ROLE_IN_USE: {
+    en: 'Role is currently in use and cannot be deleted',
+    id: 'Peran sedang digunakan dan tidak dapat dihapus',
+  },
+  ONE_OR_MORE_PERMISSIONS_NOT_FOUND: {
+    en: 'One or more permissions not found',
+    id: 'Satu atau lebih izin tidak ditemukan',
+  },
+  ONLY_PLATFORM_ADMIN_CAN_CREATE_GLOBAL_ROLE: {
+    en: 'Only platform admin can create global roles',
+    id: 'Hanya admin platform yang dapat membuat peran global',
+  },
+  ONLY_PLATFORM_ADMIN_CAN_UPDATE_GLOBAL_ROLE: {
+    en: 'Only platform admin can update global roles',
+    id: 'Hanya admin platform yang dapat memperbarui peran global',
+  },
+  ONLY_PLATFORM_ADMIN_CAN_DELETE_GLOBAL_ROLE: {
+    en: 'Only platform admin can delete global roles',
+    id: 'Hanya admin platform yang dapat menghapus peran global',
+  },
+  ONLY_PLATFORM_ADMIN_CAN_MANAGE_GLOBAL_ROLE_PERMISSIONS: {
+    en: 'Only platform admin can manage global role permissions',
+    id: 'Hanya admin platform yang dapat mengelola izin peran global',
+  },
+
+  // ─── Me ────────────────────────────────────────────────────────────────────
+  ME_UPDATED: {
+    en: 'Profile updated successfully',
+    id: 'Profil berhasil diperbarui',
+  },
+  PASSWORD_CHANGED: {
+    en: 'Password changed successfully',
+    id: 'Kata sandi berhasil diubah',
+  },
+  PASSWORD_RESET: {
+    en: 'Password reset successfully',
+    id: 'Kata sandi berhasil direset',
+  },
+  CURRENT_PASSWORD_INCORRECT: {
+    en: 'Current password is incorrect',
+    id: 'Kata sandi saat ini salah',
+  },
+  NEW_PASSWORD_MUST_BE_DIFFERENT: {
+    en: 'New password must be different from the current password',
+    id: 'Kata sandi baru harus berbeda dari kata sandi saat ini',
+  },
+
+  // ─── Users ─────────────────────────────────────────────────────────────────
+  USERS_FETCHED: {
+    en: 'Users fetched successfully',
+    id: 'Data pengguna berhasil diambil',
+  },
+  USER_FETCHED: {
+    en: 'User fetched successfully',
+    id: 'Data pengguna berhasil diambil',
+  },
+  USER_CREATED: {
+    en: 'User created successfully',
+    id: 'Pengguna berhasil dibuat',
+  },
+  USER_UPDATED: {
+    en: 'User updated successfully',
+    id: 'Pengguna berhasil diperbarui',
+  },
+  USER_DELETED: {
+    en: 'User deleted successfully',
+    id: 'Pengguna berhasil dihapus',
+  },
+  USER_NOT_FOUND: {
+    en: 'User not found',
+    id: 'Pengguna tidak ditemukan',
+  },
+  USER_HAS_ACTIVE_ASSIGNMENTS: {
+    en: 'User has active assignments and cannot be deleted',
+    id: 'Pengguna memiliki penugasan aktif dan tidak dapat dihapus',
+  },
+  CANNOT_DELETE_YOURSELF: {
+    en: 'You cannot delete your own account',
+    id: 'Tidak dapat menghapus akun sendiri',
+  },
+  EMAIL_ALREADY_EXISTS: {
+    en: 'Email address is already in use',
+    id: 'Alamat email sudah digunakan',
+  },
+  DEFAULT_PASSWORD_NOT_CONFIGURED: {
+    en: 'Default password has not been configured',
+    id: 'Kata sandi default belum dikonfigurasi',
+  },
+
+  // ─── Assignments ───────────────────────────────────────────────────────────
+  ASSIGNMENTS_FETCHED: {
+    en: 'Assignments fetched successfully',
+    id: 'Data penugasan berhasil diambil',
+  },
+  ASSIGNMENT_FETCHED: {
+    en: 'Assignment fetched successfully',
+    id: 'Data penugasan berhasil diambil',
+  },
+  ASSIGNMENT_CREATED: {
+    en: 'Assignment created successfully',
+    id: 'Penugasan berhasil dibuat',
+  },
+  ASSIGNMENT_UPDATED: {
+    en: 'Assignment updated successfully',
+    id: 'Penugasan berhasil diperbarui',
+  },
+  ASSIGNMENT_DELETED: {
+    en: 'Assignment deleted successfully',
+    id: 'Penugasan berhasil dihapus',
+  },
+  ASSIGNMENT_NOT_FOUND: {
+    en: 'Assignment not found',
+    id: 'Penugasan tidak ditemukan',
+  },
+  MAX_ASSIGNMENTS_REACHED: {
+    en: 'Maximum number of assignments has been reached',
+    id: 'Batas maksimal penugasan telah tercapai',
+  },
+  USER_ALREADY_ASSIGNED_TO_PHARMACY: {
+    en: 'User is already assigned to this pharmacy',
+    id: 'Pengguna sudah ditugaskan ke apotek ini',
+  },
+  PHARMACY_ALREADY_HAS_SIGN_FULL_USER: {
+    en: 'Pharmacy already has a user with full signing authority',
+    id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
+  },
+
+  // ─── Licenses ──────────────────────────────────────────────────────────────
+  LICENSES_FETCHED: {
+    en: 'Licenses fetched successfully',
+    id: 'Data lisensi berhasil diambil',
+  },
+  LICENSE_FETCHED: {
+    en: 'License fetched successfully',
+    id: 'Data lisensi berhasil diambil',
+  },
+  LICENSE_CREATED: {
+    en: 'License created successfully',
+    id: 'Lisensi berhasil dibuat',
+  },
+  LICENSE_UPDATED: {
+    en: 'License updated successfully',
+    id: 'Lisensi berhasil diperbarui',
+  },
+  LICENSE_DELETED: {
+    en: 'License deleted successfully',
+    id: 'Lisensi berhasil dihapus',
+  },
+  LICENSE_NOT_FOUND: {
+    en: 'License not found',
+    id: 'Lisensi tidak ditemukan',
+  },
+  LICENSE_NUMBER_ALREADY_EXISTS: {
+    en: 'License number already exists',
+    id: 'Nomor lisensi sudah ada',
+  },
+
+  // ─── Pharmacies ────────────────────────────────────────────────────────────
+  PHARMACIES_FETCHED: {
+    en: 'Pharmacies fetched successfully',
+    id: 'Data apotek berhasil diambil',
+  },
+  PHARMACY_FETCHED: {
+    en: 'Pharmacy fetched successfully',
+    id: 'Data apotek berhasil diambil',
+  },
+  PHARMACY_CREATED: {
+    en: 'Pharmacy created successfully',
+    id: 'Apotek berhasil dibuat',
+  },
+  PHARMACY_UPDATED: {
+    en: 'Pharmacy updated successfully',
+    id: 'Apotek berhasil diperbarui',
+  },
+  PHARMACY_DELETED: {
+    en: 'Pharmacy deleted successfully',
+    id: 'Apotek berhasil dihapus',
+  },
+  PHARMACY_NOT_FOUND: {
+    en: 'Pharmacy not found',
+    id: 'Apotek tidak ditemukan',
+  },
+  PHARMACY_CODE_ALREADY_EXISTS: {
+    en: 'Pharmacy code already exists',
+    id: 'Kode apotek sudah ada',
+  },
+  PHARMACY_OWNER_UPDATED: {
+    en: 'Pharmacy owner updated successfully',
+    id: 'Pemilik apotek berhasil diperbarui',
+  },
+  PHARMACY_PARAMETERS_FETCHED: {
+    en: 'Pharmacy parameters fetched successfully',
+    id: 'Parameter apotek berhasil diambil',
+  },
+  PHARMACY_PARAMETERS_UPDATED: {
+    en: 'Pharmacy parameters updated successfully',
+    id: 'Parameter apotek berhasil diperbarui',
+  },
+
 }

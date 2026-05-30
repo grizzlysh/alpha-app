@@ -20,6 +20,7 @@ export interface MedicineTypeUuidParam extends ParamsDictionary {
 
 export interface CreateMedicineTypeBody {
   name: string
+  status: RecordStatus
   pharmacyUuid?: string   // ← PLATFORM_ADMIN only, optional
 }
 

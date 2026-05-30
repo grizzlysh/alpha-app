@@ -199,6 +199,7 @@ export const createMedicineClass = async (
   const medicine_class = await prisma.medicineClass.create({
     data: {
       name: data.name,
+      status: data.status,
       pharmacyId: resolvedPharmacyId,
       createdById: userId,
     },
