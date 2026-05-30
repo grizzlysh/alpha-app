@@ -14,7 +14,6 @@ import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,
-  sendNoContent,
   sendPaginated,
 } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
@@ -97,7 +96,7 @@ export const deleteInvoice = async (
       req.user!.id
     )
 
-    sendNoContent(res, MESSAGE_CODES.INVOICE_DELETED)
+    sendSuccess(res, MESSAGE_CODES.INVOICE_DELETED, null)
   } catch (err) {
     next(err)
   }

@@ -33,8 +33,8 @@ const generateRefreshToken = (): string => {
   return crypto.randomBytes(64).toString('hex')
 }
 
-const hashToken = async (token: string): Promise<string> => {
-  return bcrypt.hash(token, 10)
+const hashToken = (token: string): string => {
+  return crypto.createHash('sha256').update(token).digest('hex')
 }
 
 // ── Permission Helpers ────────────────────────────────
@@ -164,7 +164,7 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
 
   const accessToken = generateAccessToken(accessTokenPayload)
   const refreshToken = generateRefreshToken()
-  const hashedRefreshToken = await hashToken(refreshToken)
+  const hashedRefreshToken = hashToken(refreshToken)
 
   await prisma.userToken.create({
     data: {
@@ -284,10 +284,10 @@ export const selectPharmacy = async (
 export const refreshAccessToken = async (
   refreshToken: string
 ): Promise<RefreshTokenResponse> => {
-  const userTokens = await prisma.userToken.findMany({
-    where: {
-      expiresAt: { gt: new Date() },
-    },
+  const hashed = hashToken(refreshToken)
+
+  const userToken = await prisma.userToken.findUnique({
+    where: { refreshToken: hashed },
     include: {
       user: {
         select: {
@@ -300,27 +300,18 @@ export const refreshAccessToken = async (
     },
   })
 
-  let matchedToken = null
-  for (const token of userTokens) {
-    const isMatch = await bcrypt.compare(refreshToken, token.refreshToken)
-    if (isMatch) {
-      matchedToken = token
-      break
-    }
-  }
-
-  if (!matchedToken) {
+  if (!userToken || userToken.expiresAt <= new Date()) {
     throw new UnauthorizedException('Invalid or expired refresh token')
   }
 
-  if (matchedToken.user.status !== 'ACTIVE') {
+  if (userToken.user.status !== 'ACTIVE') {
     throw new UnauthorizedException('User is inactive')
   }
 
   const accessTokenPayload: JwtPayload = {
-    id: matchedToken.user.id,
-    uuid: matchedToken.user.uuid,
-    platformRole: matchedToken.user.platformRole,
+    id: userToken.user.id,
+    uuid: userToken.user.uuid,
+    platformRole: userToken.user.platformRole,
     pharmacyId: null,
     pharmacyUuid: null,
     permissions: [],
@@ -395,15 +386,8 @@ export const logout = async (
   userId: number,
   refreshToken: string
 ): Promise<void> => {
-  const userTokens = await prisma.userToken.findMany({
-    where: { userId },
+  const hashed = hashToken(refreshToken)
+  await prisma.userToken.deleteMany({
+    where: { userId, refreshToken: hashed },
   })
-
-  for (const token of userTokens) {
-    const isMatch = await bcrypt.compare(refreshToken, token.refreshToken)
-    if (isMatch) {
-      await prisma.userToken.delete({ where: { id: token.id } })
-      break
-    }
-  }
 }

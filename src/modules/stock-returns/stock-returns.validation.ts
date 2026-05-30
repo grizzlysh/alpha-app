@@ -2,37 +2,37 @@ import { z } from 'zod'
 import { StockReturnStatus } from '@prisma/client'
 
 export const createStockReturnDetailSchema = z.object({
-  stockDetailUuid: z.string().uuid({ message: 'Invalid stock detail UUID' }),
+  stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity must be positive' }),
-  reason: z.string().optional(),
+  reason: z.string().trim().optional(),
 })
 
 export const createStockReturnSchema = z.object({
-  distributorUuid: z.string().uuid({ message: 'Invalid distributor UUID' }),
-  signedByUuid: z.string().uuid().optional(),
-  description: z.string().optional(),
+  distributorUuid: z.string().trim().uuid({ message: 'Invalid distributor UUID' }),
+  signedByUuid: z.string().trim().uuid().optional(),
+  description: z.string().trim().optional(),
   details: z
     .array(createStockReturnDetailSchema)
     .min(1, { message: 'At least one detail is required' }),
 })
 
 export const updateStockReturnSchema = z.object({
-  distributorUuid: z.string().uuid().optional(),
-  signedByUuid: z.string().uuid().optional(),
-  description: z.string().optional(),
+  distributorUuid: z.string().trim().uuid().optional(),
+  signedByUuid: z.string().trim().uuid().optional(),
+  description: z.string().trim().optional(),
   details: z.array(createStockReturnDetailSchema).min(1).optional(),
 })
 
 export const cancelStockReturnSchema = z.object({
-  description: z.string().min(1, { message: 'Description is required' }),
+  description: z.string().trim().min(1, { message: 'Description is required' }),
 })
 
 export const stockReturnQuerySchema = z.object({
-  search: z.string().optional(),
+  search: z.string().trim().optional(),
   status: z.nativeEnum(StockReturnStatus).optional(),
-  distributorUuid: z.string().uuid().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
+  distributorUuid: z.string().trim().uuid().optional(),
+  dateFrom: z.string().trim().optional(),
+  dateTo: z.string().trim().optional(),
   sortBy: z
     .enum(['returnNumber', 'createdAt', 'returnedAt'])
     .optional()

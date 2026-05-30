@@ -16,7 +16,6 @@ import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,
-  sendNoContent,
   sendPaginated,
 } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
@@ -125,7 +124,7 @@ export const deleteCustomer = async (
       req.user!.id
     )
 
-    sendNoContent(res, MESSAGE_CODES.CUSTOMER_DELETED)
+    sendSuccess(res, MESSAGE_CODES.CUSTOMER_DELETED, null)
   } catch (err) {
     next(err)
   }

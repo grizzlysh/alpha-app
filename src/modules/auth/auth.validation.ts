@@ -1,16 +1,16 @@
 import { z } from 'zod'
 
 export const loginSchema = z.object({
-  email: z.string().email({
+  email: z.string().trim().email({
     message: 'Invalid email format',
   }),
-  password: z.string().min(6, {
+  password: z.string().trim().min(6, {
     message: 'Password must be at least 6 characters',
   }),
 })
 
 export const selectPharmacySchema = z.object({
-  pharmacyUuid: z.string().uuid({
+  pharmacyUuid: z.string().trim().uuid({
     message: 'Invalid pharmacy UUID',
   }),
 })

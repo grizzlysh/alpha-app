@@ -2,9 +2,9 @@ import { z } from 'zod'
 import { PaymentStatus } from '@prisma/client'
 
 export const createInvoiceDetailSchema = z.object({
-  medicineUuid: z.string().uuid({ message: 'Invalid medicine UUID' }),
-  batchNumber: z.string().min(1, { message: 'Batch number is required' }),
-  expiryDate: z.string().min(1, { message: 'Expiry date is required' }),
+  medicineUuid: z.string().trim().uuid({ message: 'Invalid medicine UUID' }),
+  batchNumber: z.string().trim().min(1, { message: 'Batch number is required' }),
+  expiryDate: z.string().trim().min(1, { message: 'Expiry date is required' }),
   quantityBox: z.number().int().positive({ message: 'Quantity box must be positive' }),
   quantityPerBox: z.number().int().positive({ message: 'Quantity per box must be positive' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity pieces must be positive' }),
@@ -13,25 +13,25 @@ export const createInvoiceDetailSchema = z.object({
 })
 
 export const createInvoiceSchema = z.object({
-  distributorUuid: z.string().uuid({ message: 'Invalid distributor UUID' }),
-  purchaseOrderUuid: z.string().uuid().optional(),
-  signedByUuid: z.string().uuid().optional(),
-  invoiceNumber: z.string().min(1, { message: 'Invoice number is required' }),
-  invoiceDate: z.string().min(1, { message: 'Invoice date is required' }),
-  dueDate: z.string().optional(),
-  description: z.string().optional(),
+  distributorUuid: z.string().trim().uuid({ message: 'Invalid distributor UUID' }),
+  purchaseOrderUuid: z.string().trim().uuid().optional(),
+  signedByUuid: z.string().trim().uuid().optional(),
+  invoiceNumber: z.string().trim().min(1, { message: 'Invoice number is required' }),
+  invoiceDate: z.string().trim().min(1, { message: 'Invoice date is required' }),
+  dueDate: z.string().trim().optional(),
+  description: z.string().trim().optional(),
   details: z
     .array(createInvoiceDetailSchema)
     .min(1, { message: 'At least one detail is required' }),
 })
 
 export const invoiceQuerySchema = z.object({
-  search: z.string().optional(),
+  search: z.string().trim().optional(),
   paymentStatus: z.nativeEnum(PaymentStatus).optional(),
-  distributorUuid: z.string().uuid().optional(),
-  purchaseOrderUuid: z.string().uuid().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
+  distributorUuid: z.string().trim().uuid().optional(),
+  purchaseOrderUuid: z.string().trim().uuid().optional(),
+  dateFrom: z.string().trim().optional(),
+  dateTo: z.string().trim().optional(),
   sortBy: z
     .enum(['invoiceDate', 'createdAt', 'totalAmount'])
     .optional()
