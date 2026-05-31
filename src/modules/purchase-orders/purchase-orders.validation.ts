@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { PurchaseOrderStatus } from '@prisma/client'
 
 export const createPurchaseOrderDetailSchema = z.object({
   medicineUuid: z.string().trim().uuid({ message: 'Invalid medicine UUID' }),
@@ -32,7 +31,7 @@ export const cancelPurchaseOrderSchema = z.object({
 
 export const purchaseOrderQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.nativeEnum(PurchaseOrderStatus).optional(),
+  status: z.enum(['DRAFT', 'SENT', 'COMPLETED', 'CANCELLED']).optional(),
   distributorUuid: z.string().trim().uuid().optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),

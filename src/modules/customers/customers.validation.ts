@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { RecordStatus } from '@prisma/client'
 
 export const createCustomerSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name is required' }),
@@ -13,12 +12,12 @@ export const updateCustomerSchema = z.object({
   phone: z.string().trim().optional(),
   address: z.string().trim().optional(),
   description: z.string().trim().optional(),
-  status: z.nativeEnum(RecordStatus).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
 })
 
 export const customerQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.nativeEnum(RecordStatus).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
   isWalkIn: z.enum(['true', 'false']).optional(),
   sortBy: z.enum(['name', 'createdAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),

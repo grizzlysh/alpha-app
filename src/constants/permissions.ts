@@ -36,9 +36,9 @@ export const PERMISSIONS = {
   CUSTOMERS_EDIT: 'customers.edit',
   CUSTOMERS_DELETE: 'customers.delete',
 
-  // inventory
-  INVENTORY_VIEW: 'inventory.view',
-  INVENTORY_ADJUST: 'inventory.adjust',
+  // stock
+  STOCK_VIEW: 'stock.view',
+  STOCK_ADJUST: 'stock.adjust',
 
   // purchase orders
   PURCHASE_ORDERS_VIEW: 'purchase_orders.view',
@@ -81,10 +81,43 @@ export const PERMISSIONS = {
   USERS_EDIT: 'users.edit',
   USERS_DELETE: 'users.delete',
 
-  // settings
+  // oermission
+  PERMISSIONS_VIEW: 'permissions.view',
+
+  // roles
+  ROLES_VIEW: 'roles.view',
+  ROLES_CREATE: 'roles.create',
+  ROLES_EDIT: 'roles.edit',
+  ROLES_DELETE: 'roles.delete',
+
+  // licenses
+  LICENSES_VIEW: 'licenses.view',
+  LICENSES_CREATE: 'licenses.create',
+  LICENSES_EDIT: 'licenses.edit',
+  LICENSES_DELETE: 'licenses.delete',
+
+  // pharmacies
+  PHARMACIES_VIEW: 'pharmacies.view',
+  PHARMACIES_CREATE: 'pharmacies.create',
+  PHARMACIES_EDIT: 'pharmacies.edit',
+  PHARMACIES_DELETE: 'pharmacies.delete',
+
+  // business parameters
+  BUSINESS_PARAMETERS_VIEW: 'business_parameters.view',
+  BUSINESS_PARAMETERS_EDIT: 'business_parameters.edit',
+
+  // system parameters
+  SYSTEM_PARAMETERS_VIEW: 'system_parameters.view',
+  SYSTEM_PARAMETERS_EDIT: 'system_parameters.edit',
+
+  // settings (kept for backward compatibility)
   SETTINGS_VIEW: 'settings.view',
   SETTINGS_EDIT: 'settings.edit',
-  
+
+  // signing
+  SIGN_STANDARD: 'sign.standard',
+  SIGN_FULL: 'sign.full',
+
 } as const
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]

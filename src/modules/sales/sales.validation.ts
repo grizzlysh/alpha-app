@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { SaleStatus, SaleType, PaymentMethod, PaymentStatus } from '@prisma/client'
 
 export const createSaleDetailSchema = z.object({
   stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
@@ -9,7 +8,7 @@ export const createSaleDetailSchema = z.object({
 
 export const createSaleSchema = z.object({
   customerUuid: z.string().trim().uuid().optional(),
-  saleType: z.nativeEnum(SaleType).optional().default(SaleType.CASH),
+  saleType: z.enum(['CASH', 'CREDIT']).optional().default('CASH'),
   description: z.string().trim().optional(),
   details: z
     .array(createSaleDetailSchema)
@@ -22,16 +21,16 @@ export const cancelSaleSchema = z.object({
 
 export const addPaymentSchema = z.object({
   amount: z.number().positive({ message: 'Amount must be positive' }),
-  paymentMethod: z.nativeEnum(PaymentMethod),
+  paymentMethod: z.enum(['CASH', 'TRANSFER', 'CREDIT']),
   paymentDate: z.string().trim().min(1, { message: 'Payment date is required' }),
   description: z.string().trim().optional(),
 })
 
 export const saleQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.nativeEnum(SaleStatus).optional(),
-  saleType: z.nativeEnum(SaleType).optional(),
-  paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  status: z.enum(['COMPLETED', 'CANCELLED', 'REFUNDED']).optional(),
+  saleType: z.enum(['CASH', 'CREDIT']).optional(),
+  paymentStatus: z.enum(['UNPAID', 'PARTIAL', 'PAID']).optional(),
   customerUuid: z.string().trim().uuid().optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),
