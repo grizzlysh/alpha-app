@@ -127,3 +127,10 @@ export interface PurchaseOrderResponse {
   } | null
   details: PurchaseOrderDetailResponse[]
 }
+
+export interface PurchaseOrderDropdownItem {
+  uuid: string
+  orderNumber: string
+  status: PurchaseOrderStatus
+  distributorName: string
+}

@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as PurchaseOrderService from './purchase-orders.service'
 import {
   createPurchaseOrderSchema,
@@ -172,6 +172,22 @@ export const deletePurchaseOrder = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.PURCHASE_ORDER_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getPurchaseOrdersDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await PurchaseOrderService.getPurchaseOrdersDropdown(
+      req.user!.pharmacyId!,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.PURCHASE_ORDERS_FETCHED, data)
   } catch (err) {
     next(err)
   }

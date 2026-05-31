@@ -4,7 +4,7 @@ import {
   UpdateDistributorInput,
   DistributorQueryInput,
 } from './distributors.validation'
-import { DistributorResponse } from './distributors.interface'
+import { DistributorResponse, DistributorDropdownItem } from './distributors.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
@@ -189,5 +189,20 @@ export const deleteDistributor = async (
       deletedAt: new Date(),
       deletedById: userId,
     }
+  })
+}
+
+export const getDistributorsDropdown = async (
+  pharmacyId: number,
+  search?: string
+): Promise<DistributorDropdownItem[]> => {
+  return prisma.distributor.findMany({
+    where: {
+      pharmacyId,
+      status: { not: 'DELETED' },
+      ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    },
+    select: { uuid: true, name: true },
+    orderBy: { name: 'asc' },
   })
 }

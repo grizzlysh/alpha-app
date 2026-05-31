@@ -19,6 +19,12 @@ router.get(
 )
 
 router.get(
+  '/dropdown',
+  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  MedicineShapeController.getMedicineShapesDropdown
+)
+
+router.get(
   '/:medicine_shape_uuid',
   requirePermission(PERMISSIONS.MEDICINES_VIEW),
   MedicineShapeController.getMedicineShape

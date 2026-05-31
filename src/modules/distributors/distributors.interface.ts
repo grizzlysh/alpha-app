@@ -85,3 +85,8 @@ export interface DistributorResponse {
   createdAt: Date
   updatedAt: Date
 }
+
+export interface DistributorDropdownItem {
+  uuid: string
+  name: string
+}

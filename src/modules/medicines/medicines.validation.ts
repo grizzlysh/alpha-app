@@ -3,9 +3,9 @@ import { RecordStatus } from '@prisma/client'
 
 export const createMedicineSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name is required' }),
-  shapeId: z.number().int().positive({ message: 'Shape is required' }),
-  typeId: z.number().int().positive({ message: 'Type is required' }),
-  medicineClassId: z.number().int().positive({ message: 'Medicine class is required' }),
+  medicineShapeUuid: z.string().uuid({ message: 'Invalid shape UUID' }),
+  medicineTypeUuid: z.string().uuid({ message: 'Invalid type UUID' }),
+  medicineClassUuid: z.string().uuid({ message: 'Invalid medicine class UUID' }),
   unit: z.string().trim().min(1, { message: 'Unit is required' }),
   ingredients: z.array(
     z.string().trim().min(1, { message: 'Ingredient name cannot be empty' })
@@ -14,9 +14,9 @@ export const createMedicineSchema = z.object({
 
 export const updateMedicineSchema = z.object({
   name: z.string().trim().min(1).optional(),
-  shapeId: z.number().int().positive().optional(),
-  typeId: z.number().int().positive().optional(),
-  medicineClassId: z.number().int().positive().optional(),
+  medicineShapeUuid: z.string().uuid().optional(),
+  medicineTypeUuid: z.string().uuid().optional(),
+  medicineClassUuid: z.string().uuid().optional(),
   unit: z.string().trim().min(1).optional(),
   ingredients: z.array(
     z.string().trim().min(1)
@@ -26,9 +26,9 @@ export const updateMedicineSchema = z.object({
 
 export const medicineQuerySchema = z.object({
   search: z.string().trim().optional(),
-  shapeId: z.coerce.number().int().positive().optional(),
-  typeId: z.coerce.number().int().positive().optional(),
-  medicineClassId: z.coerce.number().int().positive().optional(),
+  medicineShapeUuid: z.string().uuid().optional(),
+  medicineTypeUuid: z.string().uuid().optional(),
+  medicineClassUuid: z.string().uuid().optional(),
   status: z.nativeEnum(RecordStatus).optional(),
   sortBy: z.enum(['name', 'createdAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),

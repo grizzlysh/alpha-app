@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as MedicineService from './medicines.service'
 import {
   createMedicineSchema,
@@ -127,6 +127,22 @@ export const deleteMedicine = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicinesDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await MedicineService.getMedicinesDropdown(
+      req.user!.pharmacyId!,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.MEDICINES_FETCHED, data)
   } catch (err) {
     next(err)
   }

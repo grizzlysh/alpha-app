@@ -79,3 +79,10 @@ export interface CustomerResponse {
   createdAt: Date
   updatedAt: Date
 }
+
+export interface CustomerDropdownItem {
+  uuid: string
+  name: string
+  phone: string | null
+  isWalkIn: boolean
+}

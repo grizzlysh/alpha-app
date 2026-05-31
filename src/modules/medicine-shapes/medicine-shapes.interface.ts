@@ -72,3 +72,9 @@ export interface MedicineShapeResponse {
   createdAt: Date
   updatedAt: Date
 }
+
+export interface MedicineShapeDropdownItem {
+  uuid: string
+  name: string
+  isGlobal: boolean
+}

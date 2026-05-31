@@ -19,6 +19,12 @@ router.get(
 )
 
 router.get(
+  '/dropdown',
+  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  MedicineTypeController.getMedicineTypesDropdown
+)
+
+router.get(
   '/:medicine_type_uuid',
   requirePermission(PERMISSIONS.MEDICINES_VIEW),
   MedicineTypeController.getMedicineType

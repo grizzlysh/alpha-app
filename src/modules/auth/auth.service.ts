@@ -43,10 +43,8 @@ const getEffectivePermissions = async (
   userId: number,
   pharmacyId: number
 ): Promise<string[]> => {
-  const userPharmacy = await prisma.userPharmacy.findUnique({
-    where: {
-      userId_pharmacyId: { userId, pharmacyId },
-    },
+  const userPharmacy = await prisma.userPharmacy.findFirst({
+    where: { userId, pharmacyId, status: { not: 'DELETED' } },
     select: { roleId: true },
   })
 
@@ -211,16 +209,16 @@ export const selectPharmacy = async (
     hasAccess = true
   } else if (pharmacy.ownerId === userId) {
     hasAccess = true
-    const userPharmacy = await prisma.userPharmacy.findUnique({
-      where: { userId_pharmacyId: { userId, pharmacyId: pharmacy.id } },
+    const userPharmacy = await prisma.userPharmacy.findFirst({
+      where: { userId, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
     if (userPharmacy) {
       pharmacyRole = userPharmacy.role
     }
   } else {
-    const userPharmacy = await prisma.userPharmacy.findUnique({
-      where: { userId_pharmacyId: { userId, pharmacyId: pharmacy.id } },
+    const userPharmacy = await prisma.userPharmacy.findFirst({
+      where: { userId, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
     hasAccess = !!userPharmacy && userPharmacy.status === 'ACTIVE'
@@ -363,8 +361,8 @@ export const getMe = async (
   let role: PharmacyRoleItem | null = null
 
   if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
-    const userPharmacy = await prisma.userPharmacy.findUnique({
-      where: { userId_pharmacyId: { userId, pharmacyId } },
+    const userPharmacy = await prisma.userPharmacy.findFirst({
+      where: { userId, pharmacyId, status: { not: 'DELETED' } },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
     if (userPharmacy) {

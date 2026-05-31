@@ -6,6 +6,7 @@ import {
 } from './medicines.validation'
 import {
   MedicineResponse,
+  MedicineDropdownItem,
 } from './medicines.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
@@ -55,6 +56,37 @@ const checkDuplicate = async (
   }
 }
 
+const formatResponse = (m: any): MedicineResponse => ({
+  uuid: m.uuid,
+  name: m.name,
+  unit: m.unit,
+  status: m.status,
+  medicineShape: m.shape,
+  medicineType: m.type,
+  medicineClass: m.medicineClass,
+  ingredients: m.ingredients,
+  createdAt: m.createdAt,
+  updatedAt: m.updatedAt,
+})
+
+const resolveMedicineRefs = async (
+  medicineShapeUuid: string,
+  medicineTypeUuid: string,
+  medicineClassUuid: string
+): Promise<{ shapeId: number; typeId: number; medicineClassId: number }> => {
+  const [shape, type, medicineClass] = await Promise.all([
+    prisma.medicineShape.findFirst({ where: { uuid: medicineShapeUuid, status: { not: 'DELETED' } }, select: { id: true } }),
+    prisma.medicineType.findFirst({ where: { uuid: medicineTypeUuid, status: { not: 'DELETED' } }, select: { id: true } }),
+    prisma.medicineClass.findFirst({ where: { uuid: medicineClassUuid, status: { not: 'DELETED' } }, select: { id: true } }),
+  ])
+
+  if (!shape) throw new NotFoundException('Medicine shape not found')
+  if (!type) throw new NotFoundException('Medicine type not found')
+  if (!medicineClass) throw new NotFoundException('Medicine class not found')
+
+  return { shapeId: shape.id, typeId: type.id, medicineClassId: medicineClass.id }
+}
+
 // ── Services ──────────────────────────────────────────
 
 export const getMedicines = async (
@@ -63,9 +95,9 @@ export const getMedicines = async (
 ): Promise<{ data: MedicineResponse[]; meta: PaginationMeta }> => {
   const {
     search,
-    shapeId,
-    typeId,
-    medicineClassId,
+    medicineShapeUuid,
+    medicineTypeUuid,
+    medicineClassUuid,
     status,
     sortBy,
     sortOrder,
@@ -78,9 +110,9 @@ export const getMedicines = async (
   const where = {
     pharmacyId,
     status: status ?? { not: 'DELETED' as const },
-    ...(shapeId && { shapeId }),
-    ...(typeId && { typeId }),
-    ...(medicineClassId && { medicineClassId }),
+    ...(medicineShapeUuid && { shape: { uuid: medicineShapeUuid } }),
+    ...(medicineTypeUuid && { type: { uuid: medicineTypeUuid } }),
+    ...(medicineClassUuid && { medicineClass: { uuid: medicineClassUuid } }),
     ...(search && {
       OR: [
         { name: { contains: search, mode: 'insensitive' as const } },
@@ -113,7 +145,7 @@ export const getMedicines = async (
     totalPages: Math.ceil(total / limit),
   }
 
-  return { data: medicines as MedicineResponse[], meta }
+  return { data: medicines.map(formatResponse), meta }
 }
 
 export const getMedicineByUuid = async (
@@ -129,7 +161,7 @@ export const getMedicineByUuid = async (
     throw new NotFoundException('Medicine not found')
   }
 
-  return medicine as MedicineResponse
+  return formatResponse(medicine)
 }
 
 export const createMedicine = async (
@@ -140,13 +172,19 @@ export const createMedicine = async (
 ): Promise<MedicineResponse> => {
   await checkDuplicate(data.name, pharmacyId)
 
+  const { shapeId, typeId, medicineClassId } = await resolveMedicineRefs(
+    data.medicineShapeUuid,
+    data.medicineTypeUuid,
+    data.medicineClassUuid
+  )
+
   const medicine = await prisma.medicine.create({
     data: {
       pharmacyId,
       name: data.name,
-      shapeId: data.shapeId,
-      typeId: data.typeId,
-      medicineClassId: data.medicineClassId,
+      shapeId,
+      typeId,
+      medicineClassId,
       unit: data.unit,
       createdById: userId,
       ingredients: {
@@ -159,7 +197,7 @@ export const createMedicine = async (
     select: medicineSelect,
   })
 
-  return medicine as MedicineResponse
+  return formatResponse(medicine)
 }
 
 export const updateMedicine = async (
@@ -181,20 +219,45 @@ export const updateMedicine = async (
     await checkDuplicate(data.name, pharmacyId, uuid)
   }
 
-  // handle ingredients update — delete all and recreate
+  let shapeId: number | undefined
+  let typeId: number | undefined
+  let medicineClassId: number | undefined
+
+  if (data.medicineShapeUuid || data.medicineTypeUuid || data.medicineClassUuid) {
+    const [shape, type, medicineClass] = await Promise.all([
+      data.medicineShapeUuid
+        ? prisma.medicineShape.findFirst({ where: { uuid: data.medicineShapeUuid, status: { not: 'DELETED' } }, select: { id: true } })
+        : null,
+      data.medicineTypeUuid
+        ? prisma.medicineType.findFirst({ where: { uuid: data.medicineTypeUuid, status: { not: 'DELETED' } }, select: { id: true } })
+        : null,
+      data.medicineClassUuid
+        ? prisma.medicineClass.findFirst({ where: { uuid: data.medicineClassUuid, status: { not: 'DELETED' } }, select: { id: true } })
+        : null,
+    ])
+
+    if (data.medicineShapeUuid && !shape) throw new NotFoundException('Medicine shape not found')
+    if (data.medicineTypeUuid && !type) throw new NotFoundException('Medicine type not found')
+    if (data.medicineClassUuid && !medicineClass) throw new NotFoundException('Medicine class not found')
+
+    shapeId = shape?.id
+    typeId = type?.id
+    medicineClassId = medicineClass?.id
+  }
+
   const medicine = await prisma.medicine.update({
     where: { id: existing.id },
     data: {
       ...(data.name && { name: data.name }),
-      ...(data.shapeId && { shapeId: data.shapeId }),
-      ...(data.typeId && { typeId: data.typeId }),
-      ...(data.medicineClassId && { medicineClassId: data.medicineClassId }),
+      ...(shapeId && { shapeId }),
+      ...(typeId && { typeId }),
+      ...(medicineClassId && { medicineClassId }),
       ...(data.unit && { unit: data.unit }),
       ...(data.status && { status: data.status }),
       updatedById: userId,
       ...(data.ingredients && {
         ingredients: {
-          deleteMany: {},    // ← delete all existing
+          deleteMany: {},
           create: data.ingredients.map((name) => ({
             name,
             createdById: userId,
@@ -205,7 +268,7 @@ export const updateMedicine = async (
     select: medicineSelect,
   })
 
-  return medicine as MedicineResponse
+  return formatResponse(medicine)
 }
 
 export const deleteMedicine = async (
@@ -229,5 +292,20 @@ export const deleteMedicine = async (
       deletedAt: new Date(),
       deletedById: userId,
     }
+  })
+}
+
+export const getMedicinesDropdown = async (
+  pharmacyId: number,
+  search?: string
+): Promise<MedicineDropdownItem[]> => {
+  return prisma.medicine.findMany({
+    where: {
+      pharmacyId,
+      status: { not: 'DELETED' },
+      ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    },
+    select: { uuid: true, name: true, unit: true },
+    orderBy: { name: 'asc' },
   })
 }

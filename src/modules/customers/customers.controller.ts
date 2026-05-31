@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as CustomerService from './customers.service'
 import {
   createCustomerSchema,
@@ -125,6 +125,22 @@ export const deleteCustomer = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.CUSTOMER_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getCustomersDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await CustomerService.getCustomersDropdown(
+      req.user!.pharmacyId!,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.CUSTOMERS_FETCHED, data)
   } catch (err) {
     next(err)
   }

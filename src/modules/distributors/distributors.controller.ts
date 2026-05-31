@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as DistributorService from './distributors.service'
 import {
   createDistributorSchema,
@@ -125,6 +125,22 @@ export const deleteDistributor = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.DISTRIBUTOR_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getDistributorsDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await DistributorService.getDistributorsDropdown(
+      req.user!.pharmacyId!,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.DISTRIBUTORS_FETCHED, data)
   } catch (err) {
     next(err)
   }

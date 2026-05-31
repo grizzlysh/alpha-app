@@ -5,7 +5,7 @@ import {
   UpdateMedicineTypeInput,
   MedicineTypeQueryInput,
 } from './medicine-types.validation'
-import { MedicineTypeResponse } from './medicine-types.interface'
+import { MedicineTypeResponse, MedicineTypeDropdownItem } from './medicine-types.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -279,4 +279,27 @@ export const deleteMedicineType = async (
       deletedById: userId,
     }
   })
+}
+
+export const getMedicineTypesDropdown = async (
+  pharmacyId: number | null,
+  platformRole: PlatformRole | null,
+  search?: string
+): Promise<MedicineTypeDropdownItem[]> => {
+  const pharmacyFilter =
+    platformRole === PlatformRole.PLATFORM_ADMIN
+      ? {}
+      : { OR: [{ pharmacyId: null }, { pharmacyId }] }
+
+  const rows = await prisma.medicineType.findMany({
+    where: {
+      ...pharmacyFilter,
+      status: { not: 'DELETED' },
+      ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    },
+    select: { uuid: true, name: true, pharmacyId: true },
+    orderBy: { name: 'asc' },
+  })
+
+  return rows.map(r => ({ uuid: r.uuid, name: r.name, isGlobal: r.pharmacyId === null }))
 }

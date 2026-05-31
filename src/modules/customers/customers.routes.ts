@@ -16,6 +16,12 @@ router.get(
 )
 
 router.get(
+  '/dropdown',
+  requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
+  CustomerController.getCustomersDropdown
+)
+
+router.get(
   '/:customer_uuid',
   requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
   CustomerController.getCustomer

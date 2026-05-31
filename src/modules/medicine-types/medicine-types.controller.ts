@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as MedicineTypeService from './medicine-types.service'
 import {
   createMedicineTypeSchema,
@@ -130,6 +130,23 @@ export const deleteMedicineType = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_TYPE_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicineTypesDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await MedicineTypeService.getMedicineTypesDropdown(
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.MEDICINE_TYPES_FETCHED, data)
   } catch (err) {
     next(err)
   }

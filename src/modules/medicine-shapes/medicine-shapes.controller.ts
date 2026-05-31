@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as MedicineShapeService from './medicine-shapes.service'
 import {
   createMedicineShapeSchema,
@@ -130,6 +130,23 @@ export const deleteMedicineShape = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_SHAPE_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicineShapesDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await MedicineShapeService.getMedicineShapesDropdown(
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.MEDICINE_SHAPES_FETCHED, data)
   } catch (err) {
     next(err)
   }

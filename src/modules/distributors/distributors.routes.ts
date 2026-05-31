@@ -16,6 +16,12 @@ router.get(
 )
 
 router.get(
+  '/dropdown',
+  requirePermission(PERMISSIONS.DISTRIBUTORS_VIEW),
+  DistributorController.getDistributorsDropdown
+)
+
+router.get(
   '/:distributor_uuid',
   requirePermission(PERMISSIONS.DISTRIBUTORS_VIEW),
   DistributorController.getDistributor

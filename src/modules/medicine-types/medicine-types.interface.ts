@@ -72,3 +72,9 @@ export interface MedicineTypeResponse {
   createdAt: Date
   updatedAt: Date
 }
+
+export interface MedicineTypeDropdownItem {
+  uuid: string
+  name: string
+  isGlobal: boolean
+}

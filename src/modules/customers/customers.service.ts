@@ -4,7 +4,7 @@ import {
   UpdateCustomerInput,
   CustomerQueryInput,
 } from './customers.validation'
-import { CustomerResponse } from './customers.interface'
+import { CustomerResponse, CustomerDropdownItem } from './customers.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -242,5 +242,20 @@ export const deleteCustomer = async (
       deletedAt: new Date(),
       deletedById: userId,
     }
+  })
+}
+
+export const getCustomersDropdown = async (
+  pharmacyId: number,
+  search?: string
+): Promise<CustomerDropdownItem[]> => {
+  return prisma.customer.findMany({
+    where: {
+      pharmacyId,
+      status: { not: 'DELETED' },
+      ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    },
+    select: { uuid: true, name: true, phone: true, isWalkIn: true },
+    orderBy: { name: 'asc' },
   })
 }

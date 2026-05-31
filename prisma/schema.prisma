@@ -90,7 +90,7 @@ enum StockReturnStatus {
   COMPLETED
   CANCELLED
 }
-f
+
 enum StockDisposalStatus {
   DRAFT
   SUBMITTED
@@ -178,7 +178,6 @@ model Role {
   updatedByUser   User?            @relation("RoleUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser   User?            @relation("RoleDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([pharmacyId, name])
   @@map("mst_roles")
 }
 
@@ -507,7 +506,6 @@ model UserPharmacy {
   updatedByUser User?    @relation("UserPharmacyUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?    @relation("UserPharmacyDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([userId, pharmacyId])
   @@map("mst_user_pharmacies")
 }
 
@@ -534,7 +532,6 @@ model Position {
   updatedByUser User?      @relation("PositionUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("PositionDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([pharmacyId, name])
   @@map("mst_positions")
 }
 
@@ -593,7 +590,6 @@ model EmployeePharmacy {
   updatedByUser User?    @relation("EmployeePharmacyUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?    @relation("EmployeePharmacyDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([employeeId, pharmacyId])
   @@map("mst_employee_pharmacies")
 }
 
@@ -618,7 +614,6 @@ model MedicineShape {
   updatedByUser User?      @relation("MedicineShapeUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("MedicineShapeDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([pharmacyId, name])
   @@map("mst_medicine_shapes")
 }
 
@@ -641,7 +636,6 @@ model MedicineType {
   updatedByUser User?      @relation("MedicineTypeUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("MedicineTypeDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([pharmacyId, name])
   @@map("mst_medicine_types")
 }
 
@@ -664,7 +658,6 @@ model MedicineClass {
   updatedByUser User?      @relation("MedicineClassUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("MedicineClassDeletedBy", fields: [deletedById], references: [id])
 
-  @@unique([pharmacyId, name])
   @@map("mst_medicine_classes")
 }
 
@@ -701,7 +694,6 @@ model Medicine {
   stockDisposalDetails StockDisposalDetail[]
   saleDetails          SaleDetail[]
 
-  @@unique([pharmacyId, name])
   @@map("mst_medicines")
 }
 

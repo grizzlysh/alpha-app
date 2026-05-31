@@ -6,7 +6,7 @@ import {
   CancelPurchaseOrderInput,
   PurchaseOrderQueryInput,
 } from './purchase-orders.validation'
-import { PurchaseOrderResponse } from './purchase-orders.interface'
+import { PurchaseOrderResponse, PurchaseOrderDropdownItem } from './purchase-orders.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -417,4 +417,32 @@ export const deletePurchaseOrder = async (
       deletedById: userId,
     },
   })
+}
+
+export const getPurchaseOrdersDropdown = async (
+  pharmacyId: number,
+  search?: string
+): Promise<PurchaseOrderDropdownItem[]> => {
+  const rows = await prisma.purchaseOrder.findMany({
+    where: {
+      pharmacyId,
+      deletedAt: null,
+      status: { not: PurchaseOrderStatus.CANCELLED },
+      ...(search && { orderNumber: { contains: search, mode: 'insensitive' as const } }),
+    },
+    select: {
+      uuid: true,
+      orderNumber: true,
+      status: true,
+      distributor: { select: { name: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return rows.map(r => ({
+    uuid: r.uuid,
+    orderNumber: r.orderNumber,
+    status: r.status,
+    distributorName: r.distributor.name,
+  }))
 }

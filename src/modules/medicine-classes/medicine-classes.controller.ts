@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as MedicineClassService from './medicine-classes.service'
 import {
   createMedicineClassSchema,
@@ -130,6 +130,23 @@ export const deleteMedicineClass = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_CLASS_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicineClassesDropdown = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await MedicineClassService.getMedicineClassesDropdown(
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.query.search as string | undefined
+    )
+    sendSuccess(res, MESSAGE_CODES.MEDICINE_CLASSES_FETCHED, data)
   } catch (err) {
     next(err)
   }

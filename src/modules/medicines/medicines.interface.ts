@@ -6,9 +6,9 @@ import { ParamsDictionary } from 'express-serve-static-core'
 
 export interface MedicineQueryParams {
   search?: string
-  shapeId?: string
-  typeId?: string
-  medicineClassId?: string
+  medicineShapeUuid?: string
+  medicineTypeUuid?: string
+  medicineClassUuid?: string
   status?: RecordStatus
   sortBy?: 'name' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
@@ -22,18 +22,18 @@ export interface MedicineUuidParam extends ParamsDictionary {
 
 export interface CreateMedicineBody {
   name: string
-  shapeId: number
-  typeId: number
-  medicineClassId: number
+  medicineShapeUuid: string
+  medicineTypeUuid: string
+  medicineClassUuid: string
   unit: string
   ingredients: string[]
 }
 
 export interface UpdateMedicineBody {
   name?: string
-  shapeId?: number
-  typeId?: number
-  medicineClassId?: number
+  medicineShapeUuid?: string
+  medicineTypeUuid?: string
+  medicineClassUuid?: string
   unit?: string
   ingredients?: string[]
   status?: RecordStatus
@@ -99,10 +99,16 @@ export interface MedicineResponse {
   name: string
   unit: string
   status: RecordStatus
-  shape: MedicineShapeResponse
-  type: MedicineTypeResponse
+  medicineShape: MedicineShapeResponse
+  medicineType: MedicineTypeResponse
   medicineClass: MedicineClassResponse
   ingredients: MedicineIngredientResponse[]
   createdAt: Date
   updatedAt: Date
+}
+
+export interface MedicineDropdownItem {
+  uuid: string
+  name: string
+  unit: string
 }

@@ -5,7 +5,7 @@ import {
   UpdateMedicineShapeInput,
   MedicineShapeQueryInput,
 } from './medicine-shapes.validation'
-import { MedicineShapeResponse } from './medicine-shapes.interface'
+import { MedicineShapeResponse, MedicineShapeDropdownItem } from './medicine-shapes.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -279,4 +279,27 @@ export const deleteMedicineShape = async (
       deletedById: userId,
     }
   })
+}
+
+export const getMedicineShapesDropdown = async (
+  pharmacyId: number | null,
+  platformRole: PlatformRole | null,
+  search?: string
+): Promise<MedicineShapeDropdownItem[]> => {
+  const pharmacyFilter =
+    platformRole === PlatformRole.PLATFORM_ADMIN
+      ? {}
+      : { OR: [{ pharmacyId: null }, { pharmacyId }] }
+
+  const rows = await prisma.medicineShape.findMany({
+    where: {
+      ...pharmacyFilter,
+      status: { not: 'DELETED' },
+      ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    },
+    select: { uuid: true, name: true, pharmacyId: true },
+    orderBy: { name: 'asc' },
+  })
+
+  return rows.map(r => ({ uuid: r.uuid, name: r.name, isGlobal: r.pharmacyId === null }))
 }
