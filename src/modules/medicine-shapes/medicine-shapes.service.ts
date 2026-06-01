@@ -1,4 +1,4 @@
-import { PlatformRole } from '@prisma/client'
+import { PlatformRole, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   CreateMedicineShapeInput,
@@ -22,7 +22,7 @@ const medicineShapeSelect = {
   updatedAt: true,
 }
 
-const formatResponse = (medicine_shape: any): MedicineShapeResponse => ({
+const formatResponse = (medicine_shape: Prisma.MedicineShapeGetPayload<{ select: typeof medicineShapeSelect }>): MedicineShapeResponse => ({
   uuid: medicine_shape.uuid,
   name: medicine_shape.name,
   isGlobal: medicine_shape.pharmacyId === null,

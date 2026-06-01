@@ -66,7 +66,7 @@ const stockReturnSelect = {
 const resolveDistributor = async (
   distributorUuid: string,
   pharmacyId: number,
-  tx: any
+  tx: Prisma.TransactionClient
 ) => {
   const distributor = await tx.distributor.findFirst({
     where: { uuid: distributorUuid, pharmacyId, status: 'ACTIVE' },
@@ -79,7 +79,7 @@ const resolveDistributor = async (
 const resolveSignedBy = async (
   signedByUuid: string,
   pharmacyId: number,
-  tx: any
+  tx: Prisma.TransactionClient
 ) => {
   const employee = await tx.employee.findFirst({
     where: { uuid: signedByUuid, pharmacyId, status: 'ACTIVE' },
@@ -101,7 +101,7 @@ const resolveStockDetail = async (
   stockDetailUuid: string,
   pharmacyId: number,
   quantityPieces: number,
-  tx: any
+  tx: Prisma.TransactionClient
 ) => {
   const stockDetail = await tx.stockDetail.findFirst({
     where: {

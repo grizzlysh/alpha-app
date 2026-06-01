@@ -1,4 +1,5 @@
-import { prisma } from '../../config/db'
+import { Prisma } from '@prisma/client'
+import { prisma } from '@config/db'
 import {
   CreateMedicineInput,
   UpdateMedicineInput,
@@ -56,7 +57,7 @@ const checkDuplicate = async (
   }
 }
 
-const formatResponse = (m: any): MedicineResponse => ({
+const formatResponse = (m: Prisma.MedicineGetPayload<{ select: typeof medicineSelect }>): MedicineResponse => ({
   uuid: m.uuid,
   name: m.name,
   unit: m.unit,

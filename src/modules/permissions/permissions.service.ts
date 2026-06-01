@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import { PermissionQueryInput } from './permissions.validation'
 import {
@@ -11,14 +12,14 @@ import { PaginationMeta } from '@interfaces/common.interface'
 
 const permissionSelect = {
   uuid: true,
-  name: true,
+  action: true,
   module: true,
   description: true,
 }
 
-const formatResponse = (permission: any): PermissionResponse => ({
+const formatResponse = (permission: Prisma.PermissionGetPayload<{ select: typeof permissionSelect }>): PermissionResponse => ({
   uuid: permission.uuid,
-  name: permission.name,
+  name: `${permission.module}.${permission.action}`,
   module: permission.module,
   description: permission.description,
 })

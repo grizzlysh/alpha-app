@@ -1,4 +1,4 @@
-import { SaleStatus, SaleType, PaymentStatus } from '@prisma/client'
+import { SaleStatus, SaleType, PaymentStatus, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   CreateSaleInput,
@@ -66,11 +66,29 @@ const saleSelect = {
   },
 }
 
-const formatSale = (sale: any): SaleResponse => ({
+type SaleDetailDraft = {
+  stockDetailId: number
+  medicineId: number
+  quantityPieces: number
+  quantityBox: number
+  sellingPrice: Decimal
+  discount: Decimal
+  totalAmount: Decimal
+  isFefoOverride: boolean
+  createdById: number
+  _stockDetailId: number
+  _stockId: number
+  _quantityPieces: number
+  _quantityBefore: number
+  _stockDetailQuantityBefore: number
+  _stockDetailQuantityPerBox: number
+}
+
+const formatSale = (sale: Prisma.SaleGetPayload<{ select: typeof saleSelect }>): SaleResponse => ({
   ...sale,
   totalAmount: parseFloat(sale.totalAmount.toString()),
   paidAmount: parseFloat(sale.paidAmount.toString()),
-  details: sale.details.map((d: any) => ({
+  details: sale.details.map((d) => ({
     ...d,
     sellingPrice: parseFloat(d.sellingPrice.toString()),
     discount: parseFloat(d.discount.toString()),
@@ -81,7 +99,7 @@ const formatSale = (sale: any): SaleResponse => ({
         ...sale.payment,
         totalAmount: parseFloat(sale.payment.totalAmount.toString()),
         paidAmount: parseFloat(sale.payment.paidAmount.toString()),
-        history: sale.payment.history.map((h: any) => ({
+        history: sale.payment.history.map((h) => ({
           ...h,
           amount: parseFloat(h.amount.toString()),
         })),
@@ -220,7 +238,7 @@ export const createSale = async (
 
     // ── Process Details ───────────────────────────
     let totalAmount = 0
-    const detailsData: any[] = []
+    const detailsData: SaleDetailDraft[] = []
 
     for (const detail of data.details) {
       // get stock detail
@@ -407,7 +425,7 @@ export const createSale = async (
     select: saleSelect,
   })
 
-  return formatSale(fullSale)
+  return formatSale(fullSale!)
 }
 
 export const cancelOrRefundSale = async (
@@ -542,7 +560,7 @@ export const cancelOrRefundSale = async (
     select: saleSelect,
   })
 
-  return formatSale(fullSale)
+  return formatSale(fullSale!)
 }
 
 export const addPayment = async (
@@ -645,5 +663,5 @@ export const addPayment = async (
     select: saleSelect,
   })
 
-  return formatSale(fullSale)
+  return formatSale(fullSale!)
 }

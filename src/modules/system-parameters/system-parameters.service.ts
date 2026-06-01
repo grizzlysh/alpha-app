@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   SystemParameterQueryInput,
@@ -18,7 +19,7 @@ const systemParameterSelect = {
   updatedAt: true,
 }
 
-const formatResponse = (param: any): SystemParameterResponse => ({
+const formatResponse = (param: Prisma.SystemParameterGetPayload<{ select: typeof systemParameterSelect }>): SystemParameterResponse => ({
   uuid: param.uuid,
   key: param.key,
   value: param.value,

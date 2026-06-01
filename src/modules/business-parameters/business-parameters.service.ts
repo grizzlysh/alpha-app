@@ -1,4 +1,4 @@
-import { PlatformRole } from '@prisma/client'
+import { PlatformRole, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   BusinessParameterQueryInput,
@@ -20,7 +20,7 @@ const businessParameterSelect = {
   updatedAt: true,
 }
 
-const formatResponse = (param: any): BusinessParameterResponse => ({
+const formatResponse = (param: Prisma.BusinessParameterGetPayload<{ select: typeof businessParameterSelect }>): BusinessParameterResponse => ({
   uuid: param.uuid,
   key: param.key,
   value: param.value,

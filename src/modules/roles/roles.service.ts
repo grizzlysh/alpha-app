@@ -1,4 +1,4 @@
-import { PlatformRole } from '@prisma/client'
+import { PlatformRole, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   RoleQueryInput,
@@ -32,12 +32,12 @@ const roleSelect = {
 
 const permissionSelect = {
   uuid: true,
-  name: true,
+  action: true,
   module: true,
   description: true,
 }
 
-const formatResponse = (role: any): RoleResponse => ({
+const formatResponse = (role: Prisma.RoleGetPayload<{ select: typeof roleSelect }>): RoleResponse => ({
   uuid: role.uuid,
   name: role.name,
   type: role.type,
@@ -172,7 +172,12 @@ export const getRoleByUuid = async (
 
   return {
     ...formatResponse(role),
-    permissions: role.rolePermissions.map((rp: any) => rp.permission),
+    permissions: role.rolePermissions.map((rp) => ({
+      uuid: rp.permission.uuid,
+      name: `${rp.permission.module}.${rp.permission.action}`,
+      module: rp.permission.module,
+      description: rp.permission.description,
+    })),
   }
 }
 

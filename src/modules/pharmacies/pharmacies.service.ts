@@ -1,4 +1,4 @@
-import { PlatformRole } from '@prisma/client'
+import { PlatformRole, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   PharmacyQueryInput,
@@ -35,7 +35,7 @@ const pharmacySelect = {
   },
 }
 
-const formatResponse = (pharmacy: any): PharmacyResponse => ({
+const formatResponse = (pharmacy: Prisma.PharmacyGetPayload<{ select: typeof pharmacySelect }>): PharmacyResponse => ({
   uuid: pharmacy.uuid,
   name: pharmacy.name,
   code: pharmacy.code,
