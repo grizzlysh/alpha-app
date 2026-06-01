@@ -1,6 +1,6 @@
 // utils/stockMovementRules.ts
 
-import { BadRequestException } from "@exceptions"
+import { BadRequestException } from '@exceptions/BadRequestException'
 import { StockMovementReason, StockMovementType } from "@prisma/client"
 
 const VALID_COMBINATIONS: Record<StockMovementReason, StockMovementType[]> = {

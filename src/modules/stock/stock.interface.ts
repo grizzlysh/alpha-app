@@ -123,6 +123,7 @@ export interface StockResponse {
   isManualPrice: boolean
   effectiveSellingPrice: number
   isLowStock: boolean
+  isCriticalStock: boolean
   medicine: {
     uuid: string
     name: string
@@ -189,5 +190,6 @@ export interface CrossPharmacyStockResponse {
   totalPieces: number
   effectiveSellingPrice: number
   isLowStock: boolean
+  isCriticalStock: boolean
   details: StockDetailResponse[]
 }

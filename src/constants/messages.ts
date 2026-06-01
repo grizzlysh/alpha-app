@@ -562,9 +562,9 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'User not found',
     id: 'Pengguna tidak ditemukan',
   },
-  USER_HAS_ACTIVE_ASSIGNMENTS: {
-    en: 'User has active assignments and cannot be deleted',
-    id: 'Pengguna memiliki penugasan aktif dan tidak dapat dihapus',
+  USER_HAS_ACTIVE_PLACEMENTS: {
+    en: 'User has active placements and cannot be deleted',
+    id: 'Pengguna memiliki penempatan aktif dan tidak dapat dihapus',
   },
   CANNOT_DELETE_YOURSELF: {
     en: 'You cannot delete your own account',
@@ -579,38 +579,38 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Kata sandi default belum dikonfigurasi',
   },
 
-  // ─── Assignments ───────────────────────────────────────────────────────────
-  ASSIGNMENTS_FETCHED: {
-    en: 'Assignments fetched successfully',
-    id: 'Data penugasan berhasil diambil',
+  // ─── Placements ────────────────────────────────────────────────────────────
+  PLACEMENTS_FETCHED: {
+    en: 'Placements fetched successfully',
+    id: 'Data penempatan berhasil diambil',
   },
-  ASSIGNMENT_FETCHED: {
-    en: 'Assignment fetched successfully',
-    id: 'Data penugasan berhasil diambil',
+  PLACEMENT_FETCHED: {
+    en: 'Placement fetched successfully',
+    id: 'Data penempatan berhasil diambil',
   },
-  ASSIGNMENT_CREATED: {
-    en: 'Assignment created successfully',
-    id: 'Penugasan berhasil dibuat',
+  PLACEMENT_CREATED: {
+    en: 'Placement created successfully',
+    id: 'Penempatan berhasil dibuat',
   },
-  ASSIGNMENT_UPDATED: {
-    en: 'Assignment updated successfully',
-    id: 'Penugasan berhasil diperbarui',
+  PLACEMENT_UPDATED: {
+    en: 'Placement updated successfully',
+    id: 'Penempatan berhasil diperbarui',
   },
-  ASSIGNMENT_DELETED: {
-    en: 'Assignment deleted successfully',
-    id: 'Penugasan berhasil dihapus',
+  PLACEMENT_DELETED: {
+    en: 'Placement deleted successfully',
+    id: 'Penempatan berhasil dihapus',
   },
-  ASSIGNMENT_NOT_FOUND: {
-    en: 'Assignment not found',
-    id: 'Penugasan tidak ditemukan',
+  PLACEMENT_NOT_FOUND: {
+    en: 'Placement not found',
+    id: 'Penempatan tidak ditemukan',
   },
-  MAX_ASSIGNMENTS_REACHED: {
-    en: 'Maximum number of assignments has been reached',
-    id: 'Batas maksimal penugasan telah tercapai',
+  MAX_PLACEMENTS_REACHED: {
+    en: 'Maximum number of placements has been reached',
+    id: 'Batas maksimal penempatan telah tercapai',
   },
-  USER_ALREADY_ASSIGNED_TO_PHARMACY: {
-    en: 'User is already assigned to this pharmacy',
-    id: 'Pengguna sudah ditugaskan ke apotek ini',
+  USER_ALREADY_PLACED_AT_PHARMACY: {
+    en: 'User is already placed at this pharmacy',
+    id: 'Pengguna sudah ditempatkan di apotek ini',
   },
   PHARMACY_ALREADY_HAS_SIGN_FULL_USER: {
     en: 'Pharmacy already has a user with full signing authority',

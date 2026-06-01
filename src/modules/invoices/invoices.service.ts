@@ -234,11 +234,18 @@ export const createInvoice = async (
     }
 
     // ── Get Business Parameters ───────────────────
-    const marginParam = await tx.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'MARGIN_PERCENTAGE' } },
-      select: { value: true },
-    })
+    const [marginParam, reorderParam] = await Promise.all([
+      tx.businessParameter.findUnique({
+        where: { pharmacyId_key: { pharmacyId, key: 'MARGIN_PERCENTAGE' } },
+        select: { value: true },
+      }),
+      tx.businessParameter.findUnique({
+        where: { pharmacyId_key: { pharmacyId, key: 'REORDER_LEVEL_DEFAULT' } },
+        select: { value: true },
+      }),
+    ])
     const marginPercentage = parseFloat(marginParam?.value ?? '0')
+    const reorderLevelDefault = parseInt(reorderParam?.value ?? '0', 10)
 
     // ── Calculate Details ─────────────────────────
     const detailsData = await Promise.all(
@@ -344,6 +351,7 @@ export const createInvoice = async (
           pharmacyId,
           medicineId: detail.medicineId,
           totalPieces: detail.quantityPieces,
+          reorderLevel: reorderLevelDefault,
           basePrice: detail.finalPrice,
           calculatedPrice: detail.calculatedPrice,
           createdById: userId,

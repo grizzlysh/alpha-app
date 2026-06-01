@@ -33,12 +33,11 @@ export const getPermissions = async (
   const skip = (page - 1) * limit
 
   const where = {
-    status: { not: 'DELETED' as const },
     ...(module && { module: { equals: module, mode: 'insensitive' as const } }),
     ...(search && {
       OR: [
-        { name: { contains: search, mode: 'insensitive' as const } },
         { module: { contains: search, mode: 'insensitive' as const } },
+        { action: { contains: search, mode: 'insensitive' as const } },
       ],
     }),
   }
@@ -82,7 +81,7 @@ export const getPermissionByUuid = async (
   uuid: string
 ): Promise<PermissionResponse> => {
   const permission = await prisma.permission.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid },
     select: permissionSelect,
   })
 

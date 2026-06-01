@@ -23,10 +23,17 @@ import { PERMISSIONS } from '@constants/permissions'
 
 // ── Token Helpers ─────────────────────────────────────
 
-const generateAccessToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, env.JWT_SECRET as string, {
-    expiresIn: '15m',
+const getSessionExpiry = async (): Promise<number> => {
+  const param = await prisma.systemParameter.findUnique({
+    where: { key: 'SESSION_TIMEOUT_MINUTES' },
+    select: { value: true },
   })
+  const minutes = parseInt(param?.value ?? '480', 10)
+  return minutes * 60 // JWT expiresIn expects seconds
+}
+
+const generateAccessToken = (payload: JwtPayload, expiresIn: number): string => {
+  return jwt.sign(payload, env.JWT_SECRET as string, { expiresIn })
 }
 
 const generateRefreshToken = (): string => {
@@ -133,6 +140,8 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
       password: true,
       platformRole: true,
       status: true,
+      failedLoginCount: true,
+      lockedUntil: true,
     },
   })
 
@@ -140,14 +149,44 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
     throw new UnauthorizedException('Invalid email or password')
   }
 
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    throw new UnauthorizedException('Account is temporarily locked. Please try again later.')
+  }
+
+  const maxAttemptsParam = await prisma.systemParameter.findUnique({
+    where: { key: 'MAX_LOGIN_ATTEMPTS' },
+    select: { value: true },
+  })
+  const maxAttempts = parseInt(maxAttemptsParam?.value ?? '5', 10)
+
   const isPasswordValid: boolean = await bcrypt.compare(
     data.password,
     user.password
   )
 
   if (!isPasswordValid) {
+    const newCount = user.failedLoginCount + 1
+    if (newCount >= maxAttempts) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginCount: newCount,
+          lockedUntil: new Date(Date.now() + 30 * 60 * 1000),
+        },
+      })
+      throw new UnauthorizedException('Too many failed attempts. Account locked for 30 minutes.')
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginCount: newCount },
+    })
     throw new UnauthorizedException('Invalid email or password')
   }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { failedLoginCount: 0, lockedUntil: null },
+  })
 
   const accessiblePharmacies = await getPharmaciesForUser(user.id, user.platformRole)
 
@@ -160,7 +199,8 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
     permissions: [],
   }
 
-  const accessToken = generateAccessToken(accessTokenPayload)
+  const expiresIn = await getSessionExpiry()
+  const accessToken = generateAccessToken(accessTokenPayload, expiresIn)
   const refreshToken = generateRefreshToken()
   const hashedRefreshToken = hashToken(refreshToken)
 
@@ -239,6 +279,11 @@ export const selectPharmacy = async (
     permissions = await getEffectivePermissions(userId, pharmacy.id)
   }
 
+  await prisma.user.update({
+    where: { id: userId },
+    data: { lastSelectedPharmacyId: pharmacy.id },
+  })
+
   const accessTokenPayload: JwtPayload = {
     id: userId,
     uuid: userUuid,
@@ -248,7 +293,8 @@ export const selectPharmacy = async (
     permissions,
   }
 
-  const accessToken = generateAccessToken(accessTokenPayload)
+  const expiresIn = await getSessionExpiry()
+  const accessToken = generateAccessToken(accessTokenPayload, expiresIn)
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -293,6 +339,7 @@ export const refreshAccessToken = async (
           uuid: true,
           platformRole: true,
           status: true,
+          lastSelectedPharmacyId: true,
         },
       },
     },
@@ -306,16 +353,39 @@ export const refreshAccessToken = async (
     throw new UnauthorizedException('User is inactive')
   }
 
-  const accessTokenPayload: JwtPayload = {
-    id: userToken.user.id,
-    uuid: userToken.user.uuid,
-    platformRole: userToken.user.platformRole,
-    pharmacyId: null,
-    pharmacyUuid: null,
-    permissions: [],
+  const { user } = userToken
+
+  let pharmacyId: number | null = null
+  let pharmacyUuid: string | null = null
+  let permissions: string[] = []
+
+  if (user.lastSelectedPharmacyId) {
+    const pharmacy = await prisma.pharmacy.findFirst({
+      where: { id: user.lastSelectedPharmacyId, status: 'ACTIVE' },
+      select: { id: true, uuid: true },
+    })
+    if (pharmacy) {
+      pharmacyId = pharmacy.id
+      pharmacyUuid = pharmacy.uuid
+      if (user.platformRole === PlatformRole.PLATFORM_ADMIN) {
+        permissions = Object.values(PERMISSIONS)
+      } else {
+        permissions = await getEffectivePermissions(user.id, pharmacy.id)
+      }
+    }
   }
 
-  const accessToken = generateAccessToken(accessTokenPayload)
+  const accessTokenPayload: JwtPayload = {
+    id: user.id,
+    uuid: user.uuid,
+    platformRole: user.platformRole,
+    pharmacyId,
+    pharmacyUuid,
+    permissions,
+  }
+
+  const expiresIn = await getSessionExpiry()
+  const accessToken = generateAccessToken(accessTokenPayload, expiresIn)
 
   return { accessToken }
 }

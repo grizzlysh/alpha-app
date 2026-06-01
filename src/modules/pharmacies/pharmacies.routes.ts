@@ -11,13 +11,13 @@ router.use(authenticate)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.PHARMACIES_VIEW),
+  requirePermission(PERMISSIONS.PHARMACIES_READ),
   PharmacyController.getPharmacies
 )
 
 router.get(
   '/:pharmacy_uuid',
-  requirePermission(PERMISSIONS.PHARMACIES_VIEW),
+  requirePermission(PERMISSIONS.PHARMACIES_READ),
   PharmacyController.getPharmacy
 )
 
@@ -29,7 +29,7 @@ router.post(
 
 router.put(
   '/:pharmacy_uuid',
-  requirePermission(PERMISSIONS.PHARMACIES_EDIT),
+  requirePermission(PERMISSIONS.PHARMACIES_UPDATE),
   PharmacyController.updatePharmacy
 )
 

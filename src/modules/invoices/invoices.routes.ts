@@ -11,13 +11,13 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.INVOICES_VIEW),
+  requirePermission(PERMISSIONS.INVOICES_READ),
   InvoiceController.getInvoices
 )
 
 router.get(
   '/:invoice_uuid',
-  requirePermission(PERMISSIONS.INVOICES_VIEW),
+  requirePermission(PERMISSIONS.INVOICES_READ),
   InvoiceController.getInvoice
 )
 

@@ -14,19 +14,19 @@ router.use(authenticate)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.MEDICINE_CLASSES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_READ),
   MedicineClassController.getMedicineClasses
 )
 
 router.get(
   '/dropdown',
-  requirePermission(PERMISSIONS.MEDICINE_CLASSES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_READ),
   MedicineClassController.getMedicineClassesDropdown
 )
 
 router.get(
   '/:medicine_class_uuid',
-  requirePermission(PERMISSIONS.MEDICINE_CLASSES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_READ),
   MedicineClassController.getMedicineClass
 )
 
@@ -38,7 +38,7 @@ router.post(
 
 router.put(
   '/:medicine_class_uuid',
-  requirePermission(PERMISSIONS.MEDICINE_CLASSES_EDIT),
+  requirePermission(PERMISSIONS.MEDICINE_CLASSES_UPDATE),
   MedicineClassController.updateMedicineClass
 )
 

@@ -14,13 +14,13 @@ router.use(authenticate)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.ROLES_VIEW),
+  requirePermission(PERMISSIONS.ROLES_READ),
   RoleController.getRoles
 )
 
 router.get(
   '/:role_uuid',
-  requirePermission(PERMISSIONS.ROLES_VIEW),
+  requirePermission(PERMISSIONS.ROLES_READ),
   RoleController.getRole
 )
 
@@ -32,13 +32,13 @@ router.post(
 
 router.put(
   '/:role_uuid',
-  requirePermission(PERMISSIONS.ROLES_EDIT),
+  requirePermission(PERMISSIONS.ROLES_UPDATE),
   RoleController.updateRole
 )
 
 router.put(
   '/:role_uuid/permissions',
-  requirePermission(PERMISSIONS.ROLES_EDIT),
+  requirePermission(PERMISSIONS.ROLES_UPDATE),
   RoleController.setRolePermissions
 )
 

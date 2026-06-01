@@ -11,19 +11,19 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINES_READ),
   MedicineController.getMedicines
 )
 
 router.get(
   '/dropdown',
-  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINES_READ),
   MedicineController.getMedicinesDropdown
 )
 
 router.get(
   '/:medicine_uuid',
-  requirePermission(PERMISSIONS.MEDICINES_VIEW),
+  requirePermission(PERMISSIONS.MEDICINES_READ),
   MedicineController.getMedicine
 )
 
@@ -35,7 +35,7 @@ router.post(
 
 router.put(
   '/:medicine_uuid',
-  requirePermission(PERMISSIONS.MEDICINES_EDIT),
+  requirePermission(PERMISSIONS.MEDICINES_UPDATE),
   MedicineController.updateMedicine
 )
 

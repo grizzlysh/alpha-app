@@ -10,19 +10,19 @@ router.use(authenticate)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.BUSINESS_PARAMETERS_VIEW),
+  requirePermission(PERMISSIONS.BUSINESS_PARAMETERS_READ),
   BusinessParameterController.getBusinessParameters
 )
 
 router.get(
   '/:business_parameter_uuid',
-  requirePermission(PERMISSIONS.BUSINESS_PARAMETERS_VIEW),
+  requirePermission(PERMISSIONS.BUSINESS_PARAMETERS_READ),
   BusinessParameterController.getBusinessParameter
 )
 
 router.put(
   '/:business_parameter_uuid',
-  requirePermission(PERMISSIONS.BUSINESS_PARAMETERS_EDIT),
+  requirePermission(PERMISSIONS.BUSINESS_PARAMETERS_UPDATE),
   BusinessParameterController.updateBusinessParameter
 )
 

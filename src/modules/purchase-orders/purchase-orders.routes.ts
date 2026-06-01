@@ -11,19 +11,19 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.PURCHASE_ORDERS_VIEW),
+  requirePermission(PERMISSIONS.PURCHASE_ORDERS_READ),
   PurchaseOrderController.getPurchaseOrders
 )
 
 router.get(
   '/dropdown',
-  requirePermission(PERMISSIONS.PURCHASE_ORDERS_VIEW),
+  requirePermission(PERMISSIONS.PURCHASE_ORDERS_READ),
   PurchaseOrderController.getPurchaseOrdersDropdown
 )
 
 router.get(
   '/:purchase_order_uuid',
-  requirePermission(PERMISSIONS.PURCHASE_ORDERS_VIEW),
+  requirePermission(PERMISSIONS.PURCHASE_ORDERS_READ),
   PurchaseOrderController.getPurchaseOrder
 )
 
@@ -35,19 +35,19 @@ router.post(
 
 router.put(
   '/:purchase_order_uuid',
-  requirePermission(PERMISSIONS.PURCHASE_ORDERS_EDIT),
+  requirePermission(PERMISSIONS.PURCHASE_ORDERS_UPDATE),
   PurchaseOrderController.updatePurchaseOrder
 )
 
 router.patch(
   '/:purchase_order_uuid/submit',
-  requirePermission(PERMISSIONS.PURCHASE_ORDERS_EDIT),
+  requirePermission(PERMISSIONS.PURCHASE_ORDERS_UPDATE),
   PurchaseOrderController.submitPurchaseOrder
 )
 
 router.patch(
   '/:purchase_order_uuid/cancel',
-  requirePermission(PERMISSIONS.PURCHASE_ORDERS_EDIT),
+  requirePermission(PERMISSIONS.PURCHASE_ORDERS_UPDATE),
   PurchaseOrderController.cancelPurchaseOrder
 )
 

@@ -14,13 +14,13 @@ router.use(authenticate)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.PERMISSIONS_VIEW),
+  requirePermission(PERMISSIONS.PERMISSIONS_READ),
   PermissionController.getPermissions
 )
 
 router.get(
   '/:permission_uuid',
-  requirePermission(PERMISSIONS.PERMISSIONS_VIEW),
+  requirePermission(PERMISSIONS.PERMISSIONS_READ),
   PermissionController.getPermission
 )
 

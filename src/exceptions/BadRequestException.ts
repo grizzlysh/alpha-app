@@ -1,5 +1,5 @@
 import { AppError } from './AppError'
-import { HTTP_STATUS } from '@constants'
+import { HTTP_STATUS } from '@constants/httpStatus'
 
 export class BadRequestException extends AppError {
   constructor(message: string = 'Bad request') {

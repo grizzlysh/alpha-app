@@ -1,5 +1,5 @@
 import { AppError } from './AppError'
-import { HTTP_STATUS } from '@constants'
+import { HTTP_STATUS } from '@constants/httpStatus'
 
 interface BilingualMessage {
   en: string

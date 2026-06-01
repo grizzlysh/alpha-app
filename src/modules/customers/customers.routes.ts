@@ -11,19 +11,19 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
+  requirePermission(PERMISSIONS.CUSTOMERS_READ),
   CustomerController.getCustomers
 )
 
 router.get(
   '/dropdown',
-  requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
+  requirePermission(PERMISSIONS.CUSTOMERS_READ),
   CustomerController.getCustomersDropdown
 )
 
 router.get(
   '/:customer_uuid',
-  requirePermission(PERMISSIONS.CUSTOMERS_VIEW),
+  requirePermission(PERMISSIONS.CUSTOMERS_READ),
   CustomerController.getCustomer
 )
 
@@ -35,7 +35,7 @@ router.post(
 
 router.put(
   '/:customer_uuid',
-  requirePermission(PERMISSIONS.CUSTOMERS_EDIT),
+  requirePermission(PERMISSIONS.CUSTOMERS_UPDATE),
   CustomerController.updateCustomer
 )
 

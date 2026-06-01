@@ -23,6 +23,9 @@ const saleSelect = {
   status: true,
   totalAmount: true,
   paidAmount: true,
+  taxPercentage: true,
+  taxAmount: true,
+  dueDate: true,
   description: true,
   soldAt: true,
   createdAt: true,
@@ -88,6 +91,8 @@ const formatSale = (sale: Prisma.SaleGetPayload<{ select: typeof saleSelect }>):
   ...sale,
   totalAmount: parseFloat(sale.totalAmount.toString()),
   paidAmount: parseFloat(sale.paidAmount.toString()),
+  taxPercentage: parseFloat(sale.taxPercentage.toString()),
+  taxAmount: parseFloat(sale.taxAmount.toString()),
   details: sale.details.map((d) => ({
     ...d,
     sellingPrice: parseFloat(d.sellingPrice.toString()),
@@ -201,6 +206,42 @@ export const createSale = async (
   pharmacyId: number,
   userId: number
 ): Promise<SaleResponse> => {
+  // ── Read Parameters (outside transaction) ─────
+  const [
+    allowExpiredParam,
+    taxParam,
+    maxDiscountParam,
+    allowFefoParam,
+    creditDaysParam,
+  ] = await Promise.all([
+    prisma.systemParameter.findUnique({
+      where: { key: 'ALLOW_EXPIRED_MEDICINE_SALE' },
+      select: { value: true },
+    }),
+    prisma.businessParameter.findUnique({
+      where: { pharmacyId_key: { pharmacyId, key: 'TAX_PERCENTAGE' } },
+      select: { value: true },
+    }),
+    prisma.businessParameter.findUnique({
+      where: { pharmacyId_key: { pharmacyId, key: 'MAX_DISCOUNT_PERCENTAGE' } },
+      select: { value: true },
+    }),
+    prisma.businessParameter.findUnique({
+      where: { pharmacyId_key: { pharmacyId, key: 'ALLOW_FEFO_OVERRIDE' } },
+      select: { value: true },
+    }),
+    prisma.businessParameter.findUnique({
+      where: { pharmacyId_key: { pharmacyId, key: 'CREDIT_PAYMENT_DAYS' } },
+      select: { value: true },
+    }),
+  ])
+
+  const allowExpiredSale = allowExpiredParam?.value === 'true'
+  const taxPercentage = parseFloat(taxParam?.value ?? '0')
+  const maxDiscountPct = parseFloat(maxDiscountParam?.value ?? '100')
+  const allowFefoOverride = allowFefoParam?.value !== 'false'
+  const creditPaymentDays = parseInt(creditDaysParam?.value ?? '30', 10)
+
   const createdSale = await prisma.$transaction(async (tx) => {
 
     // ── Resolve Customer ──────────────────────────
@@ -214,7 +255,6 @@ export const createSale = async (
       if (!customer) throw new NotFoundException('Customer not found')
       customerId = customer.id
     } else {
-      // auto use walk-in customer
       const walkIn = await tx.customer.findFirst({
         where: { pharmacyId, isWalkIn: true },
         select: { id: true },
@@ -237,20 +277,24 @@ export const createSale = async (
     })
 
     // ── Process Details ───────────────────────────
-    let totalAmount = 0
+    let subtotal = 0
     const detailsData: SaleDetailDraft[] = []
 
     for (const detail of data.details) {
-      // get stock detail
+      // validate discount cap
+      if (detail.discount > maxDiscountPct) {
+        throw new BadRequestException(
+          `Discount ${detail.discount}% exceeds maximum allowed ${maxDiscountPct}%`
+        )
+      }
+
       const stockDetail = await tx.stockDetail.findFirst({
-        where: {
-          uuid: detail.stockDetailUuid,
-          stock: { pharmacyId },
-        },
+        where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
         select: {
           id: true,
           quantityPieces: true,
           quantityPerBox: true,
+          expiryDate: true,
           stockId: true,
           stock: {
             select: {
@@ -265,29 +309,37 @@ export const createSale = async (
       })
 
       if (!stockDetail) {
-        throw new NotFoundException(
-          `Stock detail not found: ${detail.stockDetailUuid}`
-        )
+        throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
       }
 
-      // check sufficient stock
-      if (stockDetail.quantityPieces < detail.quantityPieces) {
+      // validate FEFO override
+      if (detail.isFefoOverride && !allowFefoOverride) {
         throw new BadRequestException(
-          `Insufficient stock for batch: ${detail.stockDetailUuid}`
+          'FEFO override is not allowed. Items must be sold in expiry order.'
         )
       }
 
-      // get effective selling price
-      const sellingPrice = parseFloat(
+      // validate expiry
+      if (!allowExpiredSale && stockDetail.expiryDate < new Date()) {
+        throw new BadRequestException(
+          `Medicine batch is expired: ${detail.stockDetailUuid}`
+        )
+      }
+
+      // validate stock quantity
+      if (stockDetail.quantityPieces < detail.quantityPieces) {
+        throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
+      }
+
+      const basePrice = parseFloat(
         (stockDetail.stock.sellingPrice ?? stockDetail.stock.calculatedPrice).toString()
       )
-
+      const discountAmount = (basePrice * detail.discount) / 100
+      const sellingPrice = basePrice - discountAmount
       const itemTotal = sellingPrice * detail.quantityPieces
-      totalAmount += itemTotal
+      subtotal += itemTotal
 
-      const quantityBox = Math.floor(
-        detail.quantityPieces / stockDetail.quantityPerBox
-      )
+      const quantityBox = Math.floor(detail.quantityPieces / stockDetail.quantityPerBox)
 
       detailsData.push({
         stockDetailId: stockDetail.id,
@@ -295,11 +347,10 @@ export const createSale = async (
         quantityPieces: detail.quantityPieces,
         quantityBox,
         sellingPrice: new Decimal(sellingPrice.toFixed(2)),
-        discount: new Decimal(0),
+        discount: new Decimal(detail.discount.toFixed(2)),
         totalAmount: new Decimal(itemTotal.toFixed(2)),
         isFefoOverride: detail.isFefoOverride ?? false,
         createdById: userId,
-        // for stock update
         _stockDetailId: stockDetail.id,
         _stockId: stockDetail.stockId,
         _quantityPieces: detail.quantityPieces,
@@ -307,6 +358,18 @@ export const createSale = async (
         _stockDetailQuantityBefore: stockDetail.quantityPieces,
         _stockDetailQuantityPerBox: stockDetail.quantityPerBox,
       })
+    }
+
+    // ── Compute Tax ───────────────────────────────
+    const taxAmount = (subtotal * taxPercentage) / 100
+    const totalAmount = subtotal + taxAmount
+
+    // ── Compute Due Date for Credit ───────────────
+    const soldAt = new Date()
+    let dueDate: Date | undefined
+    if (data.saleType === SaleType.CREDIT) {
+      dueDate = new Date(soldAt)
+      dueDate.setDate(dueDate.getDate() + creditPaymentDays)
     }
 
     // ── Create Sale ───────────────────────────────
@@ -321,6 +384,10 @@ export const createSale = async (
         paidAmount: data.saleType === SaleType.CASH
           ? new Decimal(totalAmount.toFixed(2))
           : new Decimal(0),
+        taxPercentage: new Decimal(taxPercentage.toFixed(2)),
+        taxAmount: new Decimal(taxAmount.toFixed(2)),
+        dueDate,
+        soldAt,
         description: data.description,
         createdById: userId,
         details: {
@@ -406,7 +473,7 @@ export const createSale = async (
             create: {
               amount: new Decimal(totalAmount.toFixed(2)),
               paymentMethod: 'CASH',
-              paymentDate: new Date(),
+              paymentDate: soldAt,
               createdById: userId,
             },
           },
@@ -443,6 +510,7 @@ export const cancelOrRefundSale = async (
         id: true,
         status: true,
         totalAmount: true,
+        soldAt: true,
         details: {
           select: {
             id: true,
@@ -475,6 +543,23 @@ export const cancelOrRefundSale = async (
       throw new BadRequestException(
         'Only completed sales can be cancelled or refunded'
       )
+    }
+
+    // ── Return Policy Check (refund only) ─────────
+    if (status === 'REFUNDED') {
+      const returnPolicyParam = await prisma.businessParameter.findUnique({
+        where: { pharmacyId_key: { pharmacyId, key: 'RETURN_POLICY_DAYS' } },
+        select: { value: true },
+      })
+      const returnPolicyDays = parseInt(returnPolicyParam?.value ?? '7', 10)
+      const daysSinceSale = Math.floor(
+        (Date.now() - sale.soldAt.getTime()) / (1000 * 60 * 60 * 24)
+      )
+      if (daysSinceSale > returnPolicyDays) {
+        throw new BadRequestException(
+          `Refund window has expired. Refunds must be requested within ${returnPolicyDays} days of sale.`
+        )
+      }
     }
 
     // ── Restore Stock for Each Detail ─────────────

@@ -1,118 +1,118 @@
 export const PERMISSIONS = {
 
   // medicine shapes
-  MEDICINE_SHAPES_VIEW: 'medicine_shapes.view',
+  MEDICINE_SHAPES_READ: 'medicine_shapes.read',
   MEDICINE_SHAPES_CREATE: 'medicine_shapes.create',
-  MEDICINE_SHAPES_EDIT: 'medicine_shapes.edit',
+  MEDICINE_SHAPES_UPDATE: 'medicine_shapes.update',
   MEDICINE_SHAPES_DELETE: 'medicine_shapes.delete',
 
   // medicine types
-  MEDICINE_TYPES_VIEW: 'medicine_types.view',
+  MEDICINE_TYPES_READ: 'medicine_types.read',
   MEDICINE_TYPES_CREATE: 'medicine_types.create',
-  MEDICINE_TYPES_EDIT: 'medicine_types.edit',
+  MEDICINE_TYPES_UPDATE: 'medicine_types.update',
   MEDICINE_TYPES_DELETE: 'medicine_types.delete',
 
   // medicine classes
-  MEDICINE_CLASSES_VIEW: 'medicine_classes.view',
+  MEDICINE_CLASSES_READ: 'medicine_classes.read',
   MEDICINE_CLASSES_CREATE: 'medicine_classes.create',
-  MEDICINE_CLASSES_EDIT: 'medicine_classes.edit',
+  MEDICINE_CLASSES_UPDATE: 'medicine_classes.update',
   MEDICINE_CLASSES_DELETE: 'medicine_classes.delete',
 
   // medicines
-  MEDICINES_VIEW: 'medicines.view',
+  MEDICINES_READ: 'medicines.read',
   MEDICINES_CREATE: 'medicines.create',
-  MEDICINES_EDIT: 'medicines.edit',
+  MEDICINES_UPDATE: 'medicines.update',
   MEDICINES_DELETE: 'medicines.delete',
 
   // distributors
-  DISTRIBUTORS_VIEW: 'distributors.view',
+  DISTRIBUTORS_READ: 'distributors.read',
   DISTRIBUTORS_CREATE: 'distributors.create',
-  DISTRIBUTORS_EDIT: 'distributors.edit',
+  DISTRIBUTORS_UPDATE: 'distributors.update',
   DISTRIBUTORS_DELETE: 'distributors.delete',
 
   // customers
-  CUSTOMERS_VIEW: 'customers.view',
+  CUSTOMERS_READ: 'customers.read',
   CUSTOMERS_CREATE: 'customers.create',
-  CUSTOMERS_EDIT: 'customers.edit',
+  CUSTOMERS_UPDATE: 'customers.update',
   CUSTOMERS_DELETE: 'customers.delete',
 
   // stock
-  STOCK_VIEW: 'stock.view',
+  STOCK_READ: 'stock.read',
   STOCK_ADJUST: 'stock.adjust',
 
   // purchase orders
-  PURCHASE_ORDERS_VIEW: 'purchase_orders.view',
+  PURCHASE_ORDERS_READ: 'purchase_orders.read',
   PURCHASE_ORDERS_CREATE: 'purchase_orders.create',
-  PURCHASE_ORDERS_EDIT: 'purchase_orders.edit',
+  PURCHASE_ORDERS_UPDATE: 'purchase_orders.update',
   PURCHASE_ORDERS_DELETE: 'purchase_orders.delete',
 
   // invoices
-  INVOICES_VIEW: 'invoices.view',
+  INVOICES_READ: 'invoices.read',
   INVOICES_CREATE: 'invoices.create',
-  INVOICES_EDIT: 'invoices.edit',
+  INVOICES_UPDATE: 'invoices.update',
   INVOICES_DELETE: 'invoices.delete',
   INVOICES_VERIFY: 'invoices.verify',
 
   // sales
-  SALES_VIEW: 'sales.view',
+  SALES_READ: 'sales.read',
   SALES_CREATE: 'sales.create',
-  SALES_EDIT: 'sales.edit',
+  SALES_UPDATE: 'sales.update',
   SALES_DELETE: 'sales.delete',
 
   // stock return
-  STOCK_RETURN_VIEW: 'stock_return.view',
+  STOCK_RETURN_READ: 'stock_return.read',
   STOCK_RETURN_CREATE: 'stock_return.create',
-  STOCK_RETURN_EDIT: 'stock_return.edit',
+  STOCK_RETURN_UPDATE: 'stock_return.update',
   STOCK_RETURN_DELETE: 'stock_return.delete',
 
   // stock disposal
-  STOCK_DISPOSAL_VIEW: 'stock_disposal.view',
+  STOCK_DISPOSAL_READ: 'stock_disposal.read',
   STOCK_DISPOSAL_CREATE: 'stock_disposal.create',
-  STOCK_DISPOSAL_EDIT: 'stock_disposal.edit',
+  STOCK_DISPOSAL_UPDATE: 'stock_disposal.update',
   STOCK_DISPOSAL_DELETE: 'stock_disposal.delete',
 
   // reports
-  REPORTS_VIEW: 'reports.view',
+  REPORTS_READ: 'reports.read',
   REPORTS_EXPORT: 'reports.export',
 
   // users
-  USERS_VIEW: 'users.view',
+  USERS_READ: 'users.read',
   USERS_CREATE: 'users.create',
-  USERS_EDIT: 'users.edit',
+  USERS_UPDATE: 'users.update',
   USERS_DELETE: 'users.delete',
 
-  // oermission
-  PERMISSIONS_VIEW: 'permissions.view',
+  // permissions
+  PERMISSIONS_READ: 'permissions.read',
 
   // roles
-  ROLES_VIEW: 'roles.view',
+  ROLES_READ: 'roles.read',
   ROLES_CREATE: 'roles.create',
-  ROLES_EDIT: 'roles.edit',
+  ROLES_UPDATE: 'roles.update',
   ROLES_DELETE: 'roles.delete',
 
   // licenses
-  LICENSES_VIEW: 'licenses.view',
+  LICENSES_READ: 'licenses.read',
   LICENSES_CREATE: 'licenses.create',
-  LICENSES_EDIT: 'licenses.edit',
+  LICENSES_UPDATE: 'licenses.update',
   LICENSES_DELETE: 'licenses.delete',
 
   // pharmacies
-  PHARMACIES_VIEW: 'pharmacies.view',
+  PHARMACIES_READ: 'pharmacies.read',
   PHARMACIES_CREATE: 'pharmacies.create',
-  PHARMACIES_EDIT: 'pharmacies.edit',
+  PHARMACIES_UPDATE: 'pharmacies.update',
   PHARMACIES_DELETE: 'pharmacies.delete',
 
   // business parameters
-  BUSINESS_PARAMETERS_VIEW: 'business_parameters.view',
-  BUSINESS_PARAMETERS_EDIT: 'business_parameters.edit',
+  BUSINESS_PARAMETERS_READ: 'business_parameters.read',
+  BUSINESS_PARAMETERS_UPDATE: 'business_parameters.update',
 
   // system parameters
-  SYSTEM_PARAMETERS_VIEW: 'system_parameters.view',
-  SYSTEM_PARAMETERS_EDIT: 'system_parameters.edit',
+  SYSTEM_PARAMETERS_READ: 'system_parameters.read',
+  SYSTEM_PARAMETERS_UPDATE: 'system_parameters.update',
 
-  // settings (kept for backward compatibility)
-  SETTINGS_VIEW: 'settings.view',
-  SETTINGS_EDIT: 'settings.edit',
+  // settings
+  SETTINGS_READ: 'settings.read',
+  SETTINGS_UPDATE: 'settings.update',
 
   // signing
   SIGN_STANDARD: 'sign.standard',

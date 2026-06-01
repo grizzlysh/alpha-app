@@ -11,19 +11,19 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.DISTRIBUTORS_VIEW),
+  requirePermission(PERMISSIONS.DISTRIBUTORS_READ),
   DistributorController.getDistributors
 )
 
 router.get(
   '/dropdown',
-  requirePermission(PERMISSIONS.DISTRIBUTORS_VIEW),
+  requirePermission(PERMISSIONS.DISTRIBUTORS_READ),
   DistributorController.getDistributorsDropdown
 )
 
 router.get(
   '/:distributor_uuid',
-  requirePermission(PERMISSIONS.DISTRIBUTORS_VIEW),
+  requirePermission(PERMISSIONS.DISTRIBUTORS_READ),
   DistributorController.getDistributor
 )
 
@@ -35,7 +35,7 @@ router.post(
 
 router.put(
   '/:distributor_uuid',
-  requirePermission(PERMISSIONS.DISTRIBUTORS_EDIT),
+  requirePermission(PERMISSIONS.DISTRIBUTORS_UPDATE),
   DistributorController.updateDistributor
 )
 

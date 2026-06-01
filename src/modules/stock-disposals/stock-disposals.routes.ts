@@ -11,13 +11,13 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.STOCK_DISPOSAL_VIEW),
+  requirePermission(PERMISSIONS.STOCK_DISPOSAL_READ),
   StockDisposalController.getStockDisposals
 )
 
 router.get(
   '/:stock_disposal_uuid',
-  requirePermission(PERMISSIONS.STOCK_DISPOSAL_VIEW),
+  requirePermission(PERMISSIONS.STOCK_DISPOSAL_READ),
   StockDisposalController.getStockDisposal
 )
 
@@ -29,19 +29,19 @@ router.post(
 
 router.put(
   '/:stock_disposal_uuid',
-  requirePermission(PERMISSIONS.STOCK_DISPOSAL_EDIT),
+  requirePermission(PERMISSIONS.STOCK_DISPOSAL_UPDATE),
   StockDisposalController.updateStockDisposal
 )
 
 router.patch(
   '/:stock_disposal_uuid/complete',
-  requirePermission(PERMISSIONS.STOCK_DISPOSAL_EDIT),
+  requirePermission(PERMISSIONS.STOCK_DISPOSAL_UPDATE),
   StockDisposalController.completeStockDisposal
 )
 
 router.patch(
   '/:stock_disposal_uuid/cancel',
-  requirePermission(PERMISSIONS.STOCK_DISPOSAL_EDIT),
+  requirePermission(PERMISSIONS.STOCK_DISPOSAL_UPDATE),
   StockDisposalController.cancelStockDisposal
 )
 

@@ -11,13 +11,13 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.SALES_VIEW),
+  requirePermission(PERMISSIONS.SALES_READ),
   SaleController.getSales
 )
 
 router.get(
   '/:sale_uuid',
-  requirePermission(PERMISSIONS.SALES_VIEW),
+  requirePermission(PERMISSIONS.SALES_READ),
   SaleController.getSale
 )
 
@@ -29,19 +29,19 @@ router.post(
 
 router.patch(
   '/:sale_uuid/cancel',
-  requirePermission(PERMISSIONS.SALES_EDIT),
+  requirePermission(PERMISSIONS.SALES_UPDATE),
   SaleController.cancelSale
 )
 
 router.patch(
   '/:sale_uuid/refund',
-  requirePermission(PERMISSIONS.SALES_EDIT),
+  requirePermission(PERMISSIONS.SALES_UPDATE),
   SaleController.refundSale
 )
 
 router.post(
   '/:sale_uuid/payment',
-  requirePermission(PERMISSIONS.SALES_EDIT),
+  requirePermission(PERMISSIONS.SALES_UPDATE),
   SaleController.addPayment
 )
 

@@ -38,6 +38,14 @@ const getExpiryAlertDays = async (pharmacyId: number): Promise<number> => {
   return parseInt(param?.value ?? '90')
 }
 
+const getLowStockThreshold = async (pharmacyId: number): Promise<number> => {
+  const param = await prisma.businessParameter.findUnique({
+    where: { pharmacyId_key: { pharmacyId, key: 'LOW_STOCK_ALERT_THRESHOLD' } },
+    select: { value: true },
+  })
+  return parseInt(param?.value ?? '0')
+}
+
 const stockDetailSelect = {
   uuid: true,
   batchNumber: true,
@@ -77,7 +85,7 @@ const stockSelect = {
   },
 }
 
-const formatStock = (stock: any): StockResponse => ({
+const formatStock = (stock: any, lowStockThreshold: number = 0): StockResponse => ({
   ...stock,
   basePrice: parseFloat(stock.basePrice.toString()),
   calculatedPrice: parseFloat(stock.calculatedPrice.toString()),
@@ -89,6 +97,7 @@ const formatStock = (stock: any): StockResponse => ({
     stock.calculatedPrice
   ),
   isLowStock: stock.totalPieces <= stock.reorderLevel,
+  isCriticalStock: lowStockThreshold > 0 && stock.totalPieces <= lowStockThreshold,
 })
 
 // ── Services ──────────────────────────────────────────
@@ -100,7 +109,10 @@ export const getStocks = async (
   const { search, isLowStock, isExpiringSoon, sortBy, sortOrder, page, limit } = query
 
   const skip = (page - 1) * limit
-  const expiryAlertDays = await getExpiryAlertDays(pharmacyId)
+  const [expiryAlertDays, lowStockThreshold] = await Promise.all([
+    getExpiryAlertDays(pharmacyId),
+    getLowStockThreshold(pharmacyId),
+  ])
 
   const expiryAlertDate = new Date()
   expiryAlertDate.setDate(expiryAlertDate.getDate() + expiryAlertDays)
@@ -155,27 +167,30 @@ export const getStocks = async (
     totalPages: Math.ceil(total / limit),
   }
 
-  return { data: sorted.map(formatStock), meta }
+  return { data: sorted.map((s) => formatStock(s, lowStockThreshold)), meta }
 }
 
 export const getStockByUuid = async (
   uuid: string,
   pharmacyId: number
 ): Promise<StockResponse> => {
-  const stock = await prisma.stock.findFirst({
-    where: { uuid, pharmacyId },
-    select: stockSelect,
-  })
+  const [stock, lowStockThreshold] = await Promise.all([
+    prisma.stock.findFirst({ where: { uuid, pharmacyId }, select: stockSelect }),
+    getLowStockThreshold(pharmacyId),
+  ])
 
   if (!stock) throw new NotFoundException('Stock not found')
 
-  return formatStock(stock)
+  return formatStock(stock, lowStockThreshold)
 }
 
 export const getStockAlerts = async (
   pharmacyId: number
 ): Promise<StockAlertResponse> => {
-  const expiryAlertDays = await getExpiryAlertDays(pharmacyId)
+  const [expiryAlertDays, lowStockThreshold] = await Promise.all([
+    getExpiryAlertDays(pharmacyId),
+    getLowStockThreshold(pharmacyId),
+  ])
 
   const expiryAlertDate = new Date()
   expiryAlertDate.setDate(expiryAlertDate.getDate() + expiryAlertDays)
@@ -188,7 +203,7 @@ export const getStockAlerts = async (
 
   const lowStock = allStocks
     .filter((s) => s.totalPieces <= s.reorderLevel)
-    .map(formatStock)
+    .map((s) => formatStock(s, lowStockThreshold))
 
   // expiring soon
   const expiringSoonDetails = await prisma.stockDetail.findMany({
@@ -526,6 +541,7 @@ export const getCrossPharmacyStock = async (
       stock.calculatedPrice
     ),
     isLowStock: stock.totalPieces <= stock.reorderLevel,
+    isCriticalStock: false, // cross-pharmacy view does not load per-pharmacy threshold
     details: stock.details,
   }))
 }

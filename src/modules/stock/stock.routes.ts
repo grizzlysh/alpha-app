@@ -11,31 +11,31 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.STOCK_VIEW),
+  requirePermission(PERMISSIONS.STOCK_READ),
   StockController.getStocks
 )
 
 router.get(
   '/alerts',
-  requirePermission(PERMISSIONS.STOCK_VIEW),
+  requirePermission(PERMISSIONS.STOCK_READ),
   StockController.getStockAlerts
 )
 
 router.get(
   '/movements',
-  requirePermission(PERMISSIONS.STOCK_VIEW),
+  requirePermission(PERMISSIONS.STOCK_READ),
   StockController.getStockMovements
 )
 
 router.get(
   '/cross-pharmacy/:medicine_uuid',
-  requirePermission(PERMISSIONS.STOCK_VIEW),
+  requirePermission(PERMISSIONS.STOCK_READ),
   StockController.getCrossPharmacyStock
 )
 
 router.get(
   '/:stock_uuid',
-  requirePermission(PERMISSIONS.STOCK_VIEW),
+  requirePermission(PERMISSIONS.STOCK_READ),
   StockController.getStock
 )
 

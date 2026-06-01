@@ -11,13 +11,13 @@ router.use(requirePharmacyAccess)
 
 router.get(
   '/',
-  requirePermission(PERMISSIONS.STOCK_RETURN_VIEW),
+  requirePermission(PERMISSIONS.STOCK_RETURN_READ),
   StockReturnController.getStockReturns
 )
 
 router.get(
   '/:stock_return_uuid',
-  requirePermission(PERMISSIONS.STOCK_RETURN_VIEW),
+  requirePermission(PERMISSIONS.STOCK_RETURN_READ),
   StockReturnController.getStockReturn
 )
 
@@ -29,19 +29,19 @@ router.post(
 
 router.put(
   '/:stock_return_uuid',
-  requirePermission(PERMISSIONS.STOCK_RETURN_EDIT),
+  requirePermission(PERMISSIONS.STOCK_RETURN_UPDATE),
   StockReturnController.updateStockReturn
 )
 
 router.patch(
   '/:stock_return_uuid/complete',
-  requirePermission(PERMISSIONS.STOCK_RETURN_EDIT),
+  requirePermission(PERMISSIONS.STOCK_RETURN_UPDATE),
   StockReturnController.completeStockReturn
 )
 
 router.patch(
   '/:stock_return_uuid/cancel',
-  requirePermission(PERMISSIONS.STOCK_RETURN_EDIT),
+  requirePermission(PERMISSIONS.STOCK_RETURN_UPDATE),
   StockReturnController.cancelStockReturn
 )
 

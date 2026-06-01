@@ -126,6 +126,9 @@ export interface SaleResponse {
   status: SaleStatus
   totalAmount: number
   paidAmount: number
+  taxPercentage: number
+  taxAmount: number
+  dueDate: Date | null
   description: string | null
   soldAt: Date
   createdAt: Date

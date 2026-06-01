@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const createSaleDetailSchema = z.object({
   stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity must be positive' }),
+  discount: z.number().min(0).max(100).optional().default(0),
   isFefoOverride: z.boolean().optional().default(false),
 })
 
