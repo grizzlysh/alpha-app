@@ -276,7 +276,7 @@ export const deleteRole = async (
   }
 
   // block if any users still assigned
-  const inUse = await prisma.userPharmacy.count({
+  const inUse = await prisma.placement.count({
     where: { roleId: existing.id, status: { not: 'DELETED' } },
   })
   if (inUse > 0) throw new ConflictException('Role is still assigned to active users')

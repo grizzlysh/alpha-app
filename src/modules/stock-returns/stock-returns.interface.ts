@@ -131,10 +131,6 @@ export interface StockReturnResponse {
   signedBy: {
     uuid: string
     name: string
-    position: {
-      name: string
-      signAuthority: string
-    }
   } | null
   details: StockReturnDetailResponse[]
 }

@@ -111,10 +111,6 @@ export interface InvoiceResponse {
   signedBy: {
     uuid: string
     name: string
-    position: {
-      name: string
-      signAuthority: string
-    }
   } | null
   details: InvoiceDetailResponse[]
 }

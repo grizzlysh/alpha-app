@@ -50,16 +50,16 @@ const getEffectivePermissions = async (
   userId: number,
   pharmacyId: number
 ): Promise<string[]> => {
-  const userPharmacy = await prisma.userPharmacy.findFirst({
+  const placement = await prisma.placement.findFirst({
     where: { userId, pharmacyId, status: { not: 'DELETED' } },
     select: { roleId: true },
   })
 
-  if (!userPharmacy) return []
+  if (!placement) return []
 
   const globalPermissions = await prisma.rolePermission.findMany({
     where: {
-      roleId: userPharmacy.roleId,
+      roleId: placement.roleId,
       pharmacyId: null,
       isEnabled: true,
     },
@@ -68,7 +68,7 @@ const getEffectivePermissions = async (
 
   const pharmacyOverrides = await prisma.rolePermission.findMany({
     where: {
-      roleId: userPharmacy.roleId,
+      roleId: placement.roleId,
       pharmacyId,
     },
     include: { permission: true },
@@ -109,7 +109,7 @@ const getPharmaciesForUser = async (
     select: { uuid: true, name: true, address: true },
   })
 
-  const assignedPharmacies = await prisma.userPharmacy.findMany({
+  const assignedPharmacies = await prisma.placement.findMany({
     where: { userId, status: 'ACTIVE' },
     include: {
       pharmacy: {
@@ -249,21 +249,21 @@ export const selectPharmacy = async (
     hasAccess = true
   } else if (pharmacy.ownerId === userId) {
     hasAccess = true
-    const userPharmacy = await prisma.userPharmacy.findFirst({
+    const placement = await prisma.placement.findFirst({
       where: { userId, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
-    if (userPharmacy) {
-      pharmacyRole = userPharmacy.role
+    if (placement) {
+      pharmacyRole = placement.role
     }
   } else {
-    const userPharmacy = await prisma.userPharmacy.findFirst({
+    const placement = await prisma.placement.findFirst({
       where: { userId, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
-    hasAccess = !!userPharmacy && userPharmacy.status === 'ACTIVE'
-    if (hasAccess && userPharmacy) {
-      pharmacyRole = userPharmacy.role
+    hasAccess = !!placement && placement.status === 'ACTIVE'
+    if (hasAccess && placement) {
+      pharmacyRole = placement.role
     }
   }
 
@@ -431,12 +431,12 @@ export const getMe = async (
   let role: PharmacyRoleItem | null = null
 
   if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
-    const userPharmacy = await prisma.userPharmacy.findFirst({
+    const placement = await prisma.placement.findFirst({
       where: { userId, pharmacyId, status: { not: 'DELETED' } },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
-    if (userPharmacy) {
-      role = userPharmacy.role
+    if (placement) {
+      role = placement.role
     }
   }
 

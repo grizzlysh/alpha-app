@@ -1,4 +1,4 @@
-import { SignAuthority } from '@prisma/client'
+import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import {
   StockQueryInput,
@@ -416,21 +416,32 @@ export const adjustStock = async (
     }
 
     // ── Resolve Signed By ─────────────────────────
-    const employee = await tx.employee.findFirst({
-      where: { uuid: data.signedByUuid, pharmacyId, status: 'ACTIVE' },
+    const signer = await tx.user.findFirst({
+      where: { uuid: data.signedByUuid, deletedAt: null },
       select: {
         id: true,
-        position: { select: { signAuthority: true } },
+        placements: {
+          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+          select: {
+            role: {
+              select: {
+                rolePermissions: {
+                  where: { isEnabled: true },
+                  select: { permission: { select: { module: true, action: true } } },
+                },
+              },
+            },
+          },
+        },
       },
     })
 
-    if (!employee) throw new NotFoundException('Employee not found')
+    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
 
-    if (employee.position.signAuthority === SignAuthority.NONE) {
-      throw new ForbiddenException(
-        'Only authorized personnel can sign stock adjustments'
-      )
-    }
+    const hasSignPermission = signer.placements[0].role.rolePermissions.some(
+      (rp) => rp.permission.module === 'sign'
+    )
+    if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign stock adjustments')
 
     // ── Calculate Adjustment ──────────────────────
     const quantityBefore = stockDetail.quantityPieces
@@ -511,12 +522,12 @@ export const getCrossPharmacyStock = async (
     })
     pharmacyIds = pharmacies.map((p) => p.id)
   } else {
-    // get assigned pharmacies from UserPharmacy
-    const userPharmacies = await prisma.userPharmacy.findMany({
+    // get assigned pharmacies from Placement
+    const placements = await prisma.placement.findMany({
       where: { userId, status: 'ACTIVE' },
       select: { pharmacyId: true },
     })
-    pharmacyIds = userPharmacies.map((up) => up.pharmacyId)
+    pharmacyIds = placements.map((up) => up.pharmacyId)
   }
 
   // find medicine in each pharmacy

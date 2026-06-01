@@ -128,7 +128,7 @@ export async function getMe(userId: number, pharmacyId?: number): Promise<MeItem
     select: {
       ...userBaseSelect,
       updatedAt: true,
-      userPharmacies: pharmacyId
+      placements: pharmacyId
         ? {
             where: { pharmacyId, deletedAt: null, status: RecordStatus.ACTIVE },
             select: placementSelect,
@@ -152,7 +152,7 @@ export async function getMe(userId: number, pharmacyId?: number): Promise<MeItem
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     currentPlacement:
-      user.userPharmacies?.[0] ? formatPlacement(user.userPharmacies[0]) : null,
+      user.placements?.[0] ? formatPlacement(user.placements[0]) : null,
   };
 }
 
@@ -242,7 +242,7 @@ export async function listUsers(
         ...userBaseSelect,
         _count: {
           select: {
-            userPharmacies: {
+            placements: {
               where: { deletedAt: null, status: RecordStatus.ACTIVE },
             },
           },
@@ -262,7 +262,7 @@ export async function listUsers(
       platformRole: u.platformRole,
       mustChangePassword: u.mustChangePassword,
       status: u.status,
-      assignmentCount: u._count.userPharmacies,
+      assignmentCount: u._count.placements,
       createdAt: u.createdAt,
     })),
     total,
@@ -279,12 +279,12 @@ export async function getUser(userUuid: string): Promise<UserDetailItem> {
       updatedAt: true,
       _count: {
         select: {
-          userPharmacies: {
+          placements: {
             where: { deletedAt: null, status: RecordStatus.ACTIVE },
           },
         },
       },
-      userPharmacies: {
+      placements: {
         where: { deletedAt: null },
         select: placementSelect,
         orderBy: { joinedAt: 'desc' },
@@ -303,10 +303,10 @@ export async function getUser(userUuid: string): Promise<UserDetailItem> {
     platformRole: user.platformRole,
     mustChangePassword: user.mustChangePassword,
     status: user.status,
-    assignmentCount: user._count.userPharmacies,
+    assignmentCount: user._count.placements,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    placements: user.userPharmacies.map(formatPlacement),
+    placements: user.placements.map(formatPlacement),
   };
 }
 
@@ -341,7 +341,7 @@ export async function createUser(
       updatedAt: true,
       _count: {
         select: {
-          userPharmacies: { where: { deletedAt: null, status: RecordStatus.ACTIVE } },
+          placements: { where: { deletedAt: null, status: RecordStatus.ACTIVE } },
         },
       },
     },
@@ -409,7 +409,7 @@ export async function deleteUser(
   });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const activeAssignments = await prisma.userPharmacy.count({
+  const activeAssignments = await prisma.placement.count({
     where: { userId: user.id, deletedAt: null, status: RecordStatus.ACTIVE },
   });
   if (activeAssignments > 0) throw new ConflictException('USER_HAS_ACTIVE_PLACEMENTS');
@@ -476,14 +476,14 @@ export async function listPlacements(
   };
 
   const [assignments, total] = await prisma.$transaction([
-    prisma.userPharmacy.findMany({
+    prisma.placement.findMany({
       where,
       skip,
       take: limit,
       orderBy: { joinedAt: 'desc' },
       select: placementSelect,
     }),
-    prisma.userPharmacy.count({ where }),
+    prisma.placement.count({ where }),
   ]);
 
   return { data: assignments.map(formatPlacement), total };
@@ -498,7 +498,7 @@ export async function getPlacement(
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.userPharmacy.findFirst({
+  const assignment = await prisma.placement.findFirst({
     where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
     select: placementSelect,
   });
@@ -527,12 +527,12 @@ export async function createPlacement(
   });
   if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
 
-  const activeCount = await prisma.userPharmacy.count({
+  const activeCount = await prisma.placement.count({
     where: { userId: user.id, deletedAt: null, status: RecordStatus.ACTIVE, leftAt: null },
   });
   if (activeCount >= 3) throw new BadRequestException('MAX_PLACEMENTS_REACHED');
 
-  const duplicate = await prisma.userPharmacy.findFirst({
+  const duplicate = await prisma.placement.findFirst({
     where: { userId: user.id, pharmacyId: pharmacy.id, deletedAt: null, leftAt: null },
   });
   if (duplicate) throw new ConflictException('USER_ALREADY_PLACED_AT_PHARMACY');
@@ -540,7 +540,7 @@ export async function createPlacement(
   // Max 1 SIGN_FULL role per pharmacy
   const isSignFull = await roleHasSignFull(role.id);
   if (isSignFull) {
-    const existingSignFull = await prisma.userPharmacy.findFirst({
+    const existingSignFull = await prisma.placement.findFirst({
       where: {
         pharmacyId: pharmacy.id,
         deletedAt: null,
@@ -559,7 +559,7 @@ export async function createPlacement(
     if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
   }
 
-  const assignment = await prisma.userPharmacy.create({
+  const assignment = await prisma.placement.create({
     data: {
       userId: user.id,
       pharmacyId: pharmacy.id,
@@ -585,7 +585,7 @@ export async function updatePlacement(
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.userPharmacy.findFirst({
+  const assignment = await prisma.placement.findFirst({
     where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
   });
   if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
@@ -597,7 +597,7 @@ export async function updatePlacement(
 
     const isSignFull = await roleHasSignFull(role.id);
     if (isSignFull) {
-      const existingSignFull = await prisma.userPharmacy.findFirst({
+      const existingSignFull = await prisma.placement.findFirst({
         where: {
           pharmacyId: assignment.pharmacyId,
           deletedAt: null,
@@ -620,7 +620,7 @@ export async function updatePlacement(
     roleId = role.id;
   }
 
-  const updated = await prisma.userPharmacy.update({
+  const updated = await prisma.placement.update({
     where: { id: assignment.id },
     data: {
       ...(roleId && { roleId }),
@@ -645,12 +645,12 @@ export async function deletePlacement(
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.userPharmacy.findFirst({
+  const assignment = await prisma.placement.findFirst({
     where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
   });
   if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
 
-  await prisma.userPharmacy.update({
+  await prisma.placement.update({
     where: { id: assignment.id },
     data: {
       status: RecordStatus.DELETED,
@@ -666,7 +666,7 @@ async function _resolvePlacement(userUuid: string, assignmentUuid: string) {
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.userPharmacy.findFirst({
+  const assignment = await prisma.placement.findFirst({
     where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
   });
   if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
@@ -688,7 +688,7 @@ export async function listLicenses(
   const assignment = await _resolvePlacement(userUuid, assignmentUuid);
 
   const where = {
-    userPharmacyId: assignment.id,
+    placementId: assignment.id,
     deletedAt: null,
     ...(query.status && { status: query.status }),
   };
@@ -720,7 +720,7 @@ export async function addLicense(
   const duplicate = await prisma.license.findFirst({
     where: {
       licenseNumber: body.licenseNumber,
-      userPharmacy: { pharmacyId: assignment.pharmacyId },
+      placement: { pharmacyId: assignment.pharmacyId },
       deletedAt: null,
     },
   });
@@ -728,7 +728,7 @@ export async function addLicense(
 
   const license = await prisma.license.create({
     data: {
-      userPharmacyId: assignment.id,
+      placementId: assignment.id,
       licenseNumber: body.licenseNumber,
       validFrom: new Date(body.validFrom),
       validUntil: new Date(body.validUntil),
@@ -753,7 +753,7 @@ export async function updateLicense(
   const assignment = await _resolvePlacement(userUuid, assignmentUuid);
 
   const license = await prisma.license.findFirst({
-    where: { uuid: licenseUuid, userPharmacyId: assignment.id, deletedAt: null },
+    where: { uuid: licenseUuid, placementId: assignment.id, deletedAt: null },
   });
   if (!license) throw new NotFoundException('LICENSE_NOT_FOUND');
 
@@ -761,7 +761,7 @@ export async function updateLicense(
     const duplicate = await prisma.license.findFirst({
       where: {
         licenseNumber: body.licenseNumber,
-        userPharmacy: { pharmacyId: assignment.pharmacyId },
+        placement: { pharmacyId: assignment.pharmacyId },
         deletedAt: null,
         id: { not: license.id },
       },
@@ -795,7 +795,7 @@ export async function deleteLicense(
   const assignment = await _resolvePlacement(userUuid, assignmentUuid);
 
   const license = await prisma.license.findFirst({
-    where: { uuid: licenseUuid, userPharmacyId: assignment.id, deletedAt: null },
+    where: { uuid: licenseUuid, placementId: assignment.id, deletedAt: null },
   });
   if (!license) throw new NotFoundException('LICENSE_NOT_FOUND');
 

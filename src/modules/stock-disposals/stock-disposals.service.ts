@@ -1,4 +1,5 @@
-import { StockDisposalStatus, SignAuthority, Prisma } from '@prisma/client'
+import { StockDisposalStatus, Prisma } from '@prisma/client'
+import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import {
   CreateStockDisposalInput,
@@ -24,12 +25,8 @@ const stockDisposalSelect = {
   disposedAt: true,
   createdAt: true,
   updatedAt: true,
-  signedByEmployee: {
-    select: {
-      uuid: true,
-      name: true,
-      position: { select: { name: true, signAuthority: true } },
-    },
+  signedByUser: {
+    select: { uuid: true, name: true },
   },
   details: {
     select: {
@@ -56,22 +53,31 @@ const resolveSignedBy = async (
   pharmacyId: number,
   tx: Prisma.TransactionClient
 ) => {
-  const employee = await tx.employee.findFirst({
-    where: { uuid: signedByUuid, pharmacyId, status: 'ACTIVE' },
+  const signer = await tx.user.findFirst({
+    where: { uuid: signedByUuid, deletedAt: null },
     select: {
       id: true,
-      position: { select: { signAuthority: true } },
+      placements: {
+        where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+        select: {
+          role: {
+            select: {
+              rolePermissions: {
+                where: { isEnabled: true },
+                select: { permission: { select: { module: true, action: true } } },
+              },
+            },
+          },
+        },
+      },
     },
   })
-  if (!employee) throw new NotFoundException('Employee not found')
-
-  // disposal requires FULL authority
-  if (employee.position.signAuthority !== SignAuthority.FULL) {
-    throw new ForbiddenException(
-      'Only fully authorized personnel can sign disposal documents'
-    )
-  }
-  return employee
+  if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
+  const hasSignFull = signer.placements[0].role.rolePermissions.some(
+    (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
+  )
+  if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign disposal documents')
+  return signer
 }
 
 const resolveStockDetail = async (
@@ -189,8 +195,8 @@ export const createStockDisposal = async (
 
     let signedById: number | undefined
     if (data.signedByUuid) {
-      const employee = await resolveSignedBy(data.signedByUuid, pharmacyId, tx)
-      signedById = employee.id
+      const signer = await resolveSignedBy(data.signedByUuid, pharmacyId, tx)
+      signedById = signer.id
     }
 
     const pharmacy = await tx.pharmacy.findUnique({
@@ -275,20 +281,31 @@ export const updateStockDisposal = async (
 
   let signedById: number | undefined
   if (data.signedByUuid) {
-    const employee = await prisma.employee.findFirst({
-      where: { uuid: data.signedByUuid, pharmacyId, status: 'ACTIVE' },
+    const signer = await prisma.user.findFirst({
+      where: { uuid: data.signedByUuid, deletedAt: null },
       select: {
         id: true,
-        position: { select: { signAuthority: true } },
+        placements: {
+          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+          select: {
+            role: {
+              select: {
+                rolePermissions: {
+                  where: { isEnabled: true },
+                  select: { permission: { select: { module: true, action: true } } },
+                },
+              },
+            },
+          },
+        },
       },
     })
-    if (!employee) throw new NotFoundException('Employee not found')
-    if (employee.position.signAuthority !== SignAuthority.FULL) {
-      throw new ForbiddenException(
-        'Only fully authorized personnel can sign disposal documents'
-      )
-    }
-    signedById = employee.id
+    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
+    const hasSignFull = signer.placements[0].role.rolePermissions.some(
+      (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
+    )
+    if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign disposal documents')
+    signedById = signer.id
   }
 
   const stockDisposal = await prisma.stockDisposal.update({

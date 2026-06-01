@@ -120,10 +120,6 @@ export interface PurchaseOrderResponse {
   signedBy: {
     uuid: string
     name: string
-    position: {
-      name: string
-      signAuthority: string
-    }
   } | null
   details: PurchaseOrderDetailResponse[]
 }

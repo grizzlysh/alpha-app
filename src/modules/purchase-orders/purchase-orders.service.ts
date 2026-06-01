@@ -1,4 +1,5 @@
-import { PurchaseOrderStatus, SignAuthority } from '@prisma/client'
+import { PurchaseOrderStatus } from '@prisma/client'
+import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import {
   CreatePurchaseOrderInput,
@@ -27,14 +28,8 @@ const purchaseOrderSelect = {
   distributor: {
     select: { uuid: true, name: true },
   },
-  signedByEmployee: {
-    select: {
-      uuid: true,
-      name: true,
-      position: {
-        select: { name: true, signAuthority: true },
-      },
-    },
+  signedByUser: {
+    select: { uuid: true, name: true },
   },
   details: {
     where: { deletedAt: null },
@@ -169,21 +164,31 @@ export const createPurchaseOrder = async (
     // ── Resolve Signed By ─────────────────────────
     let signedById: number | undefined
     if (data.signedByUuid) {
-      const employee = await tx.employee.findFirst({
-        where: { uuid: data.signedByUuid, pharmacyId, status: 'ACTIVE' },
+      const signer = await tx.user.findFirst({
+        where: { uuid: data.signedByUuid, deletedAt: null },
         select: {
           id: true,
-          position: { select: { signAuthority: true } },
+          placements: {
+            where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+            select: {
+              role: {
+                select: {
+                  rolePermissions: {
+                    where: { isEnabled: true },
+                    select: { permission: { select: { module: true, action: true } } },
+                  },
+                },
+              },
+            },
+          },
         },
       })
-      if (!employee) throw new NotFoundException('Employee not found')
-
-      if (employee.position.signAuthority !== SignAuthority.FULL) {
-        throw new ForbiddenException(
-          'Only authorized personnel can sign purchase orders'
-        )
-      }
-      signedById = employee.id
+      if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
+      const hasSignFull = signer.placements[0].role.rolePermissions.some(
+        (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
+      )
+      if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign purchase orders')
+      signedById = signer.id
     }
 
     // ── Generate Order Number ─────────────────────
@@ -274,20 +279,31 @@ export const updatePurchaseOrder = async (
 
   let signedById: number | undefined
   if (data.signedByUuid) {
-    const employee = await prisma.employee.findFirst({
-      where: { uuid: data.signedByUuid, pharmacyId, status: 'ACTIVE' },
+    const signer = await prisma.user.findFirst({
+      where: { uuid: data.signedByUuid, deletedAt: null },
       select: {
         id: true,
-        position: { select: { signAuthority: true } },
+        placements: {
+          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+          select: {
+            role: {
+              select: {
+                rolePermissions: {
+                  where: { isEnabled: true },
+                  select: { permission: { select: { module: true, action: true } } },
+                },
+              },
+            },
+          },
+        },
       },
     })
-    if (!employee) throw new NotFoundException('Employee not found')
-    if (employee.position.signAuthority !== SignAuthority.FULL) {
-      throw new ForbiddenException(
-        'Only authorized personnel can sign purchase orders'
-      )
-    }
-    signedById = employee.id
+    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
+    const hasSignFull = signer.placements[0].role.rolePermissions.some(
+      (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
+    )
+    if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign purchase orders')
+    signedById = signer.id
   }
 
   const purchaseOrder = await prisma.purchaseOrder.update({
