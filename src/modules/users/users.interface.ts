@@ -31,12 +31,6 @@ export interface ListPlacementQuery {
   status?: RecordStatus;
 }
 
-export interface ListLicenseQuery {
-  page?: string;
-  limit?: string;
-  status?: RecordStatus;
-}
-
 // ─── Request Bodies ───────────────────────────────────────────────────────────
 
 export interface CreateUserBody {
@@ -44,7 +38,6 @@ export interface CreateUserBody {
   email: string;
   phone?: string;
   address?: string;
-  platformRole?: PlatformRole;
 }
 
 export interface UpdateUserBody {
@@ -52,7 +45,6 @@ export interface UpdateUserBody {
   email?: string;
   phone?: string;
   address?: string;
-  platformRole?: PlatformRole;
   status?: RecordStatus;
 }
 
@@ -77,6 +69,12 @@ export interface UpdatePlacementBody {
   roleUuid?: string;
   joinedAt?: string;
   leftAt?: string | null;
+  status?: RecordStatus;
+}
+
+export interface ListLicenseQuery {
+  page?: string;
+  limit?: string;
   status?: RecordStatus;
 }
 

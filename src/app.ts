@@ -59,6 +59,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/me', meRouter)
 app.use('/api/users', userRouter)
 app.use('/api/pharmacies', pharmacyRoutes)
+
 app.use('/api/roles', roleRoutes)
 app.use('/api/permissions', permissionRoutes)
 app.use('/api/system-parameters', systemParameterRoutes)

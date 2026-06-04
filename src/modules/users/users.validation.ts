@@ -15,10 +15,6 @@ export const createUserSchema = z.object({
   email: z.string().email('Invalid email'),
   phone: z.string().max(20).optional(),
   address: z.string().max(255).optional(),
-  platformRole: z
-    .enum(['PLATFORM_ADMIN', 'PLATFORM_VIEWER', 'PLATFORM_SUPPORT'])
-    .optional()
-    .default('PLATFORM_VIEWER'),
 });
 
 export const updateUserSchema = z.object({
@@ -26,7 +22,6 @@ export const updateUserSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().max(20).optional(),
   address: z.string().max(255).optional(),
-  platformRole: z.enum(['PLATFORM_ADMIN', 'PLATFORM_VIEWER', 'PLATFORM_SUPPORT']).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 });
 
@@ -69,7 +64,7 @@ export const updatePlacementSchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 });
 
-// ─── Licenses ─────────────────────────────────────────────────────────────────
+// ─── Practice Licenses ────────────────────────────────────────────────────────
 
 export const listLicenseSchema = z.object({
   page: z.string().optional(),
@@ -100,4 +95,5 @@ export const updateLicenseSchema = z.object({
   },
   { message: 'validUntil must be after validFrom', path: ['validUntil'] }
 );
+
 

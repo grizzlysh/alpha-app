@@ -234,7 +234,7 @@ export async function deletePlacement(
   } catch (err) { next(err); }
 }
 
-// ─── Licenses ─────────────────────────────────────────────────────────────────
+// ─── Practice Licenses ────────────────────────────────────────────────────────
 
 export async function listLicenses(
   req: Request<PlacementUuidParam, any, any, ListLicenseQuery>,
@@ -250,6 +250,18 @@ export async function listLicenses(
     const { user_uuid, placement_uuid } = req.params;
     const { data, total } = await userService.listLicenses(user_uuid, placement_uuid, parsed.data);
     sendPaginated(res, 'LICENSES_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
+  } catch (err) { next(err); }
+}
+
+export async function getLicense(
+  req: Request<LicenseUuidParam>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { user_uuid, placement_uuid, license_uuid } = req.params;
+    const data = await userService.getLicense(user_uuid, placement_uuid, license_uuid);
+    sendSuccess(res, 'LICENSE_FETCHED', data);
   } catch (err) { next(err); }
 }
 
@@ -297,3 +309,4 @@ export async function deleteLicense(
     sendNoContent(res, 'LICENSE_DELETED');
   } catch (err) { next(err); }
 }
+

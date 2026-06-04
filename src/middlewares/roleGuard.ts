@@ -78,18 +78,8 @@ export const requirePharmacyAccess = (
       throw new UnauthorizedException()
     }
 
-    // platform admin bypasses — can access any pharmacy
-    if (req.user.platformRole === PlatformRole.PLATFORM_ADMIN) {
-      next()
-      return
-    }
-
-    // // check pharmacyId exists in token
-    // if (!req.user.pharmacyId) {
-    //   throw new ForbiddenException('No pharmacy assigned')
-    // }
-
-    // user hasn't selected pharmacy yet
+    // everyone — including PLATFORM_ADMIN — must select a pharmacy
+    // before accessing pharmacy-scoped routes
     if (!req.user.pharmacyId) {
       res.status(HTTP_STATUS.FORBIDDEN).json({
         success: false,

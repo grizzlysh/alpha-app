@@ -22,8 +22,6 @@ export interface CreatePharmacyBody {
   name: string
   code?: string           // auto-generated if not provided
   category: PharmacyCategory
-  permitNumber: string
-  ownerUuid: string
   phone: string
   address: string
   email?: string
@@ -33,15 +31,10 @@ export interface UpdatePharmacyBody {
   name?: string
   code?: string
   category?: PharmacyCategory
-  permitNumber?: string
   phone?: string
   address?: string
   email?: string
   status?: RecordStatus
-}
-
-export interface UpdatePharmacyOwnerBody {
-  ownerUuid: string
 }
 
 // ── Typed Request Aliases ─────────────────────────────
@@ -72,24 +65,76 @@ export type UpdatePharmacyRequest = Request<
   {}
 >
 
-export type UpdatePharmacyOwnerRequest = Request<
-  PharmacyUuidParam,
-  {},
-  UpdatePharmacyOwnerBody,
-  {}
->
-
 export type DeletePharmacyRequest = Request<
   PharmacyUuidParam,
   {}, {}, {}
 >
 
+// ── Business License Params/Types ─────────────────────
+
+export interface BusinessLicenseUuidParam extends ParamsDictionary {
+  pharmacy_uuid: string
+  license_uuid: string
+}
+
+export interface BusinessLicenseQueryParams {
+  status?: RecordStatus
+  sortBy?: 'licenseNumber' | 'validFrom' | 'validUntil' | 'createdAt'
+  sortOrder?: 'asc' | 'desc'
+  page?: string
+  limit?: string
+}
+
+export interface CreateBusinessLicenseBody {
+  licenseNumber: string
+  validFrom: string
+  validUntil: string
+}
+
+export interface UpdateBusinessLicenseBody {
+  licenseNumber?: string
+  validFrom?: string
+  validUntil?: string
+  status?: RecordStatus
+}
+
+export type GetBusinessLicensesRequest = Request<PharmacyUuidParam, {}, {}, BusinessLicenseQueryParams>
+export type GetBusinessLicenseRequest = Request<BusinessLicenseUuidParam, {}, {}, {}>
+export type CreateBusinessLicenseRequest = Request<PharmacyUuidParam, {}, CreateBusinessLicenseBody, {}>
+export type UpdateBusinessLicenseRequest = Request<BusinessLicenseUuidParam, {}, UpdateBusinessLicenseBody, {}>
+export type DeleteBusinessLicenseRequest = Request<BusinessLicenseUuidParam, {}, {}, {}>
+
 // ── Response Types ────────────────────────────────────
 
-export interface PharmacyOwnerResponse {
+export interface BusinessLicenseItem {
+  uuid: string
+  pharmacyUuid: string
+  licenseNumber: string
+  validFrom: Date
+  validUntil: Date
+  status: RecordStatus
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface PharmacyDdlItem {
   uuid: string
   name: string
-  email: string
+  code: string
+}
+
+export interface ActiveBusinessLicense {
+  uuid: string
+  licenseNumber: string
+  validFrom: Date
+  validUntil: Date
+  status: RecordStatus
+}
+
+export interface PharmacistInCharge {
+  placementUuid: string
+  user: { uuid: string; name: string }
+  activeLicense: ActiveBusinessLicense | null
 }
 
 export interface PharmacyResponse {
@@ -97,12 +142,12 @@ export interface PharmacyResponse {
   name: string
   code: string
   category: PharmacyCategory
-  permitNumber: string | null
   phone: string
   address: string
   email: string | null
   status: RecordStatus
-  owner: PharmacyOwnerResponse
+  activeLicense: ActiveBusinessLicense | null
+  pharmacistInCharge: PharmacistInCharge | null
   createdAt: Date
   updatedAt: Date
 }

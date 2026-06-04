@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as RoleService from './roles.service'
 import {
   roleQuerySchema,
@@ -136,6 +136,22 @@ export const setRolePermissions = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.ROLE_PERMISSIONS_UPDATED, role)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getRolesDdl = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await RoleService.getRolesDdl(
+      req.user!.pharmacyId,
+      req.user!.platformRole
+    )
+    sendSuccess(res, MESSAGE_CODES.ROLES_FETCHED, data)
   } catch (err) {
     next(err)
   }

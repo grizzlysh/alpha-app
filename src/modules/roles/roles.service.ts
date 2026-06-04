@@ -6,7 +6,7 @@ import {
   UpdateRoleInput,
   SetRolePermissionsInput,
 } from './roles.validation'
-import { RoleResponse, RoleDetailResponse } from './roles.interface'
+import { RoleResponse, RoleDetailResponse, RoleDdlItem } from './roles.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -20,6 +20,7 @@ const roleSelect = {
   name: true,
   type: true,
   pharmacyId: true,
+  requiresLicense: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -42,6 +43,7 @@ const formatResponse = (role: Prisma.RoleGetPayload<{ select: typeof roleSelect 
   name: role.name,
   type: role.type,
   isGlobal: role.pharmacyId === null,
+  requiresLicense: role.requiresLicense,
   status: role.status,
   permissionCount: role._count?.rolePermissions ?? 0,
   createdAt: role.createdAt,
@@ -205,6 +207,7 @@ export const createRole = async (
     data: {
       name: data.name,
       type: data.type,
+      requiresLicense: data.requiresLicense ?? false,
       pharmacyId: resolvedPharmacyId,
       createdById: userId,
       updatedById: userId,
@@ -246,7 +249,12 @@ export const updateRole = async (
 
   const role = await prisma.role.update({
     where: { id: existing.id },
-    data: { ...data, updatedById: userId },
+    data: {
+      ...(data.name && { name: data.name }),
+      ...(data.requiresLicense !== undefined && { requiresLicense: data.requiresLicense }),
+      ...(data.status && { status: data.status }),
+      updatedById: userId,
+    },
     select: roleSelect,
   })
 
@@ -318,7 +326,6 @@ export const setRolePermissions = async (
   const permissions = await prisma.permission.findMany({
     where: {
       uuid: { in: data.permissionUuids },
-      status: { not: 'DELETED' },
     },
     select: { id: true, uuid: true },
   })
@@ -350,4 +357,28 @@ export const setRolePermissions = async (
   })
 
   return getRoleByUuid(uuid, pharmacyId, platformRole)
+}
+
+export const getRolesDdl = async (
+  pharmacyId: number | null,
+  platformRole: PlatformRole | null
+): Promise<RoleDdlItem[]> => {
+  const pharmacyFilter =
+    platformRole === PlatformRole.PLATFORM_ADMIN
+      ? {}
+      : { OR: [{ pharmacyId: null }, { pharmacyId }] }
+
+  const roles = await prisma.role.findMany({
+    where: { ...pharmacyFilter, status: 'ACTIVE' },
+    select: { uuid: true, name: true, type: true, pharmacyId: true, requiresLicense: true },
+    orderBy: [{ pharmacyId: 'asc' }, { name: 'asc' }],
+  })
+
+  return roles.map((r) => ({
+    uuid: r.uuid,
+    name: r.name,
+    type: r.type,
+    isGlobal: r.pharmacyId === null,
+    requiresLicense: r.requiresLicense,
+  }))
 }

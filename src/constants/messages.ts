@@ -616,6 +616,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Pharmacy already has a user with full signing authority',
     id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
   },
+  PHARMACY_ALREADY_HAS_PHARMACIST_IN_CHARGE: {
+    en: 'Pharmacy already has a pharmacist in charge',
+    id: 'Apotek sudah memiliki apoteker penanggung jawab',
+  },
 
   // ─── Licenses ──────────────────────────────────────────────────────────────
   LICENSES_FETCHED: {
@@ -647,6 +651,70 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Nomor lisensi sudah ada',
   },
 
+  // ─── Business Licenses ─────────────────────────────────────────────────────
+  BUSINESS_LICENSES_FETCHED: {
+    en: 'Business licenses fetched successfully',
+    id: 'Data SIA berhasil diambil',
+  },
+  BUSINESS_LICENSE_FETCHED: {
+    en: 'Business license fetched successfully',
+    id: 'Data SIA berhasil diambil',
+  },
+  BUSINESS_LICENSE_CREATED: {
+    en: 'Business license created successfully',
+    id: 'SIA berhasil dibuat',
+  },
+  BUSINESS_LICENSE_UPDATED: {
+    en: 'Business license updated successfully',
+    id: 'SIA berhasil diperbarui',
+  },
+  BUSINESS_LICENSE_DELETED: {
+    en: 'Business license deleted successfully',
+    id: 'SIA berhasil dihapus',
+  },
+  BUSINESS_LICENSE_NOT_FOUND: {
+    en: 'Business license not found',
+    id: 'SIA tidak ditemukan',
+  },
+  BUSINESS_LICENSE_NUMBER_ALREADY_EXISTS: {
+    en: 'Business license number already exists for this pharmacy',
+    id: 'Nomor SIA sudah ada untuk apotek ini',
+  },
+
+  // ─── Practice Licenses ──────────────────────────────────────────────────────
+  PRACTICE_LICENSES_FETCHED: {
+    en: 'Practice licenses fetched successfully',
+    id: 'Data SIPA berhasil diambil',
+  },
+  PRACTICE_LICENSE_FETCHED: {
+    en: 'Practice license fetched successfully',
+    id: 'Data SIPA berhasil diambil',
+  },
+  PRACTICE_LICENSE_CREATED: {
+    en: 'Practice license created successfully',
+    id: 'SIPA berhasil dibuat',
+  },
+  PRACTICE_LICENSE_UPDATED: {
+    en: 'Practice license updated successfully',
+    id: 'SIPA berhasil diperbarui',
+  },
+  PRACTICE_LICENSE_DELETED: {
+    en: 'Practice license deleted successfully',
+    id: 'SIPA berhasil dihapus',
+  },
+  PRACTICE_LICENSE_NOT_FOUND: {
+    en: 'Practice license not found',
+    id: 'SIPA tidak ditemukan',
+  },
+  PRACTICE_LICENSE_NUMBER_ALREADY_EXISTS: {
+    en: 'Practice license number already exists for this placement',
+    id: 'Nomor SIPA sudah ada untuk penempatan ini',
+  },
+  PRACTICE_LICENSE_PLACEMENT_NOT_FOUND: {
+    en: 'Placement not found',
+    id: 'Penempatan tidak ditemukan',
+  },
+
   // ─── Pharmacies ────────────────────────────────────────────────────────────
   PHARMACIES_FETCHED: {
     en: 'Pharmacies fetched successfully',
@@ -675,10 +743,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   PHARMACY_CODE_ALREADY_EXISTS: {
     en: 'Pharmacy code already exists',
     id: 'Kode apotek sudah ada',
-  },
-  PHARMACY_OWNER_UPDATED: {
-    en: 'Pharmacy owner updated successfully',
-    id: 'Pemilik apotek berhasil diperbarui',
   },
   PHARMACY_PARAMETERS_FETCHED: {
     en: 'Pharmacy parameters fetched successfully',

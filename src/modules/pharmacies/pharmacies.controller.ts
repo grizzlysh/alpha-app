@@ -1,21 +1,27 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as PharmacyService from './pharmacies.service'
-import {
-  pharmacyQuerySchema,
-  createPharmacySchema,
-  updatePharmacySchema,
-  updatePharmacyOwnerSchema,
-} from './pharmacies.validation'
 import {
   GetPharmaciesRequest,
   GetPharmacyRequest,
   CreatePharmacyRequest,
   UpdatePharmacyRequest,
-  UpdatePharmacyOwnerRequest,
   DeletePharmacyRequest,
+  GetBusinessLicensesRequest,
+  GetBusinessLicenseRequest,
+  CreateBusinessLicenseRequest,
+  UpdateBusinessLicenseRequest,
+  DeleteBusinessLicenseRequest,
 } from './pharmacies.interface'
+import {
+  pharmacyQuerySchema,
+  createPharmacySchema,
+  updatePharmacySchema,
+  businessLicenseQuerySchema,
+  createBusinessLicenseSchema,
+  updateBusinessLicenseSchema,
+} from './pharmacies.validation'
 import { ValidationException } from '@exceptions/ValidationException'
-import { sendSuccess, sendCreated, sendPaginated } from '@utils/responseHelper'
+import { sendSuccess, sendCreated, sendPaginated, sendNoContent } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 
 export const getPharmacies = async (
@@ -112,26 +118,18 @@ export const updatePharmacy = async (
   }
 }
 
-export const updatePharmacyOwner = async (
-  req: UpdatePharmacyOwnerRequest,
+
+export const getPharmaciesDdl = async (
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updatePharmacyOwnerSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
-    const pharmacy = await PharmacyService.updatePharmacyOwner(
-      req.params.pharmacy_uuid,
-      parsed.data,
-      req.user!.id
+    const data = await PharmacyService.getPharmaciesDdl(
+      req.user!.pharmacyId,
+      req.user!.platformRole
     )
-
-    sendSuccess(res, MESSAGE_CODES.PHARMACY_OWNER_UPDATED, pharmacy)
+    sendSuccess(res, MESSAGE_CODES.PHARMACIES_FETCHED, data)
   } catch (err) {
     next(err)
   }
@@ -152,4 +150,99 @@ export const deletePharmacy = async (
   } catch (err) {
     next(err)
   }
+}
+
+// ─── Business Licenses ────────────────────────────────────────────────────────
+
+export const listBusinessLicenses = async (
+  req: GetBusinessLicensesRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = businessLicenseQuerySchema.safeParse(req.query)
+    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>)
+
+    const { data, meta } = await PharmacyService.getBusinessLicenses(
+      req.params.pharmacy_uuid,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      parsed.data
+    )
+    sendPaginated(res, MESSAGE_CODES.BUSINESS_LICENSES_FETCHED, data, meta)
+  } catch (err) { next(err) }
+}
+
+export const getBusinessLicense = async (
+  req: GetBusinessLicenseRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const license = await PharmacyService.getBusinessLicenseByUuid(
+      req.params.license_uuid,
+      req.params.pharmacy_uuid,
+      req.user!.pharmacyId,
+      req.user!.platformRole
+    )
+    sendSuccess(res, MESSAGE_CODES.BUSINESS_LICENSE_FETCHED, license)
+  } catch (err) { next(err) }
+}
+
+export const createBusinessLicense = async (
+  req: CreateBusinessLicenseRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = createBusinessLicenseSchema.safeParse(req.body)
+    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>)
+
+    const license = await PharmacyService.createBusinessLicense(
+      req.params.pharmacy_uuid,
+      parsed.data,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.user!.id
+    )
+    sendCreated(res, MESSAGE_CODES.BUSINESS_LICENSE_CREATED, license)
+  } catch (err) { next(err) }
+}
+
+export const updateBusinessLicense = async (
+  req: UpdateBusinessLicenseRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const parsed = updateBusinessLicenseSchema.safeParse(req.body)
+    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>)
+
+    const license = await PharmacyService.updateBusinessLicense(
+      req.params.license_uuid,
+      req.params.pharmacy_uuid,
+      parsed.data,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.user!.id
+    )
+    sendSuccess(res, MESSAGE_CODES.BUSINESS_LICENSE_UPDATED, license)
+  } catch (err) { next(err) }
+}
+
+export const deleteBusinessLicense = async (
+  req: DeleteBusinessLicenseRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    await PharmacyService.deleteBusinessLicense(
+      req.params.license_uuid,
+      req.params.pharmacy_uuid,
+      req.user!.pharmacyId,
+      req.user!.platformRole,
+      req.user!.id
+    )
+    sendNoContent(res, MESSAGE_CODES.BUSINESS_LICENSE_DELETED)
+  } catch (err) { next(err) }
 }

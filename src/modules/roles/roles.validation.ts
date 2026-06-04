@@ -13,11 +13,13 @@ export const roleQuerySchema = z.object({
 export const createRoleSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name is required' }).max(100),
   type: z.enum(['OWNER', 'ADMIN', 'PHARMACIST', 'CASHIER'], { message: 'Invalid role type' }),
+  requiresLicense: z.boolean().optional().default(false),
   pharmacyUuid: z.string().trim().uuid({ message: 'Invalid pharmacy UUID' }).optional(),
 })
 
 export const updateRoleSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
+  requiresLicense: z.boolean().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
 })
 

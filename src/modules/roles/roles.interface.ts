@@ -22,11 +22,13 @@ export interface RoleUuidParam extends ParamsDictionary {
 export interface CreateRoleBody {
   name: string
   type: PharmacyRole
+  requiresLicense?: boolean
   pharmacyUuid?: string   // PLATFORM_ADMIN only, null = global
 }
 
 export interface UpdateRoleBody {
   name?: string
+  requiresLicense?: boolean
   status?: RecordStatus
 }
 
@@ -81,6 +83,7 @@ export interface RoleResponse {
   name: string
   type: PharmacyRole
   isGlobal: boolean
+  requiresLicense: boolean
   status: RecordStatus
   permissionCount: number
   createdAt: Date
@@ -89,4 +92,12 @@ export interface RoleResponse {
 
 export interface RoleDetailResponse extends RoleResponse {
   permissions: PermissionResponse[]
+}
+
+export interface RoleDdlItem {
+  uuid: string
+  name: string
+  type: PharmacyRole
+  isGlobal: boolean
+  requiresLicense: boolean
 }

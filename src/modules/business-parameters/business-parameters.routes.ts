@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import * as BusinessParameterController from './business-parameters.controller'
 import { authenticate } from '@middlewares/auth'
-import { requirePermission } from '@middlewares/roleGuard'
+import { requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard'
 import { PERMISSIONS } from '@constants/permissions'
 
 const router: Router = Router()
 
 router.use(authenticate)
+router.use(requirePharmacyAccess)
 
 router.get(
   '/',

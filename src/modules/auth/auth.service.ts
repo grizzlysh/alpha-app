@@ -14,6 +14,7 @@ import {
   RefreshTokenResponse,
   PharmacyRoleItem,
   MeResponse,
+  PermissionMap,
 } from './auth.interface'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 import { UnauthorizedException } from '@exceptions/UnauthorizedException'
@@ -45,6 +46,19 @@ const hashToken = (token: string): string => {
 }
 
 // ── Permission Helpers ────────────────────────────────
+
+const toPermissionMap = (permissions: string[]): PermissionMap => {
+  const map: PermissionMap = {}
+  for (const perm of permissions) {
+    const dot = perm.indexOf('.')
+    if (dot === -1) continue
+    const module = perm.slice(0, dot)
+    const action = perm.slice(dot + 1)
+    if (!map[module]) map[module] = {}
+    map[module][action] = true
+  }
+  return map
+}
 
 const getEffectivePermissions = async (
   userId: number,
@@ -98,33 +112,25 @@ const getPharmaciesForUser = async (
   platformRole: PlatformRole | null
 ): Promise<PharmacyItem[]> => {
   if (platformRole === PlatformRole.PLATFORM_ADMIN) {
-    return prisma.pharmacy.findMany({
+    const pharmacies = await prisma.pharmacy.findMany({
       where: { status: 'ACTIVE' },
       select: { uuid: true, name: true, address: true },
     })
+    return pharmacies.map((p) => ({ ...p, role: null }))
   }
 
-  const ownedPharmacies = await prisma.pharmacy.findMany({
-    where: { ownerId: userId, status: 'ACTIVE' },
-    select: { uuid: true, name: true, address: true },
-  })
-
-  const assignedPharmacies = await prisma.placement.findMany({
+  const placements = await prisma.placement.findMany({
     where: { userId, status: 'ACTIVE' },
     include: {
-      pharmacy: {
-        select: { uuid: true, name: true, address: true },
-      },
+      pharmacy: { select: { uuid: true, name: true, address: true } },
+      role: { select: { name: true, type: true } },
     },
   })
 
-  const allPharmacies = new Map<string, PharmacyItem>()
-  ownedPharmacies.forEach((p) => allPharmacies.set(p.uuid, p))
-  assignedPharmacies.forEach((up) =>
-    allPharmacies.set(up.pharmacy.uuid, up.pharmacy)
-  )
-
-  return Array.from(allPharmacies.values())
+  return placements.map((p) => ({
+    ...p.pharmacy,
+    role: { name: p.role.name, type: p.role.type },
+  }))
 }
 
 // ── Services ──────────────────────────────────────────
@@ -235,7 +241,7 @@ export const selectPharmacy = async (
 ): Promise<SelectPharmacyResponse> => {
   const pharmacy = await prisma.pharmacy.findUnique({
     where: { uuid: data.pharmacyUuid, status: 'ACTIVE' },
-    select: { id: true, uuid: true, name: true, ownerId: true },
+    select: { id: true, uuid: true, name: true },
   })
 
   if (!pharmacy) {
@@ -247,22 +253,13 @@ export const selectPharmacy = async (
 
   if (platformRole === PlatformRole.PLATFORM_ADMIN) {
     hasAccess = true
-  } else if (pharmacy.ownerId === userId) {
-    hasAccess = true
-    const placement = await prisma.placement.findFirst({
-      where: { userId, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
-      include: { role: { select: { uuid: true, name: true, type: true } } },
-    })
-    if (placement) {
-      pharmacyRole = placement.role
-    }
   } else {
     const placement = await prisma.placement.findFirst({
-      where: { userId, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+      where: { userId, pharmacyId: pharmacy.id, status: 'ACTIVE' },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
-    hasAccess = !!placement && placement.status === 'ACTIVE'
-    if (hasAccess && placement) {
+    hasAccess = !!placement
+    if (placement) {
       pharmacyRole = placement.role
     }
   }
@@ -309,7 +306,7 @@ export const selectPharmacy = async (
     uuid: pharmacy.uuid,
     name: pharmacy.name,
     role: pharmacyRole,
-    permissions,
+    permissions: toPermissionMap(permissions),
   }
 
   return {
@@ -444,7 +441,7 @@ export const getMe = async (
     uuid: pharmacy.uuid,
     name: pharmacy.name,
     role,
-    permissions,
+    permissions: toPermissionMap(permissions),
   }
 
   return { user: userData, currentPharmacy }

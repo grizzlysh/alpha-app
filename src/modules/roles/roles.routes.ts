@@ -19,6 +19,12 @@ router.get(
 )
 
 router.get(
+  '/dropdown',
+  requirePermission(PERMISSIONS.ROLES_READ),
+  RoleController.getRolesDdl
+)
+
+router.get(
   '/:role_uuid',
   requirePermission(PERMISSIONS.ROLES_READ),
   RoleController.getRole

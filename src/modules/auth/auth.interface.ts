@@ -69,6 +69,8 @@ export interface LoginUserData {
 
 // ── Response Types ────────────────────────────────────
 
+export type PermissionMap = Record<string, Record<string, boolean>>
+
 export interface PharmacyRoleItem {
   uuid: string
   name: string
@@ -79,7 +81,7 @@ export interface CurrentPharmacyData {
   uuid: string
   name: string
   role: PharmacyRoleItem | null
-  permissions: string[]
+  permissions: PermissionMap
 }
 
 export interface LoginResponse {

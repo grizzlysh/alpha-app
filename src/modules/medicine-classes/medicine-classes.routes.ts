@@ -7,10 +7,7 @@ import { PERMISSIONS } from '@constants/permissions'
 const router: Router = Router()
 
 router.use(authenticate)
-
-// note: no requirePharmacyAccess here
-// because PLATFORM_ADMIN has no pharmacyId
-// but still needs access to this route
+router.use(requirePharmacyAccess)
 
 router.get(
   '/',

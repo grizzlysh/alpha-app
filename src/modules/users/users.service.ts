@@ -1,4 +1,4 @@
-import { RecordStatus, PlatformRole } from '@prisma/client';
+import { RecordStatus, PharmacyRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@config/db';
 import { BadRequestException } from '@exceptions/BadRequestException';
@@ -49,7 +49,7 @@ const placementSelect = {
   updatedAt: true,
   pharmacy: { select: { uuid: true, name: true, code: true } },
   role: { select: { uuid: true, name: true } },
-  licenses: {
+  practiceLicenses: {
     where: { deletedAt: null, status: RecordStatus.ACTIVE },
     select: licenseSelect,
     orderBy: { validUntil: 'desc' as const },
@@ -91,7 +91,7 @@ function formatPlacement(a: any): PlacementItem {
     joinedAt: a.joinedAt,
     leftAt: a.leftAt,
     status: a.status,
-    activeLicense: a.licenses?.[0] ? formatLicense(a.licenses[0]) : null,
+    activeLicense: a.practiceLicenses?.[0] ? formatLicense(a.practiceLicenses[0]) : null,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   };
@@ -331,7 +331,7 @@ export async function createUser(
       password: hashed,
       phone: body.phone,
       address: body.address,
-      platformRole: body.platformRole ?? PlatformRole.PLATFORM_VIEWER,
+      platformRole: null,
       mustChangePassword: true,
       createdById,
       updatedById: createdById,
@@ -389,7 +389,6 @@ export async function updateUser(
       ...(body.email && { email: body.email }),
       ...(body.phone !== undefined && { phone: body.phone }),
       ...(body.address !== undefined && { address: body.address }),
-      ...(body.platformRole && { platformRole: body.platformRole }),
       ...(body.status && { status: body.status }),
       updatedById,
     },
@@ -559,6 +558,20 @@ export async function createPlacement(
     if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
   }
 
+  // Max 1 PHARMACIST_IN_CHARGE per pharmacy
+  if (role.type === PharmacyRole.PHARMACIST_IN_CHARGE) {
+    const existingPic = await prisma.placement.findFirst({
+      where: {
+        pharmacyId: pharmacy.id,
+        deletedAt: null,
+        leftAt: null,
+        status: RecordStatus.ACTIVE,
+        role: { type: PharmacyRole.PHARMACIST_IN_CHARGE },
+      },
+    });
+    if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_PHARMACIST_IN_CHARGE');
+  }
+
   const assignment = await prisma.placement.create({
     data: {
       userId: user.id,
@@ -617,6 +630,20 @@ export async function updatePlacement(
       if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
     }
 
+    if (role.type === PharmacyRole.PHARMACIST_IN_CHARGE) {
+      const existingPic = await prisma.placement.findFirst({
+        where: {
+          pharmacyId: assignment.pharmacyId,
+          deletedAt: null,
+          leftAt: null,
+          status: RecordStatus.ACTIVE,
+          id: { not: assignment.id },
+          role: { type: PharmacyRole.PHARMACIST_IN_CHARGE },
+        },
+      });
+      if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_PHARMACIST_IN_CHARGE');
+    }
+
     roleId = role.id;
   }
 
@@ -660,75 +687,85 @@ export async function deletePlacement(
   });
 }
 
-// ─── Internal Helper ──────────────────────────────────────────────────────────
+// ─── Practice Licenses ────────────────────────────────────────────────────────
 
-async function _resolvePlacement(userUuid: string, assignmentUuid: string) {
+async function resolvePlacement(userUuid: string, placementUuid: string) {
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
-
-  const assignment = await prisma.placement.findFirst({
-    where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
+  const placement = await prisma.placement.findFirst({
+    where: { uuid: placementUuid, userId: user.id, deletedAt: null },
   });
-  if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
-
-  return assignment;
+  if (!placement) throw new NotFoundException('PLACEMENT_NOT_FOUND');
+  return placement;
 }
-
-// ─── List Licenses ────────────────────────────────────────────────────────────
 
 export async function listLicenses(
   userUuid: string,
-  assignmentUuid: string,
+  placementUuid: string,
   query: ListLicenseQuery
 ): Promise<{ data: LicenseItem[]; total: number }> {
   const page = Math.max(1, parseInt(query.page || '1'));
   const limit = Math.min(100, Math.max(1, parseInt(query.limit || '10')));
   const skip = (page - 1) * limit;
 
-  const assignment = await _resolvePlacement(userUuid, assignmentUuid);
+  const placement = await resolvePlacement(userUuid, placementUuid);
 
   const where = {
-    placementId: assignment.id,
+    placementId: placement.id,
     deletedAt: null,
     ...(query.status && { status: query.status }),
   };
 
   const [licenses, total] = await prisma.$transaction([
-    prisma.license.findMany({
+    prisma.practiceLicense.findMany({
       where,
       skip,
       take: limit,
       orderBy: { validUntil: 'desc' },
       select: licenseSelect,
     }),
-    prisma.license.count({ where }),
+    prisma.practiceLicense.count({ where }),
   ]);
 
   return { data: licenses.map(formatLicense), total };
 }
 
-// ─── Add License ──────────────────────────────────────────────────────────────
+export async function getLicense(
+  userUuid: string,
+  placementUuid: string,
+  licenseUuid: string
+): Promise<LicenseItem> {
+  const placement = await resolvePlacement(userUuid, placementUuid);
+
+  const license = await prisma.practiceLicense.findFirst({
+    where: { uuid: licenseUuid, placementId: placement.id, deletedAt: null },
+    select: licenseSelect,
+  });
+  if (!license) throw new NotFoundException('LICENSE_NOT_FOUND');
+
+  return formatLicense(license);
+}
 
 export async function addLicense(
   createdById: number,
   userUuid: string,
-  assignmentUuid: string,
+  placementUuid: string,
   body: CreateLicenseBody
 ): Promise<LicenseItem> {
-  const assignment = await _resolvePlacement(userUuid, assignmentUuid);
+  const placement = await resolvePlacement(userUuid, placementUuid);
 
-  const duplicate = await prisma.license.findFirst({
+  const duplicate = await prisma.practiceLicense.findFirst({
     where: {
       licenseNumber: body.licenseNumber,
-      placement: { pharmacyId: assignment.pharmacyId },
+      placementId: placement.id,
       deletedAt: null,
     },
   });
   if (duplicate) throw new ConflictException('LICENSE_NUMBER_ALREADY_EXISTS');
 
-  const license = await prisma.license.create({
+  const license = await prisma.practiceLicense.create({
     data: {
-      placementId: assignment.id,
+      placementId: placement.id,
       licenseNumber: body.licenseNumber,
       validFrom: new Date(body.validFrom),
       validUntil: new Date(body.validUntil),
@@ -741,27 +778,25 @@ export async function addLicense(
   return formatLicense(license);
 }
 
-// ─── Update License ───────────────────────────────────────────────────────────
-
 export async function updateLicense(
   updatedById: number,
   userUuid: string,
-  assignmentUuid: string,
+  placementUuid: string,
   licenseUuid: string,
   body: UpdateLicenseBody
 ): Promise<LicenseItem> {
-  const assignment = await _resolvePlacement(userUuid, assignmentUuid);
+  const placement = await resolvePlacement(userUuid, placementUuid);
 
-  const license = await prisma.license.findFirst({
-    where: { uuid: licenseUuid, placementId: assignment.id, deletedAt: null },
+  const license = await prisma.practiceLicense.findFirst({
+    where: { uuid: licenseUuid, placementId: placement.id, deletedAt: null },
   });
   if (!license) throw new NotFoundException('LICENSE_NOT_FOUND');
 
   if (body.licenseNumber && body.licenseNumber !== license.licenseNumber) {
-    const duplicate = await prisma.license.findFirst({
+    const duplicate = await prisma.practiceLicense.findFirst({
       where: {
         licenseNumber: body.licenseNumber,
-        placement: { pharmacyId: assignment.pharmacyId },
+        placementId: placement.id,
         deletedAt: null,
         id: { not: license.id },
       },
@@ -769,7 +804,7 @@ export async function updateLicense(
     if (duplicate) throw new ConflictException('LICENSE_NUMBER_ALREADY_EXISTS');
   }
 
-  const updated = await prisma.license.update({
+  const updated = await prisma.practiceLicense.update({
     where: { id: license.id },
     data: {
       ...(body.licenseNumber && { licenseNumber: body.licenseNumber }),
@@ -784,22 +819,20 @@ export async function updateLicense(
   return formatLicense(updated);
 }
 
-// ─── Delete License ───────────────────────────────────────────────────────────
-
 export async function deleteLicense(
   deletedById: number,
   userUuid: string,
-  assignmentUuid: string,
+  placementUuid: string,
   licenseUuid: string
 ): Promise<void> {
-  const assignment = await _resolvePlacement(userUuid, assignmentUuid);
+  const placement = await resolvePlacement(userUuid, placementUuid);
 
-  const license = await prisma.license.findFirst({
-    where: { uuid: licenseUuid, placementId: assignment.id, deletedAt: null },
+  const license = await prisma.practiceLicense.findFirst({
+    where: { uuid: licenseUuid, placementId: placement.id, deletedAt: null },
   });
   if (!license) throw new NotFoundException('LICENSE_NOT_FOUND');
 
-  await prisma.license.update({
+  await prisma.practiceLicense.update({
     where: { id: license.id },
     data: {
       status: RecordStatus.DELETED,
@@ -808,3 +841,4 @@ export async function deleteLicense(
     },
   });
 }
+

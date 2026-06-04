@@ -197,19 +197,36 @@ async function main() {
     where: { code: 'APK1' },
     update: {},
     create: {
-      ownerId: owner.id,
       name: 'Apotek Sejahtera',
       code: 'APK1',
       category: PharmacyCategory.APOTEK,
       address: 'Jl. Merdeka No. 1, Jakarta Pusat 10110',
       phone: '021-12345678',
       email: 'apotek@pharma.com',
-      permitNumber: 'SIA-JKT-2024-001',
       status: RecordStatus.ACTIVE,
       createdById: platformAdmin.id,
       updatedById: platformAdmin.id,
     },
   })
+
+  // ── 5a. Business license ──────────────────────────────────────────────────
+  console.log('Creating business license...')
+  const existingBl = await prisma.businessLicense.findFirst({
+    where: { pharmacyId: pharmacy.id, licenseNumber: 'SIA-JKT-2024-001', status: { not: 'DELETED' } },
+  })
+  if (!existingBl) {
+    await prisma.businessLicense.create({
+      data: {
+        pharmacyId: pharmacy.id,
+        licenseNumber: 'SIA-JKT-2024-001',
+        validFrom: new Date('2024-01-01'),
+        validUntil: new Date('2027-12-31'),
+        status: RecordStatus.ACTIVE,
+        createdById: platformAdmin.id,
+        updatedById: platformAdmin.id,
+      },
+    })
+  }
 
   // ── 6. Roles ──────────────────────────────────────────────────────────────
   console.log('Creating roles...')
@@ -221,6 +238,7 @@ async function main() {
         name: 'Owner',
         type: PharmacyRole.OWNER,
         description: 'Pharmacy owner with full access',
+        requiresLicense: false,
         status: RecordStatus.ACTIVE,
       },
     }))
@@ -233,6 +251,7 @@ async function main() {
         name: 'Pharmacist',
         type: PharmacyRole.PHARMACIST,
         description: 'Licensed pharmacist with dispensing access',
+        requiresLicense: true,
         status: RecordStatus.ACTIVE,
       },
     }))
@@ -264,21 +283,21 @@ async function main() {
     }
   }
 
-  // ── 8. UserPharmacy memberships ───────────────────────────────────────────
+  // ── 8. Placement memberships ──────────────────────────────────────────────
   console.log('Assigning users to pharmacy...')
-  const ownerMembership = await prisma.userPharmacy.findFirst({
-    where: { userId: owner.id, pharmacyId: pharmacy.id },
+  const ownerPlacement = await prisma.placement.findFirst({
+    where: { userId: owner.id, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
   })
-  if (!ownerMembership) {
-    await prisma.userPharmacy.create({
+  if (!ownerPlacement) {
+    await prisma.placement.create({
       data: { userId: owner.id, pharmacyId: pharmacy.id, roleId: ownerRole.id, status: RecordStatus.ACTIVE },
     })
   }
-  const pharmacistMembership = await prisma.userPharmacy.findFirst({
-    where: { userId: pharmacist.id, pharmacyId: pharmacy.id },
+  const pharmacistPlacement = await prisma.placement.findFirst({
+    where: { userId: pharmacist.id, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
   })
-  if (!pharmacistMembership) {
-    await prisma.userPharmacy.create({
+  if (!pharmacistPlacement) {
+    await prisma.placement.create({
       data: { userId: pharmacist.id, pharmacyId: pharmacy.id, roleId: pharmacistRole.id, status: RecordStatus.ACTIVE },
     })
   }
