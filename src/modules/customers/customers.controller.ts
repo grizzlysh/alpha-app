@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as CustomerService from './customers.service'
 import {
@@ -26,16 +27,9 @@ export const getCustomers = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = customerQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await CustomerService.getCustomers(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.CUSTOMERS_FETCHED, data, meta)
@@ -51,7 +45,7 @@ export const getCustomer = async (
 ): Promise<void> => {
   try {
     const customer = await CustomerService.getCustomerByUuid(
-      req.params.customer_uuid,
+      parseUuid(req.params.customer_uuid),
       req.user!.pharmacyId!
     )
 
@@ -67,15 +61,8 @@ export const createCustomer = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createCustomerSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const customer = await CustomerService.createCustomer(
-      parsed.data,
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -92,16 +79,9 @@ export const updateCustomer = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateCustomerSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const customer = await CustomerService.updateCustomer(
-      req.params.customer_uuid,
-      parsed.data,
+      parseUuid(req.params.customer_uuid),
+      req.query as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -119,7 +99,7 @@ export const deleteCustomer = async (
 ): Promise<void> => {
   try {
     await CustomerService.deleteCustomer(
-      req.params.customer_uuid,
+      parseUuid(req.params.customer_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )

@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as PharmacyService from './pharmacies.service'
 import {
@@ -30,17 +31,10 @@ export const getPharmacies = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = pharmacyQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await PharmacyService.getPharmacies(
       req.user!.pharmacyId,
       req.user!.platformRole,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.PHARMACIES_FETCHED, data, meta)
@@ -56,7 +50,7 @@ export const getPharmacy = async (
 ): Promise<void> => {
   try {
     const pharmacy = await PharmacyService.getPharmacyByUuid(
-      req.params.pharmacy_uuid,
+      parseUuid(req.params.pharmacy_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole
     )
@@ -73,15 +67,8 @@ export const createPharmacy = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createPharmacySchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const pharmacy = await PharmacyService.createPharmacy(
-      parsed.data,
+      req.body as any,
       req.user!.id
     )
 
@@ -97,16 +84,9 @@ export const updatePharmacy = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updatePharmacySchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const pharmacy = await PharmacyService.updatePharmacy(
-      req.params.pharmacy_uuid,
-      parsed.data,
+      parseUuid(req.params.pharmacy_uuid),
+      req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -142,7 +122,7 @@ export const deletePharmacy = async (
 ): Promise<void> => {
   try {
     await PharmacyService.deletePharmacy(
-      req.params.pharmacy_uuid,
+      parseUuid(req.params.pharmacy_uuid),
       req.user!.id
     )
 
@@ -160,14 +140,11 @@ export const listBusinessLicenses = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = businessLicenseQuerySchema.safeParse(req.query)
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>)
-
     const { data, meta } = await PharmacyService.getBusinessLicenses(
-      req.params.pharmacy_uuid,
+      parseUuid(req.params.pharmacy_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole,
-      parsed.data
+      req.query as any
     )
     sendPaginated(res, MESSAGE_CODES.BUSINESS_LICENSES_FETCHED, data, meta)
   } catch (err) { next(err) }
@@ -180,8 +157,8 @@ export const getBusinessLicense = async (
 ): Promise<void> => {
   try {
     const license = await PharmacyService.getBusinessLicenseByUuid(
-      req.params.license_uuid,
-      req.params.pharmacy_uuid,
+      parseUuid(req.params.license_uuid),
+      parseUuid(req.params.pharmacy_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole
     )
@@ -195,12 +172,9 @@ export const createBusinessLicense = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createBusinessLicenseSchema.safeParse(req.body)
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>)
-
     const license = await PharmacyService.createBusinessLicense(
-      req.params.pharmacy_uuid,
-      parsed.data,
+      parseUuid(req.params.pharmacy_uuid),
+      req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -215,13 +189,10 @@ export const updateBusinessLicense = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateBusinessLicenseSchema.safeParse(req.body)
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>)
-
     const license = await PharmacyService.updateBusinessLicense(
-      req.params.license_uuid,
-      req.params.pharmacy_uuid,
-      parsed.data,
+      parseUuid(req.params.license_uuid),
+      parseUuid(req.params.pharmacy_uuid),
+      req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -237,8 +208,8 @@ export const deleteBusinessLicense = async (
 ): Promise<void> => {
   try {
     await PharmacyService.deleteBusinessLicense(
-      req.params.license_uuid,
-      req.params.pharmacy_uuid,
+      parseUuid(req.params.license_uuid),
+      parseUuid(req.params.pharmacy_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

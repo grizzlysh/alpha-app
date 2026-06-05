@@ -3,8 +3,8 @@ import { RecordStatus, PharmacyCategory } from '@prisma/client'
 
 export const pharmacyQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.nativeEnum(RecordStatus).optional(),
-  category: z.nativeEnum(PharmacyCategory).optional(),
+  status: z.enum(RecordStatus).optional(),
+  category: z.enum(PharmacyCategory).optional(),
   sortBy: z.enum(['name', 'code', 'createdAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
   page: z.coerce.number().int().positive().optional().default(1),
@@ -16,11 +16,10 @@ export const createPharmacySchema = z.object({
   code: z
     .string()
     .trim()
-    .length(5)
+    .length(5, { message: 'Code must be exactly 5 characters' })
     .toUpperCase()
-    .regex(/^[A-Z0-9]{5}$/, { message: 'Code must be 5 alphanumeric characters' })
-    .optional(),
-  category: z.nativeEnum(PharmacyCategory),
+    .regex(/^[A-Z0-9]{5}$/, { message: 'Code must be 5 alphanumeric characters' }),
+  category: z.enum(PharmacyCategory),
   phone: z.string().trim().min(1, { message: 'Phone is required' }),
   address: z.string().trim().min(1, { message: 'Address is required' }),
   email: z.string().trim().email({ message: 'Invalid email' }).optional(),
@@ -35,11 +34,11 @@ export const updatePharmacySchema = z.object({
     .toUpperCase()
     .regex(/^[A-Z0-9]{5}$/, { message: 'Code must be 5 alphanumeric characters' })
     .optional(),
-  category: z.nativeEnum(PharmacyCategory).optional(),
+  category: z.enum(PharmacyCategory).optional(),
   phone: z.string().trim().optional(),
   address: z.string().trim().optional(),
   email: z.string().trim().email().optional(),
-  status: z.nativeEnum(RecordStatus).optional(),
+  status: z.enum(RecordStatus).optional(),
 })
 
 export type PharmacyQueryInput = z.infer<typeof pharmacyQuerySchema>
@@ -49,7 +48,7 @@ export type UpdatePharmacyInput = z.infer<typeof updatePharmacySchema>
 // ── Business Licenses ─────────────────────────────────
 
 export const businessLicenseQuerySchema = z.object({
-  status: z.nativeEnum(RecordStatus).optional(),
+  status: z.enum(RecordStatus).optional(),
   sortBy: z.enum(['licenseNumber', 'validFrom', 'validUntil', 'createdAt']).optional().default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
   page: z.coerce.number().int().positive().optional().default(1),
@@ -69,7 +68,7 @@ export const updateBusinessLicenseSchema = z.object({
   licenseNumber: z.string().trim().min(1).optional(),
   validFrom: z.coerce.date().optional(),
   validUntil: z.coerce.date().optional(),
-  status: z.nativeEnum(RecordStatus).optional(),
+  status: z.enum(RecordStatus).optional(),
 })
 
 export type BusinessLicenseQueryInput = z.infer<typeof businessLicenseQuerySchema>

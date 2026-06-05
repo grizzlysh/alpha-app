@@ -1,3 +1,4 @@
+import { PurchaseOrderStatus } from '@prisma/client'
 import { z } from 'zod'
 
 export const createPurchaseOrderDetailSchema = z.object({
@@ -31,7 +32,7 @@ export const cancelPurchaseOrderSchema = z.object({
 
 export const purchaseOrderQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.enum(['DRAFT', 'SENT', 'COMPLETED', 'CANCELLED']).optional(),
+  status: z.enum(PurchaseOrderStatus).optional(),
   distributorUuid: z.string().trim().uuid().optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),

@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { sendSuccess, sendCreated, sendPaginated, sendNoContent } from '@utils/responseHelper';
@@ -53,11 +54,8 @@ export async function updateMe(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = updateMeSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
-    const data = await userService.updateMe(id, id, parsed.data);
+    const data = await userService.updateMe(id, id, req.body);
     sendSuccess(res, 'ME_UPDATED', data);
   } catch (err) { next(err); }
 }
@@ -68,11 +66,8 @@ export async function changePassword(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = changePasswordSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
-    await userService.changePassword(id, parsed.data);
+    await userService.changePassword(id, req.body);
     sendNoContent(res, 'PASSWORD_CHANGED');
   } catch (err) { next(err); }
 }
@@ -85,12 +80,9 @@ export async function listUsers(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = listUserSchema.safeParse(req.query);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
-    const page = parseInt(parsed.data.page || '1');
-    const limit = parseInt(parsed.data.limit || '10');
-    const { data, total } = await userService.listUsers(parsed.data);
+    const { data, total } = await userService.listUsers(req.query as any);
+    const page = (req.query as any).page ?? 1;
+    const limit = (req.query as any).limit ?? 10;
     sendPaginated(res, 'USERS_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
   } catch (err) { next(err); }
 }
@@ -101,7 +93,7 @@ export async function getUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const data = await userService.getUser(req.params.user_uuid);
+    const data = await userService.getUser(parseUuid(req.params.user_uuid));
     sendSuccess(res, 'USER_FETCHED', data);
   } catch (err) { next(err); }
 }
@@ -112,11 +104,8 @@ export async function createUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = createUserSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
-    const data = await userService.createUser(id, parsed.data);
+    const data = await userService.createUser(id, req.body);
     sendCreated(res, 'USER_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -127,11 +116,8 @@ export async function updateUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = updateUserSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
-    const data = await userService.updateUser(id, req.params.user_uuid, parsed.data);
+    const data = await userService.updateUser(id, parseUuid(req.params.user_uuid), req.body);
     sendSuccess(res, 'USER_UPDATED', data);
   } catch (err) { next(err); }
 }
@@ -143,7 +129,7 @@ export async function deleteUser(
 ): Promise<void> {
   try {
     const { id } = req.user!;
-    await userService.deleteUser(id, req.params.user_uuid);
+    await userService.deleteUser(id, parseUuid(req.params.user_uuid));
     sendNoContent(res, 'USER_DELETED');
   } catch (err) { next(err); }
 }
@@ -155,7 +141,7 @@ export async function resetPassword(
 ): Promise<void> {
   try {
     const { id } = req.user!;
-    await userService.resetPassword(id, req.params.user_uuid);
+    await userService.resetPassword(id, parseUuid(req.params.user_uuid));
     sendNoContent(res, 'PASSWORD_RESET');
   } catch (err) { next(err); }
 }
@@ -168,12 +154,9 @@ export async function listPlacements(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = listPlacementSchema.safeParse(req.query);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
-    const page = parseInt(parsed.data.page || '1');
-    const limit = parseInt(parsed.data.limit || '10');
-    const { data, total } = await userService.listPlacements(req.params.user_uuid, parsed.data);
+    const { data, total } = await userService.listPlacements(parseUuid(req.params.user_uuid), req.query as any);
+    const page = (req.query as any).page ?? 1;
+    const limit = (req.query as any).limit ?? 10;
     sendPaginated(res, 'PLACEMENTS_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
   } catch (err) { next(err); }
 }
@@ -196,11 +179,8 @@ export async function createPlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = createPlacementSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
-    const data = await userService.createPlacement(id, req.params.user_uuid, parsed.data);
+    const data = await userService.createPlacement(id, parseUuid(req.params.user_uuid), req.body);
     sendCreated(res, 'PLACEMENT_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -211,12 +191,9 @@ export async function updatePlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = updatePlacementSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
     const { user_uuid, placement_uuid } = req.params;
-    const data = await userService.updatePlacement(id, user_uuid, placement_uuid, parsed.data);
+    const data = await userService.updatePlacement(id, user_uuid, placement_uuid, req.body);
     sendSuccess(res, 'PLACEMENT_UPDATED', data);
   } catch (err) { next(err); }
 }
@@ -242,13 +219,10 @@ export async function listLicenses(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = listLicenseSchema.safeParse(req.query);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
-    const page = parseInt(parsed.data.page || '1');
-    const limit = parseInt(parsed.data.limit || '10');
     const { user_uuid, placement_uuid } = req.params;
-    const { data, total } = await userService.listLicenses(user_uuid, placement_uuid, parsed.data);
+    const { data, total } = await userService.listLicenses(user_uuid, placement_uuid, req.query as any);
+    const page = (req.query as any).page ?? 1;
+    const limit = (req.query as any).limit ?? 10;
     sendPaginated(res, 'LICENSES_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
   } catch (err) { next(err); }
 }
@@ -271,12 +245,9 @@ export async function addLicense(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = createLicenseSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
     const { user_uuid, placement_uuid } = req.params;
-    const data = await userService.addLicense(id, user_uuid, placement_uuid, parsed.data);
+    const data = await userService.addLicense(id, user_uuid, placement_uuid, req.body);
     sendCreated(res, 'LICENSE_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -287,12 +258,9 @@ export async function updateLicense(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = updateLicenseSchema.safeParse(req.body);
-    if (!parsed.success) throw new ValidationException(parsed.error.flatten().fieldErrors as Record<string, any>);
-
     const { id } = req.user!;
     const { user_uuid, placement_uuid, license_uuid } = req.params;
-    const data = await userService.updateLicense(id, user_uuid, placement_uuid, license_uuid, parsed.data);
+    const data = await userService.updateLicense(id, user_uuid, placement_uuid, license_uuid, req.body);
     sendSuccess(res, 'LICENSE_UPDATED', data);
   } catch (err) { next(err); }
 }

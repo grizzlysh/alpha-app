@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { RecordStatus } from '@prisma/client'
 
 export const roleQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(RecordStatus).optional(),
   isGlobal: z.enum(['true', 'false']).optional(),
   sortBy: z.enum(['name', 'createdAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
@@ -20,7 +21,7 @@ export const createRoleSchema = z.object({
 export const updateRoleSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   requiresLicense: z.boolean().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(RecordStatus).optional(),
 })
 
 export const setRolePermissionsSchema = z.object({

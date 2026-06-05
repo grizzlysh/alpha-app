@@ -1,3 +1,4 @@
+import { PaymentStatus } from '@prisma/client'
 import { z } from 'zod'
 
 export const createInvoiceDetailSchema = z.object({
@@ -26,7 +27,7 @@ export const createInvoiceSchema = z.object({
 
 export const invoiceQuerySchema = z.object({
   search: z.string().trim().optional(),
-  paymentStatus: z.enum(['UNPAID', 'PARTIAL', 'PAID']).optional(),
+  paymentStatus: z.enum(PaymentStatus).optional(),
   distributorUuid: z.string().trim().uuid().optional(),
   purchaseOrderUuid: z.string().trim().uuid().optional(),
   dateFrom: z.string().trim().optional(),

@@ -13,8 +13,8 @@ export const stockQuerySchema = z.object({
 
 export const stockMovementQuerySchema = z.object({
   medicineUuid: z.string().trim().uuid().optional(),
-  type: z.nativeEnum(StockMovementType).optional(),
-  reason: z.nativeEnum(StockMovementReason).optional(),
+  type: z.enum(StockMovementType).optional(),
+  reason: z.enum(StockMovementReason).optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),

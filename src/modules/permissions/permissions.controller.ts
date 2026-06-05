@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as PermissionService from './permissions.service'
 import { permissionQuerySchema } from './permissions.validation'
@@ -15,14 +16,7 @@ export const getPermissions = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = permissionQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
-    const { data, meta } = await PermissionService.getPermissions(parsed.data)
+    const { data, meta } = await PermissionService.getPermissions(req.query as any)
 
     sendPaginated(res, MESSAGE_CODES.PERMISSIONS_FETCHED, data, meta)
   } catch (err) {
@@ -37,7 +31,7 @@ export const getPermission = async (
 ): Promise<void> => {
   try {
     const permission = await PermissionService.getPermissionByUuid(
-      req.params.permission_uuid
+      parseUuid(req.params.permission_uuid)
     )
 
     sendSuccess(res, MESSAGE_CODES.PERMISSION_FETCHED, permission)

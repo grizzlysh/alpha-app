@@ -20,7 +20,7 @@ export interface PharmacyUuidParam extends ParamsDictionary {
 
 export interface CreatePharmacyBody {
   name: string
-  code?: string           // auto-generated if not provided
+  code: string
   category: PharmacyCategory
   phone: string
   address: string

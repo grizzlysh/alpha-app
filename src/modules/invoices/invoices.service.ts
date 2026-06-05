@@ -1,6 +1,7 @@
 import { PurchaseOrderStatus } from '@prisma/client'
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { withDocNumberRetry } from '@utils/generateDocNumbers'
 import { CreateInvoiceInput, InvoiceQueryInput } from './invoices.validation'
 import { InvoiceResponse } from './invoices.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
@@ -165,7 +166,7 @@ export const createInvoice = async (
   pharmacyId: number,
   userId: number
 ): Promise<InvoiceResponse> => {
-  const createdInvoice = await prisma.$transaction(async (tx) => {
+  const createdInvoice = await withDocNumberRetry('INV', () => prisma.$transaction(async (tx) => {
 
     // ── Resolve Distributor ───────────────────────
     const distributor = await tx.distributor.findFirst({
@@ -441,10 +442,7 @@ export const createInvoice = async (
     }
 
     return invoice
-  }, {
-    timeout: 15000,
-    maxWait: 5000,
-  })
+  }, { timeout: 15000, maxWait: 5000 }))
 
   // fetch full response outside transaction
   const fullInvoice = await prisma.invoice.findUnique({

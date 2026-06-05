@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineClassService from './medicine-classes.service'
 import {
@@ -26,17 +27,10 @@ export const getMedicineClasses = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = medicineClassQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await MedicineClassService.getMedicineClasses(
       req.user!.pharmacyId,
       req.user!.platformRole,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.MEDICINE_CLASSES_FETCHED, data, meta)
@@ -52,7 +46,7 @@ export const getMedicineClass = async (
 ): Promise<void> => {
   try {
     const medicine_class = await MedicineClassService.getMedicineClassByUuid(
-      req.params.medicine_class_uuid,
+      parseUuid(req.params.medicine_class_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole
     )
@@ -69,15 +63,8 @@ export const createMedicineClass = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createMedicineClassSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const medicine_class = await MedicineClassService.createMedicineClass(
-      parsed.data,
+      req.body,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -95,16 +82,9 @@ export const updateMedicineClass = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateMedicineClassSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const medicine_class = await MedicineClassService.updateMedicineClass(
-      req.params.medicine_class_uuid,
-      parsed.data,
+      parseUuid(req.params.medicine_class_uuid),
+      req.query as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -123,7 +103,7 @@ export const deleteMedicineClass = async (
 ): Promise<void> => {
   try {
     await MedicineClassService.deleteMedicineClass(
-      req.params.medicine_class_uuid,
+      parseUuid(req.params.medicine_class_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

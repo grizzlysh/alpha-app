@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as RoleService from './roles.service'
 import {
@@ -24,17 +25,10 @@ export const getRoles = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = roleQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await RoleService.getRoles(
       req.user!.pharmacyId,
       req.user!.platformRole,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.ROLES_FETCHED, data, meta)
@@ -50,7 +44,7 @@ export const getRole = async (
 ): Promise<void> => {
   try {
     const role = await RoleService.getRoleByUuid(
-      req.params.role_uuid,
+      parseUuid(req.params.role_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole
     )
@@ -67,15 +61,8 @@ export const createRole = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createRoleSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const role = await RoleService.createRole(
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -93,16 +80,9 @@ export const updateRole = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateRoleSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const role = await RoleService.updateRole(
-      req.params.role_uuid,
-      parsed.data,
+      parseUuid(req.params.role_uuid),
+      req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -120,16 +100,9 @@ export const setRolePermissions = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = setRolePermissionsSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const role = await RoleService.setRolePermissions(
-      req.params.role_uuid,
-      parsed.data,
+      parseUuid(req.params.role_uuid),
+      req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -164,7 +137,7 @@ export const deleteRole = async (
 ): Promise<void> => {
   try {
     await RoleService.deleteRole(
-      req.params.role_uuid,
+      parseUuid(req.params.role_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

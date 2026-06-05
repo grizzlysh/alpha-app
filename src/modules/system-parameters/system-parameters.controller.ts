@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as SystemParameterService from './system-parameters.service'
 import {
@@ -19,15 +20,8 @@ export const getSystemParameters = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = systemParameterQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await SystemParameterService.getSystemParameters(
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.PHARMACY_PARAMETERS_FETCHED, data, meta)
@@ -43,7 +37,7 @@ export const getSystemParameter = async (
 ): Promise<void> => {
   try {
     const param = await SystemParameterService.getSystemParameterByUuid(
-      req.params.system_parameter_uuid
+      parseUuid(req.params.system_parameter_uuid)
     )
 
     sendSuccess(res, MESSAGE_CODES.PHARMACY_PARAMETERS_FETCHED, param)
@@ -58,16 +52,9 @@ export const updateSystemParameter = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateSystemParameterSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const param = await SystemParameterService.updateSystemParameter(
-      req.params.system_parameter_uuid,
-      parsed.data,
+      parseUuid(req.params.system_parameter_uuid),
+      req.body as any,
       req.user!.id
     )
 

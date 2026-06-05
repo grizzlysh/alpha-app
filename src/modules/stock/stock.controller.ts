@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as StockService from './stock.service'
 import {
@@ -29,16 +30,9 @@ export const getStocks = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = stockQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await StockService.getStocks(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.STOCKS_FETCHED, data, meta)
@@ -54,7 +48,7 @@ export const getStock = async (
 ): Promise<void> => {
   try {
     const stock = await StockService.getStockByUuid(
-      req.params.stock_uuid,
+      parseUuid(req.params.stock_uuid),
       req.user!.pharmacyId!
     )
 
@@ -86,16 +80,9 @@ export const getStockMovements = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = stockMovementQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await StockService.getStockMovements(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.STOCK_MOVEMENTS_FETCHED, data, meta)
@@ -110,16 +97,9 @@ export const updateSellingPrice = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updatePriceSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stock = await StockService.updateSellingPrice(
-      req.params.stock_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -136,16 +116,9 @@ export const updateReorderLevel = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateReorderLevelSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stock = await StockService.updateReorderLevel(
-      req.params.stock_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -162,16 +135,9 @@ export const adjustStock = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = adjustStockSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stock = await StockService.adjustStock(
-      req.params.stock_detail_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_detail_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -189,7 +155,7 @@ export const getCrossPharmacyStock = async (
 ): Promise<void> => {
   try {
     const stocks = await StockService.getCrossPharmacyStock(
-      req.params.medicine_uuid,
+      parseUuid(req.params.medicine_uuid),
       req.user!.id,
       req.user!.pharmacyId!,
       req.user!.platformRole

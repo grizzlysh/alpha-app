@@ -384,7 +384,23 @@ export const refreshAccessToken = async (
   const expiresIn = await getSessionExpiry()
   const accessToken = generateAccessToken(accessTokenPayload, expiresIn)
 
-  return { accessToken }
+  // Rotate: invalidate old token and issue a new one
+  const newRefreshToken = generateRefreshToken()
+  const newHashedRefreshToken = hashToken(newRefreshToken)
+
+  await prisma.$transaction([
+    prisma.userToken.delete({ where: { id: userToken.id } }),
+    prisma.userToken.create({
+      data: {
+        userId: user.id,
+        refreshToken: newHashedRefreshToken,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdById: user.id,
+      },
+    }),
+  ])
+
+  return { accessToken, refreshToken: newRefreshToken }
 }
 
 export const getMe = async (

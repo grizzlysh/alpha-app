@@ -1,9 +1,10 @@
+import { DisposalReason, StockDisposalStatus } from '@prisma/client'
 import { z } from 'zod'
 
 export const createStockDisposalDetailSchema = z.object({
   stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity must be positive' }),
-  reason: z.enum(['EXPIRED', 'DAMAGED', 'CONTAMINATED'], { message: 'Invalid disposal reason' }),
+  reason: z.enum(DisposalReason, { message: 'Invalid disposal reason' }),
 })
 
 export const createStockDisposalSchema = z.object({
@@ -26,7 +27,7 @@ export const cancelStockDisposalSchema = z.object({
 
 export const stockDisposalQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.enum(['DRAFT', 'SUBMITTED', 'COMPLETED', 'CANCELLED']).optional(),
+  status: z.enum(StockDisposalStatus).optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),
   sortBy: z

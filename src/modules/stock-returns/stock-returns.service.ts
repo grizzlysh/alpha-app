@@ -12,7 +12,7 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
-import { generateDocNumber } from '@utils/generateDocNumbers'
+import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 import { Decimal } from '@prisma/client/runtime/library'
 
 // ── Helpers ───────────────────────────────────────────
@@ -234,7 +234,7 @@ export const createStockReturn = async (
   pharmacyId: number,
   userId: number
 ): Promise<StockReturnResponse> => {
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await withDocNumberRetry('SR', () => prisma.$transaction(async (tx) => {
 
     const distributor = await resolveDistributor(
       data.distributorUuid,
@@ -302,10 +302,7 @@ export const createStockReturn = async (
       },
       select: { id: true },
     })
-  }, {
-    timeout: 10000,
-    maxWait: 5000,
-  })
+  }, { timeout: 10000, maxWait: 5000 }))
 
   const fullReturn = await prisma.stockReturn.findUnique({
     where: { id: created.id },
@@ -321,109 +318,77 @@ export const updateStockReturn = async (
   pharmacyId: number,
   userId: number
 ): Promise<StockReturnResponse> => {
-  const existing = await prisma.stockReturn.findFirst({
-    where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true, status: true },
-  })
-
-  if (!existing) throw new NotFoundException('Stock return not found')
-
-  if (existing.status !== StockReturnStatus.DRAFT) {
-    throw new BadRequestException(
-      'Stock return can only be edited in DRAFT status'
-    )
-  }
-
-  let distributorId: number | undefined
-  if (data.distributorUuid) {
-    const distributor = await prisma.distributor.findFirst({
-      where: { uuid: data.distributorUuid, pharmacyId, status: 'ACTIVE' },
-      select: { id: true },
+  const stockReturn = await prisma.$transaction(async (tx) => {
+    const existing = await tx.stockReturn.findFirst({
+      where: { uuid, pharmacyId, deletedAt: null },
+      select: { id: true, status: true },
     })
-    if (!distributor) throw new NotFoundException('Distributor not found')
-    distributorId = distributor.id
-  }
 
-  let signedById: number | undefined
-  if (data.signedByUuid) {
-    const signer = await prisma.user.findFirst({
-      where: { uuid: data.signedByUuid, deletedAt: null },
-      select: {
-        id: true,
-        placements: {
-          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-          select: {
-            role: {
-              select: {
-                rolePermissions: {
-                  where: { isEnabled: true },
-                  select: { permission: { select: { module: true, action: true } } },
-                },
-              },
+    if (!existing) throw new NotFoundException('Stock return not found')
+
+    if (existing.status !== StockReturnStatus.DRAFT) {
+      throw new BadRequestException('Stock return can only be edited in DRAFT status')
+    }
+
+    let distributorId: number | undefined
+    if (data.distributorUuid) {
+      const distributor = await tx.distributor.findFirst({
+        where: { uuid: data.distributorUuid, pharmacyId, status: 'ACTIVE' },
+        select: { id: true },
+      })
+      if (!distributor) throw new NotFoundException('Distributor not found')
+      distributorId = distributor.id
+    }
+
+    let signedById: number | undefined
+    if (data.signedByUuid) {
+      const signer = await resolveSignedBy(data.signedByUuid, pharmacyId, tx)
+      signedById = signer.id
+    }
+
+    let detailsCreate: any[] | undefined
+    if (data.details) {
+      detailsCreate = await Promise.all(
+        data.details.map(async (detail) => {
+          const stockDetail = await tx.stockDetail.findFirst({
+            where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
+            select: {
+              id: true,
+              quantityPieces: true,
+              quantityPerBox: true,
+              stock: { select: { medicineId: true } },
             },
-          },
-        },
-      },
-    })
-    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-    const hasSignPermission = signer.placements[0].role.rolePermissions.some(
-      (rp) => rp.permission.module === 'sign'
-    )
-    if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign this document')
-    signedById = signer.id
-  }
+          })
+          if (!stockDetail) throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
+          if (stockDetail.quantityPieces < detail.quantityPieces) {
+            throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
+          }
+          return {
+            stockDetailId: stockDetail.id,
+            medicineId: stockDetail.stock.medicineId,
+            quantityPieces: detail.quantityPieces,
+            quantityBox: Math.floor(detail.quantityPieces / stockDetail.quantityPerBox),
+            reason: detail.reason,
+            createdById: userId,
+          }
+        })
+      )
+    }
 
-  const stockReturn = await prisma.stockReturn.update({
-    where: { id: existing.id },
-    data: {
-      ...(distributorId && { distributorId }),
-      ...(signedById && { signedById }),
-      ...(data.description !== undefined && { description: data.description }),
-      updatedById: userId,
-      ...(data.details && {
-        details: {
-          deleteMany: {},
-          create: await Promise.all(
-            data.details.map(async (detail) => {
-              const stockDetail = await prisma.stockDetail.findFirst({
-                where: {
-                  uuid: detail.stockDetailUuid,
-                  stock: { pharmacyId },
-                },
-                select: {
-                  id: true,
-                  quantityPieces: true,
-                  quantityPerBox: true,
-                  stock: { select: { medicineId: true } },
-                },
-              })
-              if (!stockDetail) {
-                throw new NotFoundException(
-                  `Stock detail not found: ${detail.stockDetailUuid}`
-                )
-              }
-              if (stockDetail.quantityPieces < detail.quantityPieces) {
-                throw new BadRequestException(
-                  `Insufficient stock for batch: ${detail.stockDetailUuid}`
-                )
-              }
-              return {
-                stockDetailId: stockDetail.id,
-                medicineId: stockDetail.stock.medicineId,
-                quantityPieces: detail.quantityPieces,
-                quantityBox: Math.floor(
-                  detail.quantityPieces / stockDetail.quantityPerBox
-                ),
-                reason: detail.reason,
-                createdById: userId,
-              }
-            })
-          ),
-        },
-      }),
-    },
-    select: stockReturnSelect,
-  })
+    return tx.stockReturn.update({
+      where: { id: existing.id },
+      data: {
+        ...(distributorId && { distributorId }),
+        ...(signedById && { signedById }),
+        ...(data.description !== undefined && { description: data.description }),
+        updatedById: userId,
+        ...(detailsCreate && {
+          details: { deleteMany: {}, create: detailsCreate },
+        }),
+      },
+      select: stockReturnSelect,
+    })
+  }, { timeout: 10000, maxWait: 5000 })
 
   return stockReturn as unknown as StockReturnResponse
 }

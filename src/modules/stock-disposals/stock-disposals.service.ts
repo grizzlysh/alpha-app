@@ -12,7 +12,7 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
-import { generateDocNumber } from '@utils/generateDocNumbers'
+import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -191,7 +191,7 @@ export const createStockDisposal = async (
   pharmacyId: number,
   userId: number
 ): Promise<StockDisposalResponse> => {
-  const created = await prisma.$transaction(async (tx) => {
+  const created = await withDocNumberRetry('SD', () => prisma.$transaction(async (tx) => {
 
     let signedById: number | undefined
     if (data.signedByUuid) {
@@ -247,10 +247,7 @@ export const createStockDisposal = async (
       },
       select: { id: true },
     })
-  }, {
-    timeout: 10000,
-    maxWait: 5000,
-  })
+  }, { timeout: 10000, maxWait: 5000 }))
 
   const fullDisposal = await prisma.stockDisposal.findUnique({
     where: { id: created.id },
@@ -266,98 +263,66 @@ export const updateStockDisposal = async (
   pharmacyId: number,
   userId: number
 ): Promise<StockDisposalResponse> => {
-  const existing = await prisma.stockDisposal.findFirst({
-    where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true, status: true },
-  })
-
-  if (!existing) throw new NotFoundException('Stock disposal not found')
-
-  if (existing.status !== StockDisposalStatus.DRAFT) {
-    throw new BadRequestException(
-      'Stock disposal can only be edited in DRAFT status'
-    )
-  }
-
-  let signedById: number | undefined
-  if (data.signedByUuid) {
-    const signer = await prisma.user.findFirst({
-      where: { uuid: data.signedByUuid, deletedAt: null },
-      select: {
-        id: true,
-        placements: {
-          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-          select: {
-            role: {
-              select: {
-                rolePermissions: {
-                  where: { isEnabled: true },
-                  select: { permission: { select: { module: true, action: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
+  const stockDisposal = await prisma.$transaction(async (tx) => {
+    const existing = await tx.stockDisposal.findFirst({
+      where: { uuid, pharmacyId, deletedAt: null },
+      select: { id: true, status: true },
     })
-    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-    const hasSignFull = signer.placements[0].role.rolePermissions.some(
-      (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
-    )
-    if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign disposal documents')
-    signedById = signer.id
-  }
 
-  const stockDisposal = await prisma.stockDisposal.update({
-    where: { id: existing.id },
-    data: {
-      ...(signedById && { signedById }),
-      ...(data.description !== undefined && { description: data.description }),
-      updatedById: userId,
-      ...(data.details && {
-        details: {
-          deleteMany: {},
-          create: await Promise.all(
-            data.details.map(async (detail) => {
-              const stockDetail = await prisma.stockDetail.findFirst({
-                where: {
-                  uuid: detail.stockDetailUuid,
-                  stock: { pharmacyId },
-                },
-                select: {
-                  id: true,
-                  quantityPieces: true,
-                  quantityPerBox: true,
-                  stock: { select: { medicineId: true } },
-                },
-              })
-              if (!stockDetail) {
-                throw new NotFoundException(
-                  `Stock detail not found: ${detail.stockDetailUuid}`
-                )
-              }
-              if (stockDetail.quantityPieces < detail.quantityPieces) {
-                throw new BadRequestException(
-                  `Insufficient stock for batch: ${detail.stockDetailUuid}`
-                )
-              }
-              return {
-                stockDetailId: stockDetail.id,
-                medicineId: stockDetail.stock.medicineId,
-                quantityPieces: detail.quantityPieces,
-                quantityBox: Math.floor(
-                  detail.quantityPieces / stockDetail.quantityPerBox
-                ),
-                reason: detail.reason,
-                createdById: userId,
-              }
-            })
-          ),
-        },
-      }),
-    },
-    select: stockDisposalSelect,
-  })
+    if (!existing) throw new NotFoundException('Stock disposal not found')
+
+    if (existing.status !== StockDisposalStatus.DRAFT) {
+      throw new BadRequestException('Stock disposal can only be edited in DRAFT status')
+    }
+
+    let signedById: number | undefined
+    if (data.signedByUuid) {
+      const signer = await resolveSignedBy(data.signedByUuid, pharmacyId, tx)
+      signedById = signer.id
+    }
+
+    let detailsCreate: any[] | undefined
+    if (data.details) {
+      detailsCreate = await Promise.all(
+        data.details.map(async (detail) => {
+          const stockDetail = await tx.stockDetail.findFirst({
+            where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
+            select: {
+              id: true,
+              quantityPieces: true,
+              quantityPerBox: true,
+              stock: { select: { medicineId: true } },
+            },
+          })
+          if (!stockDetail) throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
+          if (stockDetail.quantityPieces < detail.quantityPieces) {
+            throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
+          }
+          return {
+            stockDetailId: stockDetail.id,
+            medicineId: stockDetail.stock.medicineId,
+            quantityPieces: detail.quantityPieces,
+            quantityBox: Math.floor(detail.quantityPieces / stockDetail.quantityPerBox),
+            reason: detail.reason,
+            createdById: userId,
+          }
+        })
+      )
+    }
+
+    return tx.stockDisposal.update({
+      where: { id: existing.id },
+      data: {
+        ...(signedById && { signedById }),
+        ...(data.description !== undefined && { description: data.description }),
+        updatedById: userId,
+        ...(detailsCreate && {
+          details: { deleteMany: {}, create: detailsCreate },
+        }),
+      },
+      select: stockDisposalSelect,
+    })
+  }, { timeout: 10000, maxWait: 5000 })
 
   return stockDisposal as unknown as StockDisposalResponse
 }

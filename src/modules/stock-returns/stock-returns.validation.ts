@@ -29,7 +29,7 @@ export const cancelStockReturnSchema = z.object({
 
 export const stockReturnQuerySchema = z.object({
   search: z.string().trim().optional(),
-  status: z.nativeEnum(StockReturnStatus).optional(),
+  status: z.enum(StockReturnStatus).optional(),
   distributorUuid: z.string().trim().uuid().optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),

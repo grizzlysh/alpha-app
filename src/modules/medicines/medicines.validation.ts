@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { RecordStatus } from '@prisma/client'
 
 export const createMedicineSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name is required' }),
@@ -20,7 +21,7 @@ export const updateMedicineSchema = z.object({
   ingredients: z.array(
     z.string().trim().min(1)
   ).min(1).optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(RecordStatus).optional(),
 })
 
 export const medicineQuerySchema = z.object({
@@ -28,7 +29,7 @@ export const medicineQuerySchema = z.object({
   medicineShapeUuid: z.string().uuid().optional(),
   medicineTypeUuid: z.string().uuid().optional(),
   medicineClassUuid: z.string().uuid().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(RecordStatus).optional(),
   sortBy: z.enum(['name', 'createdAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
   page: z.coerce.number().int().positive().optional().default(1),

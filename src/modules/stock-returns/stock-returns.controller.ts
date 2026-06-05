@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as StockReturnService from './stock-returns.service'
 import {
@@ -29,16 +30,9 @@ export const getStockReturns = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = stockReturnQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await StockReturnService.getStockReturns(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.STOCK_RETURNS_FETCHED, data, meta)
@@ -54,7 +48,7 @@ export const getStockReturn = async (
 ): Promise<void> => {
   try {
     const stockReturn = await StockReturnService.getStockReturnByUuid(
-      req.params.stock_return_uuid,
+      parseUuid(req.params.stock_return_uuid),
       req.user!.pharmacyId!
     )
 
@@ -70,15 +64,8 @@ export const createStockReturn = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createStockReturnSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stockReturn = await StockReturnService.createStockReturn(
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -95,16 +82,9 @@ export const updateStockReturn = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateStockReturnSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stockReturn = await StockReturnService.updateStockReturn(
-      req.params.stock_return_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_return_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -122,7 +102,7 @@ export const completeStockReturn = async (
 ): Promise<void> => {
   try {
     const stockReturn = await StockReturnService.completeStockReturn(
-      req.params.stock_return_uuid,
+      parseUuid(req.params.stock_return_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -139,16 +119,9 @@ export const cancelStockReturn = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = cancelStockReturnSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stockReturn = await StockReturnService.cancelStockReturn(
-      req.params.stock_return_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_return_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -166,7 +139,7 @@ export const deleteStockReturn = async (
 ): Promise<void> => {
   try {
     await StockReturnService.deleteStockReturn(
-      req.params.stock_return_uuid,
+      parseUuid(req.params.stock_return_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )

@@ -1,7 +1,48 @@
 import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 export type DocType = 'PO' | 'INV' | 'SL' | 'SR' | 'SD'
+
+// Maps DocType to the DB column name holding the unique document number.
+const DOC_NUMBER_FIELD: Record<DocType, string> = {
+  PO: 'order_number',
+  INV: 'invoice_number',
+  SL: 'sale_number',
+  SR: 'return_number',
+  SD: 'disposal_number',
+}
+
+/**
+ * Wraps a transaction factory with retry logic for document-number unique
+ * constraint violations (P2002). On collision the factory is called again,
+ * which re-runs generateDocNumber and picks the next available sequence.
+ */
+export async function withDocNumberRetry<T>(
+  type: DocType,
+  fn: () => Promise<T>,
+  maxRetries = 3
+): Promise<T> {
+  const field = DOC_NUMBER_FIELD[type]
+  let lastError: unknown
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastError = e
+      if (
+        e instanceof PrismaClientKnownRequestError &&
+        e.code === 'P2002' &&
+        (e.meta?.target as string[] | undefined)?.some((f) => f === field) &&
+        attempt < maxRetries - 1
+      ) {
+        continue
+      }
+      throw e
+    }
+  }
+  throw lastError
+}
 
 interface GenerateDocNumberOptions {
   type: DocType

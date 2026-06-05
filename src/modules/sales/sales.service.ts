@@ -11,7 +11,7 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
-import { generateDocNumber } from '@utils/generateDocNumbers'
+import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 import { Decimal } from '@prisma/client/runtime/library'
 
 // ── Helpers ───────────────────────────────────────────
@@ -242,7 +242,7 @@ export const createSale = async (
   const allowFefoOverride = allowFefoParam?.value !== 'false'
   const creditPaymentDays = parseInt(creditDaysParam?.value ?? '30', 10)
 
-  const createdSale = await prisma.$transaction(async (tx) => {
+  const createdSale = await withDocNumberRetry('SL', () => prisma.$transaction(async (tx) => {
 
     // ── Resolve Customer ──────────────────────────
     let customerId: number
@@ -482,10 +482,7 @@ export const createSale = async (
     })
 
     return sale
-  }, {
-    timeout: 15000,
-    maxWait: 5000,
-  })
+  }, { timeout: 15000, maxWait: 5000 }))
 
   const fullSale = await prisma.sale.findUnique({
     where: { id: createdSale.id },

@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as DistributorService from './distributors.service'
 import {
@@ -26,16 +27,9 @@ export const getDistributors = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = distributorQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await DistributorService.getDistributors(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.DISTRIBUTORS_FETCHED, data, meta)
@@ -51,7 +45,7 @@ export const getDistributor = async (
 ): Promise<void> => {
   try {
     const distributor = await DistributorService.getDistributorByUuid(
-      req.params.distributor_uuid,
+      parseUuid(req.params.distributor_uuid),
       req.user!.pharmacyId!
     )
 
@@ -67,15 +61,8 @@ export const createDistributor = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createDistributorSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const distributor = await DistributorService.createDistributor(
-      parsed.data,
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -92,16 +79,9 @@ export const updateDistributor = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateDistributorSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const distributor = await DistributorService.updateDistributor(
-      req.params.distributor_uuid,
-      parsed.data,
+      parseUuid(req.params.distributor_uuid),
+      req.query as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -119,7 +99,7 @@ export const deleteDistributor = async (
 ): Promise<void> => {
   try {
     await DistributorService.deleteDistributor(
-      req.params.distributor_uuid,
+      parseUuid(req.params.distributor_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )

@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as InvoiceService from './invoices.service'
 import {
@@ -24,16 +25,9 @@ export const getInvoices = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = invoiceQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await InvoiceService.getInvoices(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.INVOICES_FETCHED, data, meta)
@@ -49,7 +43,7 @@ export const getInvoice = async (
 ): Promise<void> => {
   try {
     const invoice = await InvoiceService.getInvoiceByUuid(
-      req.params.invoice_uuid,
+      parseUuid(req.params.invoice_uuid),
       req.user!.pharmacyId!
     )
 
@@ -65,15 +59,8 @@ export const createInvoice = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createInvoiceSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const invoice = await InvoiceService.createInvoice(
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -91,7 +78,7 @@ export const deleteInvoice = async (
 ): Promise<void> => {
   try {
     await InvoiceService.deleteInvoice(
-      req.params.invoice_uuid,
+      parseUuid(req.params.invoice_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )

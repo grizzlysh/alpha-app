@@ -1,4 +1,5 @@
 import { PlatformRole, Prisma } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { prisma } from '@config/db'
 import {
   PharmacyQueryInput,
@@ -74,13 +75,6 @@ const formatResponse = (pharmacy: Prisma.PharmacyGetPayload<{ select: typeof pha
   createdAt: pharmacy.createdAt,
   updatedAt: pharmacy.updatedAt,
 })
-
-const generateCode = (): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  return Array.from({ length: 5 }, () =>
-    chars.charAt(Math.floor(Math.random() * chars.length))
-  ).join('')
-}
 
 const ensureUniqueCode = async (code: string, excludeUuid?: string): Promise<void> => {
   const existing = await prisma.pharmacy.findFirst({
@@ -163,34 +157,31 @@ export const createPharmacy = async (
   data: CreatePharmacyInput,
   userId: number
 ): Promise<PharmacyResponse> => {
-  let code = data.code ?? generateCode()
-
-  let attempts = 0
-  while (attempts < 5) {
-    const exists = await prisma.pharmacy.findFirst({
-      where: { code, status: { not: 'DELETED' } },
+  try {
+    const pharmacy = await prisma.pharmacy.create({
+      data: {
+        name: data.name,
+        code: data.code,
+        category: data.category,
+        phone: data.phone,
+        address: data.address,
+        email: data.email,
+        createdById: userId,
+        updatedById: userId,
+      },
+      select: pharmacySelect,
     })
-    if (!exists) break
-    if (data.code) throw new ConflictException('Pharmacy code already exists')
-    code = generateCode()
-    attempts++
+    return formatResponse(pharmacy)
+  } catch (e) {
+    if (
+      e instanceof PrismaClientKnownRequestError &&
+      e.code === 'P2002' &&
+      (e.meta?.target as string[] | undefined)?.some((f) => f === 'code')
+    ) {
+      throw new ConflictException('Pharmacy code already exists')
+    }
+    throw e
   }
-
-  const pharmacy = await prisma.pharmacy.create({
-    data: {
-      name: data.name,
-      code,
-      category: data.category,
-      phone: data.phone,
-      address: data.address,
-      email: data.email,
-      createdById: userId,
-      updatedById: userId,
-    },
-    select: pharmacySelect,
-  })
-
-  return formatResponse(pharmacy)
 }
 
 export const updatePharmacy = async (
@@ -359,7 +350,7 @@ export const createBusinessLicense = async (
   const conflict = await prisma.businessLicense.findFirst({
     where: { pharmacyId: pharmacy.id, licenseNumber: data.licenseNumber, status: { not: 'DELETED' } },
   })
-  if (conflict) throw new ConflictException('BUSINESS_LICENSE_NUMBER_ALREADY_EXISTS')
+  if (conflict) throw new ConflictException('Business license number already exists')
 
   const license = await prisma.businessLicense.create({
     data: {
@@ -401,7 +392,7 @@ export const updateBusinessLicense = async (
         NOT: { uuid },
       },
     })
-    if (conflict) throw new ConflictException('BUSINESS_LICENSE_NUMBER_ALREADY_EXISTS')
+    if (conflict) throw new ConflictException('Business license number already exists')
   }
 
   const license = await prisma.businessLicense.update({

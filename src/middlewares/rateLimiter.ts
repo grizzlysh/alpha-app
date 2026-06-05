@@ -10,7 +10,7 @@ export const rateLimiter: RateLimitRequestHandler = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    res.status(HTTP_STATUS.UNAUTHORIZED).json({
+    res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
       success: false,
       code: MESSAGE_CODES.TOO_MANY_REQUESTS,
       message: MESSAGES[MESSAGE_CODES.TOO_MANY_REQUESTS],
@@ -28,7 +28,7 @@ export const authRateLimiter: RateLimitRequestHandler = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
-    res.status(HTTP_STATUS.UNAUTHORIZED).json({
+    res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
       success: false,
       code: MESSAGE_CODES.TOO_MANY_REQUESTS,
       message: MESSAGES[MESSAGE_CODES.TOO_MANY_REQUESTS],

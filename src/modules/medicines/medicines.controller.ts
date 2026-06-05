@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineService from './medicines.service'
 import {
@@ -27,16 +28,9 @@ export const getMedicines = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = medicineQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await MedicineService.getMedicines(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.MEDICINES_FETCHED, data, meta)
@@ -52,7 +46,7 @@ export const getMedicine = async (
 ): Promise<void> => {
   try {
     const medicine = await MedicineService.getMedicineByUuid(
-      req.params.medicine_uuid,
+      parseUuid(req.params.medicine_uuid),
       req.user!.pharmacyId!
     )
 
@@ -68,16 +62,8 @@ export const createMedicine = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createMedicineSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const medicine = await MedicineService.createMedicine(
-      parsed.data,
-      req.user!.pharmacyId!,
+      req.body as any,      req.user!.pharmacyId!,
       req.user!.uuid,
       req.user!.id
     )
@@ -94,17 +80,9 @@ export const updateMedicine = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateMedicineSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const medicine = await MedicineService.updateMedicine(
-      req.params.medicine_uuid,
-      parsed.data,
-      req.user!.pharmacyId!,
+      parseUuid(req.params.medicine_uuid),
+      req.body as any,      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -121,7 +99,7 @@ export const deleteMedicine = async (
 ): Promise<void> => {
   try {
     await MedicineService.deleteMedicine(
-      req.params.medicine_uuid,
+      parseUuid(req.params.medicine_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )

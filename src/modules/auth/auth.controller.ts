@@ -31,14 +31,7 @@ export const login = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = loginSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
-    const result = await AuthService.login(parsed.data)
+    const result = await AuthService.login(req.body)
 
     res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS)
 
@@ -60,18 +53,11 @@ export const selectPharmacy = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = selectPharmacySchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const result = await AuthService.selectPharmacy(
       req.user!.id,
       req.user!.uuid,
       req.user!.platformRole,
-      parsed.data
+      req.body
     )
 
     const response: SelectPharmacyResponse = result
@@ -95,7 +81,9 @@ export const refresh = async (
 
     const result = await AuthService.refreshAccessToken(refreshToken)
 
-    const response: RefreshTokenResponse = result
+    res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS)
+
+    const response: RefreshTokenResponse = { accessToken: result.accessToken, refreshToken: result.refreshToken }
 
     sendSuccess(res, MESSAGE_CODES.TOKEN_REFRESHED, response)
   } catch (err) {

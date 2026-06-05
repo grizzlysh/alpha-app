@@ -12,7 +12,7 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
-import { generateDocNumber } from '@utils/generateDocNumbers'
+import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -152,7 +152,7 @@ export const createPurchaseOrder = async (
   pharmacyId: number,
   userId: number
 ): Promise<PurchaseOrderResponse> => {
-  const purchaseOrder = await prisma.$transaction(async (tx) => {
+  const purchaseOrder = await withDocNumberRetry('PO', () => prisma.$transaction(async (tx) => {
 
     // ── Resolve Distributor ───────────────────────
     const distributor = await tx.distributor.findFirst({
@@ -245,10 +245,7 @@ export const createPurchaseOrder = async (
       },
       select: purchaseOrderSelect,
     })
-  }, {
-    timeout: 10000,
-    maxWait: 5000,
-  })
+  }, { timeout: 10000, maxWait: 5000 }))
 
   return purchaseOrder as unknown as PurchaseOrderResponse
 }
@@ -259,95 +256,94 @@ export const updatePurchaseOrder = async (
   pharmacyId: number,
   userId: number
 ): Promise<PurchaseOrderResponse> => {
-  const existing = await prisma.purchaseOrder.findFirst({
-    where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true, status: true },
-  })
-
-  if (!existing) throw new NotFoundException('Purchase order not found')
-  checkEditable(existing.status)
-
-  let distributorId: number | undefined
-  if (data.distributorUuid) {
-    const distributor = await prisma.distributor.findFirst({
-      where: { uuid: data.distributorUuid, pharmacyId, status: 'ACTIVE' },
-      select: { id: true },
+  const purchaseOrder = await prisma.$transaction(async (tx) => {
+    const existing = await tx.purchaseOrder.findFirst({
+      where: { uuid, pharmacyId, deletedAt: null },
+      select: { id: true, status: true },
     })
-    if (!distributor) throw new NotFoundException('Distributor not found')
-    distributorId = distributor.id
-  }
 
-  let signedById: number | undefined
-  if (data.signedByUuid) {
-    const signer = await prisma.user.findFirst({
-      where: { uuid: data.signedByUuid, deletedAt: null },
-      select: {
-        id: true,
-        placements: {
-          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-          select: {
-            role: {
-              select: {
-                rolePermissions: {
-                  where: { isEnabled: true },
-                  select: { permission: { select: { module: true, action: true } } },
+    if (!existing) throw new NotFoundException('Purchase order not found')
+    checkEditable(existing.status)
+
+    let distributorId: number | undefined
+    if (data.distributorUuid) {
+      const distributor = await tx.distributor.findFirst({
+        where: { uuid: data.distributorUuid, pharmacyId, status: 'ACTIVE' },
+        select: { id: true },
+      })
+      if (!distributor) throw new NotFoundException('Distributor not found')
+      distributorId = distributor.id
+    }
+
+    let signedById: number | undefined
+    if (data.signedByUuid) {
+      const signer = await tx.user.findFirst({
+        where: { uuid: data.signedByUuid, deletedAt: null },
+        select: {
+          id: true,
+          placements: {
+            where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+            select: {
+              role: {
+                select: {
+                  rolePermissions: {
+                    where: { isEnabled: true },
+                    select: { permission: { select: { module: true, action: true } } },
+                  },
                 },
               },
             },
           },
         },
-      },
-    })
-    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-    const hasSignFull = signer.placements[0].role.rolePermissions.some(
-      (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
-    )
-    if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign purchase orders')
-    signedById = signer.id
-  }
+      })
+      if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
+      const hasSignFull = signer.placements[0].role.rolePermissions.some(
+        (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
+      )
+      if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign purchase orders')
+      signedById = signer.id
+    }
 
-  const purchaseOrder = await prisma.purchaseOrder.update({
-    where: { id: existing.id },
-    data: {
-      ...(distributorId && { distributorId }),
-      ...(signedById && { signedById }),
-      ...(data.description !== undefined && { description: data.description }),
-      updatedById: userId,
-      ...(data.details && {
-        details: {
-          updateMany: {
-            where: { deletedAt: null },
-            data: { deletedAt: new Date(), deletedById: userId },
+    let detailsCreate: any[] | undefined
+    if (data.details) {
+      detailsCreate = await Promise.all(
+        data.details.map(async (detail) => {
+          const medicine = await tx.medicine.findFirst({
+            where: { uuid: detail.medicineUuid, pharmacyId, status: 'ACTIVE' },
+            select: { id: true },
+          })
+          if (!medicine) throw new NotFoundException(`Medicine not found: ${detail.medicineUuid}`)
+          return {
+            medicineId: medicine.id,
+            quantity: detail.quantity,
+            unit: detail.unit,
+            description: detail.description,
+            createdById: userId,
+          }
+        })
+      )
+    }
+
+    return tx.purchaseOrder.update({
+      where: { id: existing.id },
+      data: {
+        ...(distributorId && { distributorId }),
+        ...(signedById && { signedById }),
+        ...(data.description !== undefined && { description: data.description }),
+        updatedById: userId,
+        ...(detailsCreate && {
+          details: {
+            updateMany: {
+              where: { deletedAt: null },
+              data: { deletedAt: new Date(), deletedById: userId },
+            },
+            create: detailsCreate,
           },
-          create: await Promise.all(
-            data.details.map(async (detail) => {
-              const medicine = await prisma.medicine.findFirst({
-                where: {
-                  uuid: detail.medicineUuid,
-                  pharmacyId,
-                  status: 'ACTIVE',
-                },
-                select: { id: true },
-              })
-              if (!medicine) {
-                throw new NotFoundException(
-                  `Medicine not found: ${detail.medicineUuid}`
-                )
-              }
-              return {
-                medicineId: medicine.id,
-                quantity: detail.quantity,
-                unit: detail.unit,
-                description: detail.description,
-                createdById: userId,
-              }
-            })
-          ),
-        },
-      }),
-    },
-    select: purchaseOrderSelect,
-  })
+        }),
+      },
+      select: purchaseOrderSelect,
+    })
+  }, { timeout: 10000, maxWait: 5000 })
 
   return purchaseOrder as unknown as PurchaseOrderResponse
 }

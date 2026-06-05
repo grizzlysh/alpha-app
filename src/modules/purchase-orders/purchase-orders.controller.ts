@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as PurchaseOrderService from './purchase-orders.service'
 import {
@@ -29,16 +30,9 @@ export const getPurchaseOrders = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = purchaseOrderQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await PurchaseOrderService.getPurchaseOrders(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.PURCHASE_ORDERS_FETCHED, data, meta)
@@ -54,7 +48,7 @@ export const getPurchaseOrder = async (
 ): Promise<void> => {
   try {
     const purchaseOrder = await PurchaseOrderService.getPurchaseOrderByUuid(
-      req.params.purchase_order_uuid,
+      parseUuid(req.params.purchase_order_uuid),
       req.user!.pharmacyId!
     )
 
@@ -70,15 +64,8 @@ export const createPurchaseOrder = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createPurchaseOrderSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const purchaseOrder = await PurchaseOrderService.createPurchaseOrder(
-      parsed.data,
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -95,16 +82,9 @@ export const updatePurchaseOrder = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updatePurchaseOrderSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const purchaseOrder = await PurchaseOrderService.updatePurchaseOrder(
-      req.params.purchase_order_uuid,
-      parsed.data,
+      parseUuid(req.params.purchase_order_uuid),
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -122,7 +102,7 @@ export const submitPurchaseOrder = async (
 ): Promise<void> => {
   try {
     const purchaseOrder = await PurchaseOrderService.submitPurchaseOrder(
-      req.params.purchase_order_uuid,
+      parseUuid(req.params.purchase_order_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -139,16 +119,9 @@ export const cancelPurchaseOrder = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = cancelPurchaseOrderSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const purchaseOrder = await PurchaseOrderService.cancelPurchaseOrder(
-      req.params.purchase_order_uuid,
-      parsed.data,
+      parseUuid(req.params.purchase_order_uuid),
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -166,7 +139,7 @@ export const deletePurchaseOrder = async (
 ): Promise<void> => {
   try {
     await PurchaseOrderService.deletePurchaseOrder(
-      req.params.purchase_order_uuid,
+      parseUuid(req.params.purchase_order_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )

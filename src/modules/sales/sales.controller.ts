@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import { SaleStatus } from '@prisma/client'
 import * as SaleService from './sales.service'
@@ -28,16 +29,9 @@ export const getSales = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = saleQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await SaleService.getSales(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.SALES_FETCHED, data, meta)
@@ -53,7 +47,7 @@ export const getSale = async (
 ): Promise<void> => {
   try {
     const sale = await SaleService.getSaleByUuid(
-      req.params.sale_uuid,
+      parseUuid(req.params.sale_uuid),
       req.user!.pharmacyId!
     )
 
@@ -69,15 +63,8 @@ export const createSale = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createSaleSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const sale = await SaleService.createSale(
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -94,17 +81,10 @@ export const cancelSale = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = cancelSaleSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const sale = await SaleService.cancelOrRefundSale(
-      req.params.sale_uuid,
+      parseUuid(req.params.sale_uuid),
       SaleStatus.CANCELLED,
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -121,17 +101,10 @@ export const refundSale = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = cancelSaleSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const sale = await SaleService.cancelOrRefundSale(
-      req.params.sale_uuid,
+      parseUuid(req.params.sale_uuid),
       SaleStatus.REFUNDED,
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -148,16 +121,9 @@ export const addPayment = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = addPaymentSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const sale = await SaleService.addPayment(
-      req.params.sale_uuid,
-      parsed.data,
+      parseUuid(req.params.sale_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )

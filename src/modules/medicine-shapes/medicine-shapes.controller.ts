@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineShapeService from './medicine-shapes.service'
 import {
@@ -26,17 +27,10 @@ export const getMedicineShapes = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = medicineShapeQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await MedicineShapeService.getMedicineShapes(
       req.user!.pharmacyId,
       req.user!.platformRole,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.MEDICINE_SHAPES_FETCHED, data, meta)
@@ -52,7 +46,7 @@ export const getMedicineShape = async (
 ): Promise<void> => {
   try {
     const medicine_shape = await MedicineShapeService.getMedicineShapeByUuid(
-      req.params.medicine_shape_uuid,
+      parseUuid(req.params.medicine_shape_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole
     )
@@ -69,15 +63,8 @@ export const createMedicineShape = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createMedicineShapeSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const medicine_shape = await MedicineShapeService.createMedicineShape(
-      parsed.data,
+      req.body,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -95,16 +82,9 @@ export const updateMedicineShape = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateMedicineShapeSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const medicine_shape = await MedicineShapeService.updateMedicineShape(
-      req.params.medicine_shape_uuid,
-      parsed.data,
+      parseUuid(req.params.medicine_shape_uuid),
+      req.query as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id
@@ -123,7 +103,7 @@ export const deleteMedicineShape = async (
 ): Promise<void> => {
   try {
     await MedicineShapeService.deleteMedicineShape(
-      req.params.medicine_shape_uuid,
+      parseUuid(req.params.medicine_shape_uuid),
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

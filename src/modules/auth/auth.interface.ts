@@ -98,6 +98,7 @@ export interface SelectPharmacyResponse {
 
 export interface RefreshTokenResponse {
   accessToken: string
+  refreshToken: string
 }
 
 export interface MeResponse {

@@ -1,3 +1,4 @@
+import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as StockDisposalService from './stock-disposals.service'
 import {
@@ -29,16 +30,9 @@ export const getStockDisposals = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = stockDisposalQuerySchema.safeParse(req.query)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const { data, meta } = await StockDisposalService.getStockDisposals(
       req.user!.pharmacyId!,
-      parsed.data
+      req.query as any
     )
 
     sendPaginated(res, MESSAGE_CODES.STOCK_DISPOSALS_FETCHED, data, meta)
@@ -54,7 +48,7 @@ export const getStockDisposal = async (
 ): Promise<void> => {
   try {
     const stockDisposal = await StockDisposalService.getStockDisposalByUuid(
-      req.params.stock_disposal_uuid,
+      parseUuid(req.params.stock_disposal_uuid),
       req.user!.pharmacyId!
     )
 
@@ -70,15 +64,8 @@ export const createStockDisposal = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = createStockDisposalSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stockDisposal = await StockDisposalService.createStockDisposal(
-      parsed.data,
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -95,16 +82,9 @@ export const updateStockDisposal = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = updateStockDisposalSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stockDisposal = await StockDisposalService.updateStockDisposal(
-      req.params.stock_disposal_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_disposal_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -122,7 +102,7 @@ export const completeStockDisposal = async (
 ): Promise<void> => {
   try {
     const stockDisposal = await StockDisposalService.completeStockDisposal(
-      req.params.stock_disposal_uuid,
+      parseUuid(req.params.stock_disposal_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -139,16 +119,9 @@ export const cancelStockDisposal = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const parsed = cancelStockDisposalSchema.safeParse(req.body)
-    if (!parsed.success) {
-      throw new ValidationException(
-        parsed.error.flatten().fieldErrors as Record<string, any>
-      )
-    }
-
     const stockDisposal = await StockDisposalService.cancelStockDisposal(
-      req.params.stock_disposal_uuid,
-      parsed.data,
+      parseUuid(req.params.stock_disposal_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )
@@ -166,7 +139,7 @@ export const deleteStockDisposal = async (
 ): Promise<void> => {
   try {
     await StockDisposalService.deleteStockDisposal(
-      req.params.stock_disposal_uuid,
+      parseUuid(req.params.stock_disposal_uuid),
       req.user!.pharmacyId!,
       req.user!.id
     )
