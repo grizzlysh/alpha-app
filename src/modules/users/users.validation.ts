@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+// ─── Shared ───────────────────────────────────────────────────────────────────
+
+const licenseInputSchema = z.object({
+  licenseNumber: z.string().min(1, 'License number is required').max(100),
+  validFrom: z.string().datetime({ message: 'Invalid validFrom date' }),
+  validUntil: z.string().datetime({ message: 'Invalid validUntil date' }),
+}).refine(
+  (data) => new Date(data.validUntil) > new Date(data.validFrom),
+  { message: 'validUntil must be after validFrom', path: ['validUntil'] }
+);
+
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 export const listUserSchema = z.object({
@@ -15,6 +26,12 @@ export const createUserSchema = z.object({
   email: z.string().email('Invalid email'),
   phone: z.string().max(20).optional(),
   address: z.string().max(255).optional(),
+  placement: z.object({
+    pharmacyUuid: z.string().uuid('Invalid pharmacy UUID'),
+    roleUuid: z.string().uuid('Invalid role UUID'),
+    joinedAt: z.string().datetime({ message: 'Invalid joinedAt date' }),
+    license: licenseInputSchema.optional(),
+  }).optional(),
 });
 
 export const updateUserSchema = z.object({
@@ -43,11 +60,9 @@ export const changePasswordSchema = z.object({
     .regex(/[0-9]/, 'Must contain at least one number'),
 });
 
-// ─── Assignments ──────────────────────────────────────────────────────────────
+// ─── Placements ──────────────────────────────────────────────────────────────
 
 export const listPlacementSchema = z.object({
-  page: z.string().optional(),
-  limit: z.string().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
 });
 
@@ -55,6 +70,7 @@ export const createPlacementSchema = z.object({
   pharmacyUuid: z.string().uuid('Invalid pharmacy UUID'),
   roleUuid: z.string().uuid('Invalid role UUID'),
   joinedAt: z.string().datetime({ message: 'Invalid joinedAt date' }),
+  license: licenseInputSchema.optional(),
 });
 
 export const updatePlacementSchema = z.object({
@@ -95,5 +111,3 @@ export const updateLicenseSchema = z.object({
   },
   { message: 'validUntil must be after validFrom', path: ['validUntil'] }
 );
-
-

@@ -616,9 +616,17 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Pharmacy already has a user with full signing authority',
     id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
   },
-  PHARMACY_ALREADY_HAS_PHARMACIST_IN_CHARGE: {
+  PHARMACY_ALREADY_HAS_HEAD_PHARMACIST: {
     en: 'Pharmacy already has a pharmacist in charge',
     id: 'Apotek sudah memiliki apoteker penanggung jawab',
+  },
+  PLACEMENT_DATE_OVERLAP: {
+    en: 'Placement dates overlap with an existing tenure at this pharmacy',
+    id: 'Tanggal penempatan bertumpang tindih dengan masa tugas yang sudah ada di apotek ini',
+  },
+  LICENSE_REQUIRED_FOR_ROLE: {
+    en: 'A practice license is required for this role',
+    id: 'SIPA wajib diisi untuk peran ini',
   },
 
   // ─── Licenses ──────────────────────────────────────────────────────────────

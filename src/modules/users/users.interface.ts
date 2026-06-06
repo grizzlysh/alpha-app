@@ -26,18 +26,33 @@ export interface ListUserQuery {
 }
 
 export interface ListPlacementQuery {
-  page?: string;
-  limit?: string;
   status?: RecordStatus;
 }
 
+export interface PlacementGroup {
+  pharmacy: { uuid: string; name: string; code: string };
+  tenures: PlacementItem[];
+}
+
 // ─── Request Bodies ───────────────────────────────────────────────────────────
+
+export interface LicenseInput {
+  licenseNumber: string;
+  validFrom: string;
+  validUntil: string;
+}
 
 export interface CreateUserBody {
   name: string;
   email: string;
   phone?: string;
   address?: string;
+  placement?: {
+    pharmacyUuid: string;
+    roleUuid: string;
+    joinedAt: string;
+    license?: LicenseInput;
+  };
 }
 
 export interface UpdateUserBody {
@@ -63,6 +78,7 @@ export interface CreatePlacementBody {
   pharmacyUuid: string;
   roleUuid: string;
   joinedAt: string;
+  license?: LicenseInput;
 }
 
 export interface UpdatePlacementBody {
@@ -124,7 +140,7 @@ export interface UserListItem {
   platformRole: PlatformRole | null;
   mustChangePassword: boolean;
   status: RecordStatus;
-  assignmentCount: number;
+  placementCount: number;
   createdAt: Date;
 }
 

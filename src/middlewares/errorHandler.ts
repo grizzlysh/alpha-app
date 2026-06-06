@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { AppError } from '@exceptions/AppError'
 import { ValidationException } from '@exceptions/ValidationException'
-import { MESSAGE_CODES } from '@constants/messageCodes'
+import { MESSAGE_CODES, MessageCode } from '@constants/messageCodes'
 import { HTTP_STATUS } from '@constants/httpStatus'
 import { MESSAGES } from '@constants/messages'
 
@@ -27,14 +27,15 @@ export const errorHandler = (
 
   // ── Operational App Error ───────────────────────────
   if (err instanceof AppError && err.isOperational) {
-    const code = resolveMessageCode(err.statusCode)
+    const knownCode = err.message in MESSAGES ? (err.message as MessageCode) : null
+    const code = knownCode ?? resolveMessageCode(err.statusCode)
+    const message = knownCode
+      ? MESSAGES[knownCode]
+      : { en: err.message, id: resolveIdMessage(err.statusCode, err.message) }
     res.status(err.statusCode).json({
       success: false,
       code,
-      message: {
-        en: err.message,
-        id: resolveIdMessage(err.statusCode, err.message),
-      },
+      message,
       data: null,
       errors: null,
       meta: null,

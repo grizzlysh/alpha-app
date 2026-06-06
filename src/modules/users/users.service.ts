@@ -10,6 +10,7 @@ import { PERMISSIONS } from '@constants/permissions';
 import {
   ListUserQuery,
   ListPlacementQuery,
+  PlacementGroup,
   ListLicenseQuery,
   CreateUserBody,
   UpdateUserBody,
@@ -262,7 +263,7 @@ export async function listUsers(
       platformRole: u.platformRole,
       mustChangePassword: u.mustChangePassword,
       status: u.status,
-      assignmentCount: u._count.placements,
+      placementCount: u._count.placements,
       createdAt: u.createdAt,
     })),
     total,
@@ -303,7 +304,7 @@ export async function getUser(userUuid: string): Promise<UserDetailItem> {
     platformRole: user.platformRole,
     mustChangePassword: user.mustChangePassword,
     status: user.status,
-    assignmentCount: user._count.placements,
+    placementCount: user._count.placements,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     placements: user.placements.map(formatPlacement),
@@ -324,43 +325,114 @@ export async function createUser(
   const defaultPassword = await getDefaultPassword();
   const hashed = await bcrypt.hash(defaultPassword, BCRYPT_ROUNDS);
 
-  const user = await prisma.user.create({
-    data: {
-      name: body.name,
-      email: body.email,
-      password: hashed,
-      phone: body.phone,
-      address: body.address,
-      platformRole: null,
-      mustChangePassword: true,
-      createdById,
-      updatedById: createdById,
-    },
-    select: {
-      ...userBaseSelect,
-      updatedAt: true,
-      _count: {
-        select: {
-          placements: { where: { deletedAt: null, status: RecordStatus.ACTIVE } },
+  if (!body.placement) {
+    const user = await prisma.user.create({
+      data: {
+        name: body.name,
+        email: body.email,
+        password: hashed,
+        phone: body.phone,
+        address: body.address,
+        platformRole: null,
+        mustChangePassword: true,
+        createdById,
+        updatedById: createdById,
+      },
+      select: { ...userBaseSelect, updatedAt: true },
+    });
+    return { ...user, placementCount: 0, placements: [] };
+  }
+
+  const pharmacy = await prisma.pharmacy.findFirst({
+    where: { uuid: body.placement.pharmacyUuid, deletedAt: null },
+  });
+  if (!pharmacy) throw new NotFoundException('PHARMACY_NOT_FOUND');
+
+  const role = await prisma.role.findFirst({
+    where: { uuid: body.placement.roleUuid, deletedAt: null },
+  });
+  if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
+
+  const licenseRequired = role.type === PharmacyRole.PHARMACIST || role.type === PharmacyRole.HEAD_PHARMACIST;
+  if (licenseRequired && !body.placement.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
+
+  const isSignFull = await roleHasSignFull(role.id);
+  if (isSignFull) {
+    const existingSignFull = await prisma.placement.findFirst({
+      where: {
+        pharmacyId: pharmacy.id,
+        deletedAt: null,
+        leftAt: null,
+        status: RecordStatus.ACTIVE,
+        role: {
+          rolePermissions: {
+            some: { isEnabled: true, permission: { module: SIGN_FULL_MODULE, action: SIGN_FULL_ACTION } },
+          },
         },
       },
-    },
+    });
+    if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
+  }
+
+  if (role.type === PharmacyRole.HEAD_PHARMACIST) {
+    const existingPic = await prisma.placement.findFirst({
+      where: {
+        pharmacyId: pharmacy.id,
+        deletedAt: null,
+        leftAt: null,
+        status: RecordStatus.ACTIVE,
+        role: { type: PharmacyRole.HEAD_PHARMACIST },
+      },
+    });
+    if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
+  }
+
+  const userUuid = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        name: body.name,
+        email: body.email,
+        password: hashed,
+        phone: body.phone,
+        address: body.address,
+        platformRole: null,
+        mustChangePassword: true,
+        createdById,
+        updatedById: createdById,
+      },
+      select: { id: true, uuid: true },
+    });
+
+    const placement = await tx.placement.create({
+      data: {
+        userId: user.id,
+        pharmacyId: pharmacy.id,
+        roleId: role.id,
+        joinedAt: new Date(body.placement!.joinedAt),
+        createdById,
+        updatedById: createdById,
+      },
+      select: { id: true },
+    });
+
+    if (body.placement!.license) {
+      const lic = body.placement!.license;
+      await tx.practiceLicense.create({
+        data: {
+          placementId: placement.id,
+          licenseNumber: lic.licenseNumber,
+          validFrom: new Date(lic.validFrom),
+          validUntil: new Date(lic.validUntil),
+          createdById,
+          updatedById: createdById,
+        },
+      });
+    }
+
+    return user.uuid;
   });
 
-  return {
-    uuid: user.uuid,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    address: user.address,
-    platformRole: user.platformRole,
-    mustChangePassword: user.mustChangePassword,
-    status: user.status,
-    assignmentCount: 0,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    placements: [],
-  };
+  return getUser(userUuid);
 }
 
 // ─── Update User ──────────────────────────────────────────────────────────────
@@ -460,53 +532,79 @@ export async function resetPassword(
 export async function listPlacements(
   userUuid: string,
   query: ListPlacementQuery
-): Promise<{ data: PlacementItem[]; total: number }> {
-  const page = Math.max(1, parseInt(query.page || '1'));
-  const limit = Math.min(100, Math.max(1, parseInt(query.limit || '10')));
-  const skip = (page - 1) * limit;
-
+): Promise<PlacementGroup[]> {
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const where = {
-    userId: user.id,
-    deletedAt: null,
-    ...(query.status && { status: query.status }),
-  };
+  const placements = await prisma.placement.findMany({
+    where: {
+      userId: user.id,
+      deletedAt: null,
+      ...(query.status && { status: query.status }),
+    },
+    orderBy: { joinedAt: 'desc' },
+    select: placementSelect,
+  });
 
-  const [assignments, total] = await prisma.$transaction([
-    prisma.placement.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { joinedAt: 'desc' },
-      select: placementSelect,
-    }),
-    prisma.placement.count({ where }),
-  ]);
+  const groupMap = new Map<string, PlacementGroup>();
+  for (const p of placements) {
+    const item = formatPlacement(p);
+    const key = item.pharmacy.uuid;
+    if (!groupMap.has(key)) groupMap.set(key, { pharmacy: item.pharmacy, tenures: [] });
+    groupMap.get(key)!.tenures.push(item);
+  }
 
-  return { data: assignments.map(formatPlacement), total };
+  for (const group of groupMap.values()) {
+    group.tenures.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
+  }
+
+  return Array.from(groupMap.values());
 }
 
 // ─── Get Assignment ───────────────────────────────────────────────────────────
 
 export async function getPlacement(
   userUuid: string,
-  assignmentUuid: string
+  placementUuid: string
 ): Promise<PlacementItem> {
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.placement.findFirst({
-    where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
+  const placement = await prisma.placement.findFirst({
+    where: { uuid: placementUuid, userId: user.id, deletedAt: null },
     select: placementSelect,
   });
-  if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
+  if (!placement) throw new NotFoundException('PLACEMENT_NOT_FOUND');
 
-  return formatPlacement(assignment);
+  return formatPlacement(placement);
 }
 
 // ─── Create Assignment ────────────────────────────────────────────────────────
+
+async function checkPlacementOverlap(
+  userId: number,
+  pharmacyId: number,
+  joinedAt: Date,
+  leftAt: Date | null,
+  excludeId?: number
+): Promise<void> {
+  const overlap = await prisma.placement.findFirst({
+    where: {
+      userId,
+      pharmacyId,
+      deletedAt: null,
+      status: RecordStatus.ACTIVE,
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+      AND: [
+        // existing tenure ends after (or during) new start
+        { OR: [{ leftAt: null }, { leftAt: { gte: joinedAt } }] },
+        // existing tenure starts before (or during) new end — skip if new is open-ended
+        ...(leftAt ? [{ joinedAt: { lte: leftAt } }] : []),
+      ],
+    },
+  });
+  if (overlap) throw new ConflictException('PLACEMENT_DATE_OVERLAP');
+}
 
 export async function createPlacement(
   createdById: number,
@@ -532,7 +630,7 @@ export async function createPlacement(
   if (activeCount >= 3) throw new BadRequestException('MAX_PLACEMENTS_REACHED');
 
   const duplicate = await prisma.placement.findFirst({
-    where: { userId: user.id, pharmacyId: pharmacy.id, deletedAt: null, leftAt: null },
+    where: { userId: user.id, pharmacyId: pharmacy.id, deletedAt: null, leftAt: null, status: RecordStatus.ACTIVE },
   });
   if (duplicate) throw new ConflictException('USER_ALREADY_PLACED_AT_PHARMACY');
 
@@ -558,33 +656,55 @@ export async function createPlacement(
     if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
   }
 
-  // Max 1 PHARMACIST_IN_CHARGE per pharmacy
-  if (role.type === PharmacyRole.PHARMACIST_IN_CHARGE) {
+  // Max 1 HEAD_PHARMACIST per pharmacy
+  if (role.type === PharmacyRole.HEAD_PHARMACIST) {
     const existingPic = await prisma.placement.findFirst({
       where: {
         pharmacyId: pharmacy.id,
         deletedAt: null,
         leftAt: null,
         status: RecordStatus.ACTIVE,
-        role: { type: PharmacyRole.PHARMACIST_IN_CHARGE },
+        role: { type: PharmacyRole.HEAD_PHARMACIST },
       },
     });
-    if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_PHARMACIST_IN_CHARGE');
+    if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
   }
 
-  const assignment = await prisma.placement.create({
-    data: {
-      userId: user.id,
-      pharmacyId: pharmacy.id,
-      roleId: role.id,
-      joinedAt: new Date(body.joinedAt),
-      createdById,
-      updatedById: createdById,
-    },
-    select: placementSelect,
+  const licenseRequired = role.type === PharmacyRole.PHARMACIST || role.type === PharmacyRole.HEAD_PHARMACIST;
+  if (licenseRequired && !body.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
+
+  await checkPlacementOverlap(user.id, pharmacy.id, new Date(body.joinedAt), null);
+
+  const placementUuid = await prisma.$transaction(async (tx) => {
+    const placement = await tx.placement.create({
+      data: {
+        userId: user.id,
+        pharmacyId: pharmacy.id,
+        roleId: role.id,
+        joinedAt: new Date(body.joinedAt),
+        createdById,
+        updatedById: createdById,
+      },
+      select: { id: true, uuid: true },
+    });
+
+    if (body.license) {
+      await tx.practiceLicense.create({
+        data: {
+          placementId: placement.id,
+          licenseNumber: body.license.licenseNumber,
+          validFrom: new Date(body.license.validFrom),
+          validUntil: new Date(body.license.validUntil),
+          createdById,
+          updatedById: createdById,
+        },
+      });
+    }
+
+    return placement.uuid;
   });
 
-  return formatPlacement(assignment);
+  return getPlacement(userUuid, placementUuid);
 }
 
 // ─── Update Assignment ────────────────────────────────────────────────────────
@@ -592,16 +712,16 @@ export async function createPlacement(
 export async function updatePlacement(
   updatedById: number,
   userUuid: string,
-  assignmentUuid: string,
+  placementUuid: string,
   body: UpdatePlacementBody
 ): Promise<PlacementItem> {
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.placement.findFirst({
-    where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
+  const placement = await prisma.placement.findFirst({
+    where: { uuid: placementUuid, userId: user.id, deletedAt: null },
   });
-  if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
+  if (!placement) throw new NotFoundException('PLACEMENT_NOT_FOUND');
 
   let roleId: number | undefined;
   if (body.roleUuid) {
@@ -612,11 +732,11 @@ export async function updatePlacement(
     if (isSignFull) {
       const existingSignFull = await prisma.placement.findFirst({
         where: {
-          pharmacyId: assignment.pharmacyId,
+          pharmacyId: placement.pharmacyId,
           deletedAt: null,
           leftAt: null,
           status: RecordStatus.ACTIVE,
-          id: { not: assignment.id },
+          id: { not: placement.id },
           role: {
             rolePermissions: {
               some: {
@@ -630,25 +750,36 @@ export async function updatePlacement(
       if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
     }
 
-    if (role.type === PharmacyRole.PHARMACIST_IN_CHARGE) {
+    if (role.type === PharmacyRole.HEAD_PHARMACIST) {
       const existingPic = await prisma.placement.findFirst({
         where: {
-          pharmacyId: assignment.pharmacyId,
+          pharmacyId: placement.pharmacyId,
           deletedAt: null,
           leftAt: null,
           status: RecordStatus.ACTIVE,
-          id: { not: assignment.id },
-          role: { type: PharmacyRole.PHARMACIST_IN_CHARGE },
+          id: { not: placement.id },
+          role: { type: PharmacyRole.HEAD_PHARMACIST },
         },
       });
-      if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_PHARMACIST_IN_CHARGE');
+      if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
     }
 
     roleId = role.id;
   }
 
+  if (body.joinedAt !== undefined || body.leftAt !== undefined) {
+    const newJoinedAt = body.joinedAt ? new Date(body.joinedAt) : placement.joinedAt;
+    const newLeftAt =
+      body.leftAt !== undefined
+        ? body.leftAt
+          ? new Date(body.leftAt)
+          : null
+        : placement.leftAt;
+    await checkPlacementOverlap(user.id, placement.pharmacyId, newJoinedAt, newLeftAt, placement.id);
+  }
+
   const updated = await prisma.placement.update({
-    where: { id: assignment.id },
+    where: { id: placement.id },
     data: {
       ...(roleId && { roleId }),
       ...(body.joinedAt && { joinedAt: new Date(body.joinedAt) }),
@@ -667,18 +798,18 @@ export async function updatePlacement(
 export async function deletePlacement(
   deletedById: number,
   userUuid: string,
-  assignmentUuid: string
+  placementUuid: string
 ): Promise<void> {
   const user = await prisma.user.findFirst({ where: { uuid: userUuid, deletedAt: null } });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const assignment = await prisma.placement.findFirst({
-    where: { uuid: assignmentUuid, userId: user.id, deletedAt: null },
+  const placement = await prisma.placement.findFirst({
+    where: { uuid: placementUuid, userId: user.id, deletedAt: null },
   });
-  if (!assignment) throw new NotFoundException('PLACEMENT_NOT_FOUND');
+  if (!placement) throw new NotFoundException('PLACEMENT_NOT_FOUND');
 
   await prisma.placement.update({
-    where: { id: assignment.id },
+    where: { id: placement.id },
     data: {
       status: RecordStatus.DELETED,
       deletedAt: new Date(),

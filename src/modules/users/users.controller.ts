@@ -154,10 +154,8 @@ export async function listPlacements(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { data, total } = await userService.listPlacements(parseUuid(req.params.user_uuid), req.query as any);
-    const page = (req.query as any).page ?? 1;
-    const limit = (req.query as any).limit ?? 10;
-    sendPaginated(res, 'PLACEMENTS_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
+    const data = await userService.listPlacements(parseUuid(req.params.user_uuid), req.query as any);
+    sendSuccess(res, 'PLACEMENTS_FETCHED', data);
   } catch (err) { next(err); }
 }
 

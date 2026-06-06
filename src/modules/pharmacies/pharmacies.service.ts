@@ -31,7 +31,7 @@ const pharmacySelect = {
   businessLicenses: {
     where: { status: 'ACTIVE' as const, deletedAt: null },
     select: { uuid: true, licenseNumber: true, validFrom: true, validUntil: true, status: true },
-    orderBy: { validUntil: 'desc' as const },
+    orderBy: { validFrom: 'desc' as const },
     take: 1,
   },
   placements: {
@@ -39,7 +39,7 @@ const pharmacySelect = {
       status: 'ACTIVE' as const,
       deletedAt: null,
       leftAt: null,
-      role: { type: 'PHARMACIST_IN_CHARGE' as const },
+      role: { type: 'HEAD_PHARMACIST' as const },
     },
     select: {
       uuid: true,
@@ -47,7 +47,7 @@ const pharmacySelect = {
       practiceLicenses: {
         where: { status: 'ACTIVE' as const, deletedAt: null },
         select: { uuid: true, licenseNumber: true, validFrom: true, validUntil: true, status: true },
-        orderBy: { validUntil: 'desc' as const },
+        orderBy: { validFrom: 'desc' as const },
         take: 1,
       },
     },
