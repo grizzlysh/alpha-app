@@ -6,7 +6,6 @@ import { ConflictException } from '@exceptions/ConflictException';
 import { ForbiddenException } from '@exceptions/ForbiddenException';
 import { NotFoundException } from '@exceptions/NotFoundException';
 import { UnauthorizedException } from '@exceptions/UnauthorizedException';
-import { PERMISSIONS } from '@constants/permissions';
 import {
   ListUserQuery,
   ListPlacementQuery,
@@ -98,20 +97,6 @@ function formatPlacement(a: any): PlacementItem {
   };
 }
 
-// PERMISSIONS.SIGN_FULL = 'sign.full' → module='sign', action='full'
-const [SIGN_FULL_MODULE, SIGN_FULL_ACTION] = PERMISSIONS.SIGN_FULL.split('.');
-
-async function roleHasSignFull(roleId: number): Promise<boolean> {
-  const signFull = await prisma.permission.findFirst({
-    where: { module: SIGN_FULL_MODULE, action: SIGN_FULL_ACTION },
-  });
-  if (!signFull) return false;
-
-  const rp = await prisma.rolePermission.findFirst({
-    where: { roleId, permissionId: signFull.id, isEnabled: true },
-  });
-  return !!rp;
-}
 
 async function getDefaultPassword(): Promise<string> {
   const param = await prisma.systemParameter.findFirst({
@@ -356,24 +341,6 @@ export async function createUser(
   const licenseRequired = role.type === PharmacyRole.PHARMACIST || role.type === PharmacyRole.HEAD_PHARMACIST;
   if (licenseRequired && !body.placement.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
 
-  const isSignFull = await roleHasSignFull(role.id);
-  if (isSignFull) {
-    const existingSignFull = await prisma.placement.findFirst({
-      where: {
-        pharmacyId: pharmacy.id,
-        deletedAt: null,
-        leftAt: null,
-        status: RecordStatus.ACTIVE,
-        role: {
-          rolePermissions: {
-            some: { isEnabled: true, permission: { module: SIGN_FULL_MODULE, action: SIGN_FULL_ACTION } },
-          },
-        },
-      },
-    });
-    if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
-  }
-
   if (role.type === PharmacyRole.HEAD_PHARMACIST) {
     const existingPic = await prisma.placement.findFirst({
       where: {
@@ -480,10 +447,10 @@ export async function deleteUser(
   });
   if (!user) throw new NotFoundException('USER_NOT_FOUND');
 
-  const activeAssignments = await prisma.placement.count({
+  const activePlacements = await prisma.placement.count({
     where: { userId: user.id, deletedAt: null, status: RecordStatus.ACTIVE },
   });
-  if (activeAssignments > 0) throw new ConflictException('USER_HAS_ACTIVE_PLACEMENTS');
+  if (activePlacements > 0) throw new ConflictException('USER_HAS_ACTIVE_PLACEMENTS');
 
   if (user.id === deletedById) throw new ForbiddenException('CANNOT_DELETE_YOURSELF');
 
@@ -527,7 +494,7 @@ export async function resetPassword(
   });
 }
 
-// ─── List Assignments ─────────────────────────────────────────────────────────
+// ─── List Placements ─────────────────────────────────────────────────────────
 
 export async function listPlacements(
   userUuid: string,
@@ -561,7 +528,7 @@ export async function listPlacements(
   return Array.from(groupMap.values());
 }
 
-// ─── Get Assignment ───────────────────────────────────────────────────────────
+// ─── Get Placement ───────────────────────────────────────────────────────────
 
 export async function getPlacement(
   userUuid: string,
@@ -579,7 +546,7 @@ export async function getPlacement(
   return formatPlacement(placement);
 }
 
-// ─── Create Assignment ────────────────────────────────────────────────────────
+// ─── Create Placement ────────────────────────────────────────────────────────
 
 async function checkPlacementOverlap(
   userId: number,
@@ -635,27 +602,6 @@ export async function createPlacement(
   if (duplicate) throw new ConflictException('USER_ALREADY_PLACED_AT_PHARMACY');
 
   // Max 1 SIGN_FULL role per pharmacy
-  const isSignFull = await roleHasSignFull(role.id);
-  if (isSignFull) {
-    const existingSignFull = await prisma.placement.findFirst({
-      where: {
-        pharmacyId: pharmacy.id,
-        deletedAt: null,
-        leftAt: null,
-        status: RecordStatus.ACTIVE,
-        role: {
-          rolePermissions: {
-            some: {
-              isEnabled: true,
-              permission: { module: SIGN_FULL_MODULE, action: SIGN_FULL_ACTION },
-            },
-          },
-        },
-      },
-    });
-    if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
-  }
-
   // Max 1 HEAD_PHARMACIST per pharmacy
   if (role.type === PharmacyRole.HEAD_PHARMACIST) {
     const existingPic = await prisma.placement.findFirst({
@@ -707,7 +653,7 @@ export async function createPlacement(
   return getPlacement(userUuid, placementUuid);
 }
 
-// ─── Update Assignment ────────────────────────────────────────────────────────
+// ─── Update Placement ────────────────────────────────────────────────────────
 
 export async function updatePlacement(
   updatedById: number,
@@ -727,28 +673,6 @@ export async function updatePlacement(
   if (body.roleUuid) {
     const role = await prisma.role.findFirst({ where: { uuid: body.roleUuid, deletedAt: null } });
     if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
-
-    const isSignFull = await roleHasSignFull(role.id);
-    if (isSignFull) {
-      const existingSignFull = await prisma.placement.findFirst({
-        where: {
-          pharmacyId: placement.pharmacyId,
-          deletedAt: null,
-          leftAt: null,
-          status: RecordStatus.ACTIVE,
-          id: { not: placement.id },
-          role: {
-            rolePermissions: {
-              some: {
-                isEnabled: true,
-                permission: { module: SIGN_FULL_MODULE, action: SIGN_FULL_ACTION },
-              },
-            },
-          },
-        },
-      });
-      if (existingSignFull) throw new ConflictException('PHARMACY_ALREADY_HAS_SIGN_FULL_USER');
-    }
 
     if (role.type === PharmacyRole.HEAD_PHARMACIST) {
       const existingPic = await prisma.placement.findFirst({
@@ -793,7 +717,7 @@ export async function updatePlacement(
   return formatPlacement(updated);
 }
 
-// ─── Delete Assignment ────────────────────────────────────────────────────────
+// ─── Delete Placement ────────────────────────────────────────────────────────
 
 export async function deletePlacement(
   deletedById: number,

@@ -78,6 +78,11 @@ export type SubmitPurchaseOrderRequest = Request<
   {}, {}, {}
 >
 
+export type CompletePurchaseOrderRequest = Request<
+  PurchaseOrderUuidParam,
+  {}, {}, {}
+>
+
 export type CancelPurchaseOrderRequest = Request<
   PurchaseOrderUuidParam,
   {},
@@ -122,6 +127,23 @@ export interface PurchaseOrderResponse {
     name: string
   } | null
   details: PurchaseOrderDetailResponse[]
+}
+
+export interface PurchaseOrderPrintResponse {
+  orderNumber: string
+  orderedAt: Date
+  distributor: {
+    name: string
+  }
+  pharmacy: {
+    name: string
+    address: string
+    businessLicenseNumber: string | null
+  }
+  headPharmacist: {
+    name: string
+    practiceLicenseNumber: string | null
+  } | null
 }
 
 export interface PurchaseOrderDropdownItem {

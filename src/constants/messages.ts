@@ -264,9 +264,17 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Purchase order deleted successfully',
     id: 'Purchase order berhasil dihapus',
   },
+  PURCHASE_ORDER_PRINT_FETCHED: {
+    en: 'Purchase order print data fetched successfully',
+    id: 'Data cetak purchase order berhasil diambil',
+  },
   PURCHASE_ORDER_SUBMITTED: {
     en: 'Purchase order submitted successfully',
     id: 'Purchase order berhasil diajukan',
+  },
+  PURCHASE_ORDER_COMPLETED: {
+    en: 'Purchase order completed successfully',
+    id: 'Purchase order berhasil diselesaikan',
   },
   PURCHASE_ORDER_CANCELLED: {
     en: 'Purchase order cancelled successfully',

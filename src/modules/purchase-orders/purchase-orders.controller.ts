@@ -13,8 +13,10 @@ import {
   CreatePurchaseOrderRequest,
   UpdatePurchaseOrderRequest,
   SubmitPurchaseOrderRequest,
+  CompletePurchaseOrderRequest,
   CancelPurchaseOrderRequest,
   DeletePurchaseOrderRequest,
+  PurchaseOrderUuidParam,
 } from './purchase-orders.interface'
 import { ValidationException } from '@exceptions/ValidationException'
 import {
@@ -95,6 +97,23 @@ export const updatePurchaseOrder = async (
   }
 }
 
+export const getPurchaseOrderPrint = async (
+  req: Request<PurchaseOrderUuidParam, {}, {}, {}>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await PurchaseOrderService.getPurchaseOrderPrintData(
+      parseUuid(req.params.purchase_order_uuid),
+      req.user!.pharmacyId!
+    )
+
+    sendSuccess(res, MESSAGE_CODES.PURCHASE_ORDER_PRINT_FETCHED, data)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export const submitPurchaseOrder = async (
   req: SubmitPurchaseOrderRequest,
   res: Response,
@@ -108,6 +127,24 @@ export const submitPurchaseOrder = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.PURCHASE_ORDER_SUBMITTED, purchaseOrder)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const completePurchaseOrder = async (
+  req: CompletePurchaseOrderRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const purchaseOrder = await PurchaseOrderService.completePurchaseOrder(
+      parseUuid(req.params.purchase_order_uuid),
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.PURCHASE_ORDER_COMPLETED, purchaseOrder)
   } catch (err) {
     next(err)
   }

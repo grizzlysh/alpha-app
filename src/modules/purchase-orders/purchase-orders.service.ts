@@ -1,4 +1,4 @@
-import { PurchaseOrderStatus } from '@prisma/client'
+import { PurchaseOrderStatus, RecordStatus, PharmacyRole } from '@prisma/client'
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import {
@@ -7,7 +7,7 @@ import {
   CancelPurchaseOrderInput,
   PurchaseOrderQueryInput,
 } from './purchase-orders.validation'
-import { PurchaseOrderResponse, PurchaseOrderDropdownItem } from './purchase-orders.interface'
+import { PurchaseOrderResponse, PurchaseOrderDropdownItem, PurchaseOrderPrintResponse } from './purchase-orders.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -379,6 +379,34 @@ export const submitPurchaseOrder = async (
   return purchaseOrder as unknown as PurchaseOrderResponse
 }
 
+export const completePurchaseOrder = async (
+  uuid: string,
+  pharmacyId: number,
+  userId: number
+): Promise<PurchaseOrderResponse> => {
+  const existing = await prisma.purchaseOrder.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true, status: true },
+  })
+
+  if (!existing) throw new NotFoundException('Purchase order not found')
+
+  if (existing.status !== PurchaseOrderStatus.SENT) {
+    throw new BadRequestException('Only SENT purchase orders can be completed')
+  }
+
+  const purchaseOrder = await prisma.purchaseOrder.update({
+    where: { id: existing.id },
+    data: {
+      status: PurchaseOrderStatus.COMPLETED,
+      updatedById: userId,
+    },
+    select: purchaseOrderSelect,
+  })
+
+  return purchaseOrder as unknown as PurchaseOrderResponse
+}
+
 export const cancelPurchaseOrder = async (
   uuid: string,
   data: CancelPurchaseOrderInput,
@@ -429,6 +457,72 @@ export const deletePurchaseOrder = async (
       deletedById: userId,
     },
   })
+}
+
+export const getPurchaseOrderPrintData = async (
+  uuid: string,
+  pharmacyId: number
+): Promise<PurchaseOrderPrintResponse> => {
+  const purchaseOrder = await prisma.purchaseOrder.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: {
+      orderNumber: true,
+      orderedAt: true,
+      distributor: { select: { name: true } },
+      pharmacy: {
+        select: {
+          name: true,
+          address: true,
+          status: true,
+          businessLicenses: {
+            where: { status: RecordStatus.ACTIVE, deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { licenseNumber: true },
+          },
+          placements: {
+            where: {
+              status: RecordStatus.ACTIVE,
+              deletedAt: null,
+              leftAt: null,
+              role: { type: PharmacyRole.HEAD_PHARMACIST },
+            },
+            take: 1,
+            select: {
+              user: { select: { name: true } },
+              practiceLicenses: {
+                where: { status: RecordStatus.ACTIVE, deletedAt: null },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: { licenseNumber: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!purchaseOrder) throw new NotFoundException('Purchase order not found')
+
+  const headPharmacistPlacement = purchaseOrder.pharmacy.placements[0] ?? null
+
+  return {
+    orderNumber: purchaseOrder.orderNumber,
+    orderedAt: purchaseOrder.orderedAt,
+    distributor: { name: purchaseOrder.distributor.name },
+    pharmacy: {
+      name: purchaseOrder.pharmacy.name,
+      address: purchaseOrder.pharmacy.address,
+      businessLicenseNumber: purchaseOrder.pharmacy.businessLicenses[0]?.licenseNumber ?? null,
+    },
+    headPharmacist: headPharmacistPlacement
+      ? {
+          name: headPharmacistPlacement.user.name,
+          practiceLicenseNumber: headPharmacistPlacement.practiceLicenses[0]?.licenseNumber ?? null,
+        }
+      : null,
+  }
 }
 
 export const getPurchaseOrdersDropdown = async (

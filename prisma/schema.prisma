@@ -25,7 +25,7 @@ enum PharmacyRole {
   OWNER
   ADMIN
   PHARMACIST
-  PHARMACIST_IN_CHARGE
+  HEAD_PHARMACIST
   CASHIER
 }
 
@@ -152,20 +152,20 @@ model BusinessParameter {
 }
 
 model Role {
-  id          Int          @id @default(autoincrement())
-  uuid        String       @unique @default(uuid())
-  pharmacyId  Int?         @map("pharmacy_id")
-  name             String
-  type             PharmacyRole
-  description      String?
-  requiresLicense  Boolean      @default(false) @map("requires_license")
-  status           RecordStatus @default(ACTIVE)
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  deletedAt   DateTime?    @map("deleted_at")
-  createdById Int?         @map("created_by_id")
-  updatedById Int?         @map("updated_by_id")
-  deletedById Int?         @map("deleted_by_id")
+  id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid())
+  pharmacyId      Int?         @map("pharmacy_id")
+  name            String
+  type            PharmacyRole
+  description     String?
+  requiresLicense Boolean      @default(false) @map("requires_license")
+  status          RecordStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  deletedAt       DateTime?    @map("deleted_at")
+  createdById     Int?         @map("created_by_id")
+  updatedById     Int?         @map("updated_by_id")
+  deletedById     Int?         @map("deleted_by_id")
 
   pharmacy        Pharmacy?        @relation(fields: [pharmacyId], references: [id])
   rolePermissions RolePermission[]
@@ -221,21 +221,21 @@ model RolePermission {
 // ── MST PHARMACY & USER ──────────────────────────────────
 
 model Pharmacy {
-  id           Int              @id @default(autoincrement())
-  uuid         String           @unique @default(uuid())
-  name         String
-  code         String           @unique
-  category     PharmacyCategory @default(APOTEK)
-  address      String
-  phone        String
-  email        String?
-  status       RecordStatus     @default(ACTIVE)
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-  deletedAt    DateTime?        @map("deleted_at")
-  createdById  Int?             @map("created_by_id")
-  updatedById  Int?             @map("updated_by_id")
-  deletedById  Int?             @map("deleted_by_id")
+  id          Int              @id @default(autoincrement())
+  uuid        String           @unique @default(uuid())
+  name        String
+  code        String           @unique
+  category    PharmacyCategory @default(APOTEK)
+  address     String
+  phone       String
+  email       String?
+  status      RecordStatus     @default(ACTIVE)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  deletedAt   DateTime?        @map("deleted_at")
+  createdById Int?             @map("created_by_id")
+  updatedById Int?             @map("updated_by_id")
+  deletedById Int?             @map("deleted_by_id")
 
   lastSelectedByUsers User[]              @relation("UserLastPharmacy")
   createdByUser       User?               @relation("PharmacyCreatedBy", fields: [createdById], references: [id])
