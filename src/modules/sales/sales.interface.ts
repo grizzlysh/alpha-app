@@ -22,6 +22,11 @@ export interface SaleUuidParam extends ParamsDictionary {
   sale_uuid: string
 }
 
+export interface SalePaymentHistoryUuidParam extends ParamsDictionary {
+  sale_uuid: string
+  history_uuid: string
+}
+
 export interface CreateSaleDetailBody {
   stockDetailUuid: string
   quantityPieces: number
@@ -74,11 +79,34 @@ export type CancelSaleRequest = Request<
   {}
 >
 
+export type GetSalePaymentRequest = Request<
+  SaleUuidParam,
+  {}, {}, {}
+>
+
 export type AddPaymentRequest = Request<
   SaleUuidParam,
   {},
   AddPaymentBody,
   {}
+>
+
+export interface UpdateSalePaymentHistoryBody {
+  paymentMethod?: PaymentMethod
+  paymentDate?: string
+  description?: string
+}
+
+export type UpdateSalePaymentHistoryRequest = Request<
+  SalePaymentHistoryUuidParam,
+  {},
+  UpdateSalePaymentHistoryBody,
+  {}
+>
+
+export type DeleteSalePaymentHistoryRequest = Request<
+  SalePaymentHistoryUuidParam,
+  {}, {}, {}
 >
 
 // ── Response Types ────────────────────────────────────

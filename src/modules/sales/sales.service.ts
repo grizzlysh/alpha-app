@@ -4,9 +4,10 @@ import {
   CreateSaleInput,
   CancelSaleInput,
   AddPaymentInput,
+  UpdatePaymentHistoryInput,
   SaleQueryInput,
 } from './sales.validation'
-import { SaleResponse } from './sales.interface'
+import { SalePaymentResponse, SaleResponse } from './sales.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ConflictException } from '@exceptions/ConflictException'
@@ -110,6 +111,30 @@ const formatSale = (sale: Prisma.SaleGetPayload<{ select: typeof saleSelect }>):
         })),
       }
     : null,
+})
+
+const salePaymentSelect = {
+  uuid: true,
+  totalAmount: true,
+  paidAmount: true,
+  paymentStatus: true,
+  history: {
+    select: {
+      uuid: true,
+      amount: true,
+      paymentMethod: true,
+      paymentDate: true,
+      description: true,
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
+}
+
+const formatSalePayment = (p: any): SalePaymentResponse => ({
+  ...p,
+  totalAmount: parseFloat(p.totalAmount.toString()),
+  paidAmount: parseFloat(p.paidAmount.toString()),
+  history: p.history.map((h: any) => ({ ...h, amount: parseFloat(h.amount.toString()) })),
 })
 
 // ── Services ──────────────────────────────────────────
@@ -746,4 +771,119 @@ export const addPayment = async (
   })
 
   return formatSale(fullSale!)
+}
+
+export const getSalePayment = async (
+  saleUuid: string,
+  pharmacyId: number
+): Promise<SalePaymentResponse> => {
+  const sale = await prisma.sale.findFirst({
+    where: { uuid: saleUuid, pharmacyId, deletedAt: null },
+    select: {
+      payment: { select: salePaymentSelect },
+    },
+  })
+
+  if (!sale) throw new NotFoundException('Sale not found')
+  if (!sale.payment) throw new NotFoundException('Sale payment record not found')
+
+  return formatSalePayment(sale.payment)
+}
+
+export const updatePaymentHistory = async (
+  historyUuid: string,
+  data: UpdatePaymentHistoryInput,
+  pharmacyId: number,
+  userId: number
+): Promise<SalePaymentResponse> => {
+  const history = await prisma.salePaymentHistory.findFirst({
+    where: {
+      uuid: historyUuid,
+      salePayment: { sale: { pharmacyId, deletedAt: null } },
+    },
+    select: { id: true, salePaymentId: true },
+  })
+
+  if (!history) throw new NotFoundException('Payment record not found')
+
+  await prisma.salePaymentHistory.update({
+    where: { id: history.id },
+    data: {
+      ...(data.paymentMethod && { paymentMethod: data.paymentMethod }),
+      ...(data.paymentDate && { paymentDate: new Date(data.paymentDate) }),
+      ...(data.description !== undefined && { description: data.description }),
+      updatedById: userId,
+    },
+  })
+
+  const payment = await prisma.salePayment.findUnique({
+    where: { id: history.salePaymentId },
+    select: salePaymentSelect,
+  })
+
+  return formatSalePayment(payment)
+}
+
+export const deletePaymentHistory = async (
+  historyUuid: string,
+  pharmacyId: number,
+  userId: number
+): Promise<SalePaymentResponse> => {
+  const paymentId = await prisma.$transaction(async (tx) => {
+    const history = await tx.salePaymentHistory.findFirst({
+      where: {
+        uuid: historyUuid,
+        salePayment: { sale: { pharmacyId, deletedAt: null } },
+      },
+      select: {
+        id: true,
+        amount: true,
+        salePaymentId: true,
+        salePayment: {
+          select: {
+            id: true,
+            paidAmount: true,
+            saleId: true,
+          },
+        },
+      },
+    })
+
+    if (!history) throw new NotFoundException('Payment record not found')
+
+    const payment = history.salePayment
+    const newPaid = Math.max(0, parseFloat(payment.paidAmount.toString()) - parseFloat(history.amount.toString()))
+
+    const newPaymentStatus = newPaid <= 0
+      ? PaymentStatus.UNPAID
+      : PaymentStatus.PARTIAL
+
+    await tx.salePayment.update({
+      where: { id: payment.id },
+      data: {
+        paidAmount: new Decimal(newPaid.toFixed(2)),
+        paymentStatus: newPaymentStatus,
+        updatedById: userId,
+      },
+    })
+
+    await tx.sale.update({
+      where: { id: payment.saleId },
+      data: {
+        paidAmount: new Decimal(newPaid.toFixed(2)),
+        updatedById: userId,
+      },
+    })
+
+    await tx.salePaymentHistory.delete({ where: { id: history.id } })
+
+    return payment.id
+  }, { timeout: 10000, maxWait: 5000 })
+
+  const updatedPayment = await prisma.salePayment.findUnique({
+    where: { id: paymentId },
+    select: salePaymentSelect,
+  })
+
+  return formatSalePayment(updatedPayment)
 }

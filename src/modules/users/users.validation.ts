@@ -17,7 +17,7 @@ export const listUserSchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
   platformRole: z.enum(['PLATFORM_ADMIN', 'PLATFORM_VIEWER', 'PLATFORM_SUPPORT']).optional(),
 });
 
@@ -63,7 +63,7 @@ export const changePasswordSchema = z.object({
 // ─── Placements ──────────────────────────────────────────────────────────────
 
 export const listPlacementSchema = z.object({
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 });
 
 export const createPlacementSchema = z.object({
@@ -85,7 +85,7 @@ export const updatePlacementSchema = z.object({
 export const listLicenseSchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'DELETED']).optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
 });
 
 export const createLicenseSchema = z.object({

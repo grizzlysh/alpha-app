@@ -40,7 +40,7 @@ const checkDuplicate = async (
     where: {
       name,
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(excludeUuid && { NOT: { uuid: excludeUuid } })
     }
   })
@@ -122,7 +122,8 @@ export const getMedicineTypes = async (
 
   const where = {
     ...pharmacyFilter,
-    status: status ?? { not: 'DELETED' as const },
+    deletedAt: null,
+    ...(status && { status }),
     ...(search && {
       name: { contains: search, mode: 'insensitive' as const }
     })
@@ -159,10 +160,10 @@ export const getMedicineTypeByUuid = async (
 ): Promise<MedicineTypeResponse> => {
   const where =
     platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { uuid, status: { not: 'DELETED' as const } }
+      ? { uuid, deletedAt: null }
       : {
         uuid,
-        status: { not: 'DELETED' as const },
+        deletedAt: null,
         OR: [{ pharmacyId: null }, { pharmacyId }]
       }
 
@@ -217,7 +218,7 @@ export const updateMedicineType = async (
   userId: number
 ): Promise<MedicineTypeResponse> => {
   const existing = await prisma.medicineType.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true, pharmacyId: true }
   })
 
@@ -254,7 +255,7 @@ export const deleteMedicineType = async (
   userId: number
 ): Promise<void> => {
   const existing = await prisma.medicineType.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true, pharmacyId: true }
   })
 
@@ -274,7 +275,6 @@ export const deleteMedicineType = async (
   await prisma.medicineType.update({
     where: { id: existing.id },
     data: {
-      status: 'DELETED',
       deletedAt: new Date(),
       deletedById: userId,
     }
@@ -294,7 +294,7 @@ export const getMedicineTypesDropdown = async (
   const rows = await prisma.medicineType.findMany({
     where: {
       ...pharmacyFilter,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
     select: { uuid: true, name: true, pharmacyId: true },

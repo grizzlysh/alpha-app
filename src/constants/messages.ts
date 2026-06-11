@@ -302,6 +302,22 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Invoice deleted successfully',
     id: 'Invoice berhasil dihapus',
   },
+  INVOICE_PAYMENT_FETCHED: {
+    en: 'Invoice payment fetched successfully',
+    id: 'Data pembayaran invoice berhasil diambil',
+  },
+  INVOICE_PAYMENT_ADDED: {
+    en: 'Invoice payment added successfully',
+    id: 'Pembayaran invoice berhasil ditambahkan',
+  },
+  INVOICE_PAYMENT_HISTORY_UPDATED: {
+    en: 'Payment record updated successfully',
+    id: 'Data pembayaran berhasil diperbarui',
+  },
+  INVOICE_PAYMENT_HISTORY_DELETED: {
+    en: 'Payment record reversed successfully',
+    id: 'Data pembayaran berhasil dibatalkan',
+  },
   INVOICE_NOT_FOUND: {
     en: 'Invoice not found',
     id: 'Invoice tidak ditemukan',
@@ -370,9 +386,21 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Sale refunded successfully',
     id: 'Penjualan berhasil direfund',
   },
+  SALE_PAYMENT_FETCHED: {
+    en: 'Sale payment fetched successfully',
+    id: 'Data pembayaran penjualan berhasil diambil',
+  },
   SALE_PAYMENT_ADDED: {
     en: 'Payment added successfully',
     id: 'Pembayaran berhasil ditambahkan',
+  },
+  SALE_PAYMENT_HISTORY_UPDATED: {
+    en: 'Payment record updated successfully',
+    id: 'Data pembayaran berhasil diperbarui',
+  },
+  SALE_PAYMENT_HISTORY_DELETED: {
+    en: 'Payment record reversed successfully',
+    id: 'Data pembayaran berhasil dibatalkan',
   },
   SALE_NOT_FOUND: {
     en: 'Sale not found',

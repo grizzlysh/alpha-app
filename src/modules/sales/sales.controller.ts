@@ -14,6 +14,9 @@ import {
   CreateSaleRequest,
   CancelSaleRequest,
   AddPaymentRequest,
+  GetSalePaymentRequest,
+  UpdateSalePaymentHistoryRequest,
+  DeleteSalePaymentHistoryRequest,
 } from './sales.interface'
 import { ValidationException } from '@exceptions/ValidationException'
 import {
@@ -115,6 +118,23 @@ export const refundSale = async (
   }
 }
 
+export const getPayment = async (
+  req: GetSalePaymentRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const payment = await SaleService.getSalePayment(
+      parseUuid(req.params.sale_uuid),
+      req.user!.pharmacyId!
+    )
+
+    sendSuccess(res, MESSAGE_CODES.SALE_PAYMENT_FETCHED, payment)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export const addPayment = async (
   req: AddPaymentRequest,
   res: Response,
@@ -129,6 +149,43 @@ export const addPayment = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.SALE_PAYMENT_ADDED, sale)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const updatePaymentHistory = async (
+  req: UpdateSalePaymentHistoryRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const payment = await SaleService.updatePaymentHistory(
+      parseUuid(req.params.history_uuid),
+      req.body as any,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.SALE_PAYMENT_HISTORY_UPDATED, payment)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const deletePaymentHistory = async (
+  req: DeleteSalePaymentHistoryRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const payment = await SaleService.deletePaymentHistory(
+      parseUuid(req.params.history_uuid),
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.SALE_PAYMENT_HISTORY_DELETED, payment)
   } catch (err) {
     next(err)
   }

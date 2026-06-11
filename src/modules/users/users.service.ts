@@ -458,7 +458,6 @@ export async function deleteUser(
     await tx.user.update({
       where: { id: user.id },
       data: {
-        status: RecordStatus.DELETED,
         deletedAt: new Date(),
         deletedById,
       },
@@ -735,7 +734,6 @@ export async function deletePlacement(
   await prisma.placement.update({
     where: { id: placement.id },
     data: {
-      status: RecordStatus.DELETED,
       deletedAt: new Date(),
       deletedById,
     },
@@ -890,7 +888,6 @@ export async function deleteLicense(
   await prisma.practiceLicense.update({
     where: { id: license.id },
     data: {
-      status: RecordStatus.DELETED,
       deletedAt: new Date(),
       deletedById,
     },

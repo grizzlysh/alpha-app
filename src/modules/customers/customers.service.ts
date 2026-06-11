@@ -33,7 +33,7 @@ const checkDuplicate = async (
     where: {
       phone,
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(excludeUuid && {
         NOT: { uuid: excludeUuid }
       })
@@ -110,7 +110,8 @@ export const getCustomers = async (
 
   const where = {
     pharmacyId,
-    status: status ?? { not: 'DELETED' as const },
+    deletedAt: null,
+    ...(status && { status }),
     ...(isWalkIn !== undefined && {
       isWalkIn: isWalkIn === 'true'
     }),
@@ -148,7 +149,7 @@ export const getCustomerByUuid = async (
   pharmacyId: number
 ): Promise<CustomerResponse> => {
   const customer = await prisma.customer.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: customerSelect,
   })
 
@@ -191,7 +192,7 @@ export const updateCustomer = async (
   userId: number
 ): Promise<CustomerResponse> => {
   const existing = await prisma.customer.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: { id: true }
   })
 
@@ -224,7 +225,7 @@ export const deleteCustomer = async (
   userId: number
 ): Promise<void> => {
   const existing = await prisma.customer.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: { id: true }
   })
 
@@ -238,7 +239,6 @@ export const deleteCustomer = async (
   await prisma.customer.update({
     where: { id: existing.id },
     data: {
-      status: 'DELETED',
       deletedAt: new Date(),
       deletedById: userId,
     }
@@ -252,7 +252,7 @@ export const getCustomersDropdown = async (
   return prisma.customer.findMany({
     where: {
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
     select: { uuid: true, name: true, phone: true, isWalkIn: true },

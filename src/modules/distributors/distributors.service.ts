@@ -34,7 +34,7 @@ const checkDuplicate = async (
     where: {
       name,
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(excludeUuid && {
         NOT: { uuid: excludeUuid }
       })
@@ -65,7 +65,8 @@ export const getDistributors = async (
 
   const where = {
     pharmacyId,
-    status: status ?? { not: 'DELETED' as const },
+    deletedAt: null,
+    ...(status && { status }),
     ...(search && {
       OR: [
         { name: { contains: search, mode: 'insensitive' as const } },
@@ -101,7 +102,7 @@ export const getDistributorByUuid = async (
   pharmacyId: number
 ): Promise<DistributorResponse> => {
   const distributor = await prisma.distributor.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: distributorSelect,
   })
 
@@ -144,7 +145,7 @@ export const updateDistributor = async (
   userId: number
 ): Promise<DistributorResponse> => {
   const existing = await prisma.distributor.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: { id: true }
   })
 
@@ -174,7 +175,7 @@ export const deleteDistributor = async (
   userId: number
 ): Promise<void> => {
   const existing = await prisma.distributor.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: { id: true }
   })
 
@@ -185,7 +186,6 @@ export const deleteDistributor = async (
   await prisma.distributor.update({
     where: { id: existing.id },
     data: {
-      status: 'DELETED',
       deletedAt: new Date(),
       deletedById: userId,
     }
@@ -199,7 +199,7 @@ export const getDistributorsDropdown = async (
   return prisma.distributor.findMany({
     where: {
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
     select: { uuid: true, name: true },

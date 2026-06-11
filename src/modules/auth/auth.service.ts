@@ -65,7 +65,7 @@ const getEffectivePermissions = async (
   pharmacyId: number
 ): Promise<string[]> => {
   const placement = await prisma.placement.findFirst({
-    where: { userId, pharmacyId, status: { not: 'DELETED' } },
+    where: { userId, pharmacyId, deletedAt: null },
     select: { roleId: true },
   })
 
@@ -445,7 +445,7 @@ export const getMe = async (
 
   if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
     const placement = await prisma.placement.findFirst({
-      where: { userId, pharmacyId, status: { not: 'DELETED' } },
+      where: { userId, pharmacyId, deletedAt: null },
       include: { role: { select: { uuid: true, name: true, type: true } } },
     })
     if (placement) {

@@ -45,7 +45,7 @@ const checkDuplicate = async (
     where: {
       name,
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(excludeUuid && {
         NOT: { uuid: excludeUuid }
       })
@@ -76,9 +76,9 @@ const resolveMedicineRefs = async (
   medicineClassUuid: string
 ): Promise<{ shapeId: number; typeId: number; medicineClassId: number }> => {
   const [shape, type, medicineClass] = await Promise.all([
-    prisma.medicineShape.findFirst({ where: { uuid: medicineShapeUuid, status: { not: 'DELETED' } }, select: { id: true } }),
-    prisma.medicineType.findFirst({ where: { uuid: medicineTypeUuid, status: { not: 'DELETED' } }, select: { id: true } }),
-    prisma.medicineClass.findFirst({ where: { uuid: medicineClassUuid, status: { not: 'DELETED' } }, select: { id: true } }),
+    prisma.medicineShape.findFirst({ where: { uuid: medicineShapeUuid, deletedAt: null }, select: { id: true } }),
+    prisma.medicineType.findFirst({ where: { uuid: medicineTypeUuid, deletedAt: null }, select: { id: true } }),
+    prisma.medicineClass.findFirst({ where: { uuid: medicineClassUuid, deletedAt: null }, select: { id: true } }),
   ])
 
   if (!shape) throw new NotFoundException('Medicine shape not found')
@@ -110,7 +110,8 @@ export const getMedicines = async (
 
   const where = {
     pharmacyId,
-    status: status ?? { not: 'DELETED' as const },
+    deletedAt: null,
+    ...(status && { status }),
     ...(medicineShapeUuid && { shape: { uuid: medicineShapeUuid } }),
     ...(medicineTypeUuid && { type: { uuid: medicineTypeUuid } }),
     ...(medicineClassUuid && { medicineClass: { uuid: medicineClassUuid } }),
@@ -154,7 +155,7 @@ export const getMedicineByUuid = async (
   pharmacyId: number
 ): Promise<MedicineResponse> => {
   const medicine = await prisma.medicine.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: medicineSelect,
   })
 
@@ -208,7 +209,7 @@ export const updateMedicine = async (
   userId: number
 ): Promise<MedicineResponse> => {
   const existing = await prisma.medicine.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: { id: true }
   })
 
@@ -227,13 +228,13 @@ export const updateMedicine = async (
   if (data.medicineShapeUuid || data.medicineTypeUuid || data.medicineClassUuid) {
     const [shape, type, medicineClass] = await Promise.all([
       data.medicineShapeUuid
-        ? prisma.medicineShape.findFirst({ where: { uuid: data.medicineShapeUuid, status: { not: 'DELETED' } }, select: { id: true } })
+        ? prisma.medicineShape.findFirst({ where: { uuid: data.medicineShapeUuid, deletedAt: null }, select: { id: true } })
         : null,
       data.medicineTypeUuid
-        ? prisma.medicineType.findFirst({ where: { uuid: data.medicineTypeUuid, status: { not: 'DELETED' } }, select: { id: true } })
+        ? prisma.medicineType.findFirst({ where: { uuid: data.medicineTypeUuid, deletedAt: null }, select: { id: true } })
         : null,
       data.medicineClassUuid
-        ? prisma.medicineClass.findFirst({ where: { uuid: data.medicineClassUuid, status: { not: 'DELETED' } }, select: { id: true } })
+        ? prisma.medicineClass.findFirst({ where: { uuid: data.medicineClassUuid, deletedAt: null }, select: { id: true } })
         : null,
     ])
 
@@ -278,7 +279,7 @@ export const deleteMedicine = async (
   userId: number
 ): Promise<void> => {
   const existing = await prisma.medicine.findFirst({
-    where: { uuid, pharmacyId, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId, deletedAt: null },
     select: { id: true }
   })
 
@@ -289,7 +290,6 @@ export const deleteMedicine = async (
   await prisma.medicine.update({
     where: { id: existing.id },
     data: {
-      status: 'DELETED',
       deletedAt: new Date(),
       deletedById: userId,
     }
@@ -303,7 +303,7 @@ export const getMedicinesDropdown = async (
   return prisma.medicine.findMany({
     where: {
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
     select: { uuid: true, name: true, unit: true },

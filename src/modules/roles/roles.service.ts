@@ -59,7 +59,7 @@ const checkDuplicate = async (
     where: {
       name: { equals: name, mode: 'insensitive' },
       pharmacyId,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(excludeUuid && { NOT: { uuid: excludeUuid } }),
     },
   })
@@ -81,7 +81,7 @@ const resolvePharmacyId = async (
   if (!pharmacyUuid) return null
 
   const pharmacy = await prisma.pharmacy.findFirst({
-    where: { uuid: pharmacyUuid, status: { not: 'DELETED' } },
+    where: { uuid: pharmacyUuid, deletedAt: null },
     select: { id: true },
   })
 
@@ -115,7 +115,8 @@ export const getRoles = async (
 
   const where = {
     ...pharmacyFilter,
-    status: status ?? { not: 'DELETED' as const },
+    deletedAt: null,
+    ...(status && { status }),
     ...(search && {
       name: { contains: search, mode: 'insensitive' as const },
     }),
@@ -149,10 +150,10 @@ export const getRoleByUuid = async (
 ): Promise<RoleDetailResponse> => {
   const where =
     platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { uuid, status: { not: 'DELETED' as const } }
+      ? { uuid, deletedAt: null }
       : {
           uuid,
-          status: { not: 'DELETED' as const },
+          deletedAt: null,
           OR: [{ pharmacyId: null }, { pharmacyId }],
         }
 
@@ -226,7 +227,7 @@ export const updateRole = async (
   userId: number
 ): Promise<RoleResponse> => {
   const existing = await prisma.role.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true, pharmacyId: true },
   })
 
@@ -268,7 +269,7 @@ export const deleteRole = async (
   userId: number
 ): Promise<void> => {
   const existing = await prisma.role.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true, pharmacyId: true },
   })
 
@@ -285,14 +286,13 @@ export const deleteRole = async (
 
   // block if any users still assigned
   const inUse = await prisma.placement.count({
-    where: { roleId: existing.id, status: { not: 'DELETED' } },
+    where: { roleId: existing.id, deletedAt: null },
   })
   if (inUse > 0) throw new ConflictException('Role is still assigned to active users')
 
   await prisma.role.update({
     where: { id: existing.id },
     data: {
-      status: 'DELETED',
       deletedAt: new Date(),
       deletedById: userId,
     },
@@ -307,7 +307,7 @@ export const setRolePermissions = async (
   userId: number
 ): Promise<RoleDetailResponse> => {
   const existing = await prisma.role.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true, pharmacyId: true },
   })
 

@@ -12,7 +12,6 @@ datasource db {
 enum RecordStatus {
   ACTIVE
   INACTIVE
-  DELETED
 }
 
 enum PlatformRole {
@@ -65,7 +64,6 @@ enum PurchaseOrderStatus {
   // PARTIAL
   COMPLETED
   CANCELLED
-  // DELETED
 }
 
 enum PaymentStatus {
@@ -807,7 +805,11 @@ model Invoice {
   paymentStatus   PaymentStatus @default(UNPAID) @map("payment_status")
   invoiceDate     DateTime      @map("invoice_date")
   dueDate         DateTime?     @map("due_date")
+  receiveDate     DateTime?     @map("receive_date")
   totalAmount     Decimal       @map("total_amount") @db.Decimal(12, 2)
+  ppnPercentage   Decimal       @default(0) @map("ppn_percentage") @db.Decimal(5, 2)
+  ppnAmount       Decimal       @default(0) @map("ppn_amount") @db.Decimal(12, 2)
+  grandTotal      Decimal       @map("grand_total") @db.Decimal(12, 2)
   paidAmount      Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
   description     String?
   createdAt       DateTime      @default(now()) @map("created_at")

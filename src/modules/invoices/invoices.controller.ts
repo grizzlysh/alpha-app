@@ -10,6 +10,10 @@ import {
   GetInvoiceRequest,
   CreateInvoiceRequest,
   DeleteInvoiceRequest,
+  AddInvoicePaymentRequest,
+  GetInvoicePaymentRequest,
+  UpdatePaymentHistoryRequest,
+  DeletePaymentHistoryRequest,
 } from './invoices.interface'
 import { ValidationException } from '@exceptions/ValidationException'
 import {
@@ -84,6 +88,79 @@ export const deleteInvoice = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.INVOICE_DELETED, null)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getPayment = async (
+  req: GetInvoicePaymentRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const payment = await InvoiceService.getInvoicePayment(
+      parseUuid(req.params.invoice_uuid),
+      req.user!.pharmacyId!
+    )
+
+    sendSuccess(res, MESSAGE_CODES.INVOICE_PAYMENT_FETCHED, payment)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const addPayment = async (
+  req: AddInvoicePaymentRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const invoice = await InvoiceService.addPayment(
+      parseUuid(req.params.invoice_uuid),
+      req.body as any,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.INVOICE_PAYMENT_ADDED, invoice)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const updatePaymentHistory = async (
+  req: UpdatePaymentHistoryRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const payment = await InvoiceService.updatePaymentHistory(
+      parseUuid(req.params.history_uuid),
+      req.body as any,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.INVOICE_PAYMENT_HISTORY_UPDATED, payment)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const deletePaymentHistory = async (
+  req: DeletePaymentHistoryRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const payment = await InvoiceService.deletePaymentHistory(
+      parseUuid(req.params.history_uuid),
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.INVOICE_PAYMENT_HISTORY_DELETED, payment)
   } catch (err) {
     next(err)
   }

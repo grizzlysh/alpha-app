@@ -146,7 +146,7 @@ export async function resetPassword(
   } catch (err) { next(err); }
 }
 
-// ─── Assignments ──────────────────────────────────────────────────────────────
+// ─── Placements ──────────────────────────────────────────────────────────────
 
 export async function listPlacements(
   req: Request<UserUuidParam, any, any, ListPlacementQuery>,

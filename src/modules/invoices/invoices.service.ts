@@ -1,12 +1,13 @@
-import { PurchaseOrderStatus } from '@prisma/client'
+import { PaymentStatus, PurchaseOrderStatus } from '@prisma/client'
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import { withDocNumberRetry } from '@utils/generateDocNumbers'
-import { CreateInvoiceInput, InvoiceQueryInput } from './invoices.validation'
-import { InvoiceResponse } from './invoices.interface'
+import { AddPaymentInput, CreateInvoiceInput, InvoiceQueryInput, UpdatePaymentHistoryInput } from './invoices.validation'
+import { InvoicePaymentResponse, InvoiceResponse } from './invoices.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
+import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -17,7 +18,11 @@ const invoiceSelect = {
   invoiceNumber: true,
   invoiceDate: true,
   dueDate: true,
+  receiveDate: true,
   totalAmount: true,
+  ppnPercentage: true,
+  ppnAmount: true,
+  grandTotal: true,
   paidAmount: true,
   paymentStatus: true,
   description: true,
@@ -49,21 +54,102 @@ const invoiceSelect = {
       },
     },
   },
+  payments: {
+    select: {
+      uuid: true,
+      totalAmount: true,
+      paidAmount: true,
+      paymentStatus: true,
+      history: {
+        select: {
+          uuid: true,
+          amount: true,
+          paymentMethod: true,
+          paymentDate: true,
+          description: true,
+        },
+        orderBy: { createdAt: 'asc' as const },
+      },
+    },
+    take: 1,
+  },
 }
+
+const toNum = (v: Decimal | number) => parseFloat(v.toString())
+
+const formatInvoice = (invoice: any): InvoiceResponse => ({
+  ...invoice,
+  totalAmount: toNum(invoice.totalAmount),
+  ppnPercentage: toNum(invoice.ppnPercentage),
+  ppnAmount: toNum(invoice.ppnAmount),
+  grandTotal: toNum(invoice.grandTotal),
+  paidAmount: toNum(invoice.paidAmount),
+  details: invoice.details.map((d: any) => ({
+    ...d,
+    price: toNum(d.price),
+    discountPercentage: toNum(d.discountPercentage),
+    discountAmount: toNum(d.discountAmount),
+    finalPrice: toNum(d.finalPrice),
+    totalAmount: toNum(d.totalAmount),
+  })),
+  payment: invoice.payments?.[0]
+    ? {
+        ...invoice.payments[0],
+        totalAmount: toNum(invoice.payments[0].totalAmount),
+        paidAmount: toNum(invoice.payments[0].paidAmount),
+        history: invoice.payments[0].history.map((h: any) => ({
+          ...h,
+          amount: toNum(h.amount),
+        })),
+      }
+    : null,
+})
+
+const paymentSelect = {
+  uuid: true,
+  totalAmount: true,
+  paidAmount: true,
+  paymentStatus: true,
+  history: {
+    select: {
+      uuid: true,
+      amount: true,
+      paymentMethod: true,
+      paymentDate: true,
+      description: true,
+    },
+    orderBy: { createdAt: 'asc' as const },
+  },
+}
+
+const formatPayment = (p: any): InvoicePaymentResponse => ({
+  ...p,
+  totalAmount: toNum(p.totalAmount),
+  paidAmount: toNum(p.paidAmount),
+  history: p.history.map((h: any) => ({ ...h, amount: toNum(h.amount) })),
+})
+
+const ROUND_HALF_UP = Decimal.ROUND_HALF_UP
+
+const round = (value: number | Decimal, dp: number) =>
+  new Decimal(value).toDecimalPlaces(dp, ROUND_HALF_UP)
 
 const calculatePrices = (
   price: number,
   discountPercentage: number,
+  quantityPerBox: number,
   marginPercentage: number
 ) => {
   const discountAmount = (price * discountPercentage) / 100
-  const finalPrice = price - discountAmount
-  const calculatedPrice = finalPrice + (finalPrice * marginPercentage) / 100
+  const finalPrice = price - discountAmount                          // per box, after discount
+  const basePrice = price / quantityPerBox                          // per piece, before discount
+  const calculatedPrice = basePrice + (basePrice * marginPercentage) / 100  // selling price per piece
 
   return {
-    discountAmount: new Decimal(discountAmount.toFixed(2)),
-    finalPrice: new Decimal(finalPrice.toFixed(2)),
-    calculatedPrice: new Decimal(calculatedPrice.toFixed(2)),
+    discountAmount: round(discountAmount, 2),
+    finalPrice: round(finalPrice, 2),
+    basePrice: round(basePrice, 2),
+    calculatedPrice: round(calculatedPrice, 2),
   }
 }
 
@@ -144,7 +230,7 @@ export const getInvoices = async (
     totalPages: Math.ceil(total / limit),
   }
 
-  return { data: invoices as unknown as InvoiceResponse[], meta }
+  return { data: invoices.map(formatInvoice), meta }
 }
 
 export const getInvoiceByUuid = async (
@@ -158,7 +244,7 @@ export const getInvoiceByUuid = async (
 
   if (!invoice) throw new NotFoundException('Invoice not found')
 
-  return invoice as unknown as InvoiceResponse
+  return formatInvoice(invoice)
 }
 
 export const createInvoice = async (
@@ -257,6 +343,7 @@ export const createInvoice = async (
     const reorderLevelDefault = parseInt(reorderParam?.value ?? '0', 10)
 
     // ── Calculate Details ─────────────────────────
+    const stockPriceMap = new Map<number, { basePrice: Decimal; calculatedPrice: Decimal }>()
     const detailsData = await Promise.all(
       data.details.map(async (detail) => {
         const medicine = await tx.medicine.findFirst({
@@ -269,11 +356,14 @@ export const createInvoice = async (
           )
         }
 
-        const { discountAmount, finalPrice, calculatedPrice } = calculatePrices(
+        const { discountAmount, finalPrice, basePrice, calculatedPrice } = calculatePrices(
           detail.price,
           detail.discountPercentage,
+          detail.quantityPerBox,
           marginPercentage
         )
+
+        stockPriceMap.set(medicine.id, { basePrice, calculatedPrice })
 
         return {
           medicineId: medicine.id,
@@ -282,14 +372,11 @@ export const createInvoice = async (
           quantityBox: detail.quantityBox,
           quantityPerBox: detail.quantityPerBox,
           quantityPieces: detail.quantityPieces,
-          price: new Decimal(detail.price),
+          price: round(detail.price, 2),
           discountPercentage: new Decimal(detail.discountPercentage),
           discountAmount,
           finalPrice,
-          calculatedPrice,
-          totalAmount: new Decimal(
-            (detail.quantityPieces * parseFloat(finalPrice.toString())).toFixed(2)
-          ),
+          totalAmount: round(detail.quantityBox * parseFloat(finalPrice.toString()), 2),
           createdById: userId,
         }
       })
@@ -299,6 +386,9 @@ export const createInvoice = async (
       (sum, d) => sum + parseFloat(d.totalAmount.toString()),
       0
     )
+    const ppnPercentage = data.ppnPercentage ?? 0
+    const ppnAmount = (totalAmount * ppnPercentage) / 100
+    const grandTotal = totalAmount + ppnAmount
 
     // ── Create Invoice + Details ──────────────────
     const invoice = await tx.invoice.create({
@@ -309,8 +399,12 @@ export const createInvoice = async (
         signedById,
         invoiceNumber: data.invoiceNumber,
         invoiceDate: new Date(data.invoiceDate),
-        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        totalAmount: new Decimal(totalAmount.toFixed(2)),
+        dueDate: new Date(data.dueDate),
+        receiveDate: new Date(data.receiveDate),
+        totalAmount: round(totalAmount, 2),
+        ppnPercentage: round(ppnPercentage, 2),
+        ppnAmount: round(ppnAmount, 0),
+        grandTotal: round(grandTotal, 0),
         description: data.description,
         createdById: userId,
         details: {
@@ -328,9 +422,19 @@ export const createInvoice = async (
             quantityPerBox: true,
             quantityPieces: true,
             finalPrice: true,
-            calculatedPrice: true,
           },
         },
+      },
+    })
+
+    // ── Create Payment Record ─────────────────────
+    await tx.invoicePayment.create({
+      data: {
+        invoiceId: invoice.id,
+        totalAmount: round(grandTotal, 0),
+        paidAmount: new Decimal(0),
+        paymentStatus: PaymentStatus.UNPAID,
+        createdById: userId,
       },
     })
 
@@ -347,8 +451,10 @@ export const createInvoice = async (
       const quantityBefore = currentStock?.totalPieces ?? 0
       const quantityAfter = quantityBefore + detail.quantityPieces
 
+      const { basePrice, calculatedPrice } = stockPriceMap.get(detail.medicineId)!
+
       const shouldUpdatePrice = currentStock
-        ? detail.finalPrice.greaterThan(currentStock.basePrice)
+        ? !basePrice.isZero() && basePrice.greaterThan(currentStock.basePrice)
         : true
 
       // upsert stock header — atomic, handles race condition
@@ -361,15 +467,15 @@ export const createInvoice = async (
           medicineId: detail.medicineId,
           totalPieces: detail.quantityPieces,
           reorderLevel: reorderLevelDefault,
-          basePrice: detail.finalPrice,
-          calculatedPrice: detail.calculatedPrice,
+          basePrice,
+          calculatedPrice,
           createdById: userId,
         },
         update: {
           totalPieces: { increment: detail.quantityPieces },
           ...(shouldUpdatePrice && {
-            basePrice: detail.finalPrice,
-            calculatedPrice: detail.calculatedPrice,
+            basePrice,
+            calculatedPrice,
             isManualPrice: false,
           }),
           updatedById: userId,
@@ -450,7 +556,7 @@ export const createInvoice = async (
     select: invoiceSelect,
   })
 
-  return fullInvoice as unknown as InvoiceResponse
+  return formatInvoice(fullInvoice)
 }
 
 export const deleteInvoice = async (
@@ -472,4 +578,211 @@ export const deleteInvoice = async (
       deletedById: userId,
     },
   })
+}
+
+export const getInvoicePayment = async (
+  invoiceUuid: string,
+  pharmacyId: number
+): Promise<InvoicePaymentResponse> => {
+  const invoice = await prisma.invoice.findFirst({
+    where: { uuid: invoiceUuid, pharmacyId, deletedAt: null },
+    select: {
+      payments: {
+        select: paymentSelect,
+        take: 1,
+      },
+    },
+  })
+
+  if (!invoice) throw new NotFoundException('Invoice not found')
+
+  const payment = invoice.payments[0]
+  if (!payment) throw new NotFoundException('Invoice payment record not found')
+
+  return formatPayment(payment)
+}
+
+export const addPayment = async (
+  uuid: string,
+  data: AddPaymentInput,
+  pharmacyId: number,
+  userId: number
+): Promise<InvoiceResponse> => {
+  const invoiceId = await prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findFirst({
+      where: { uuid, pharmacyId, deletedAt: null },
+      select: {
+        id: true,
+        payments: {
+          select: {
+            id: true,
+            totalAmount: true,
+            paidAmount: true,
+            paymentStatus: true,
+          },
+          take: 1,
+        },
+      },
+    })
+
+    if (!invoice) throw new NotFoundException('Invoice not found')
+
+    const payment = invoice.payments[0]
+    if (!payment) throw new NotFoundException('Invoice payment record not found')
+
+    if (payment.paymentStatus === PaymentStatus.PAID) {
+      throw new ConflictException('Invoice is already fully paid')
+    }
+
+    const currentPaid = parseFloat(payment.paidAmount.toString())
+    const totalAmount = parseFloat(payment.totalAmount.toString())
+    const newPaid = currentPaid + data.amount
+
+    if (newPaid > totalAmount) {
+      throw new BadRequestException(
+        `Payment exceeds remaining balance. Remaining: ${(totalAmount - currentPaid).toFixed(2)}`
+      )
+    }
+
+    const newPaymentStatus = newPaid >= totalAmount
+      ? PaymentStatus.PAID
+      : PaymentStatus.PARTIAL
+
+    await tx.invoicePayment.update({
+      where: { id: payment.id },
+      data: {
+        paidAmount: new Decimal(newPaid.toFixed(2)),
+        paymentStatus: newPaymentStatus,
+        updatedById: userId,
+      },
+    })
+
+    await tx.invoicePaymentHistory.create({
+      data: {
+        invoicePaymentId: payment.id,
+        amount: new Decimal(data.amount.toFixed(2)),
+        paymentMethod: data.paymentMethod,
+        paymentDate: new Date(data.paymentDate),
+        description: data.description,
+        createdById: userId,
+      },
+    })
+
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        paidAmount: new Decimal(newPaid.toFixed(2)),
+        paymentStatus: newPaymentStatus,
+        updatedById: userId,
+      },
+    })
+
+    return invoice.id
+  }, { timeout: 10000, maxWait: 5000 })
+
+  const fullInvoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    select: invoiceSelect,
+  })
+
+  return formatInvoice(fullInvoice)
+}
+
+export const updatePaymentHistory = async (
+  historyUuid: string,
+  data: UpdatePaymentHistoryInput,
+  pharmacyId: number,
+  userId: number
+): Promise<InvoicePaymentResponse> => {
+  const history = await prisma.invoicePaymentHistory.findFirst({
+    where: {
+      uuid: historyUuid,
+      invoicePayment: { invoice: { pharmacyId, deletedAt: null } },
+    },
+    select: { id: true, invoicePaymentId: true },
+  })
+
+  if (!history) throw new NotFoundException('Payment record not found')
+
+  await prisma.invoicePaymentHistory.update({
+    where: { id: history.id },
+    data: {
+      ...(data.paymentMethod && { paymentMethod: data.paymentMethod }),
+      ...(data.paymentDate && { paymentDate: new Date(data.paymentDate) }),
+      ...(data.description !== undefined && { description: data.description }),
+      updatedById: userId,
+    },
+  })
+
+  const payment = await prisma.invoicePayment.findUnique({
+    where: { id: history.invoicePaymentId },
+    select: paymentSelect,
+  })
+
+  return formatPayment(payment)
+}
+
+export const deletePaymentHistory = async (
+  historyUuid: string,
+  pharmacyId: number,
+  userId: number
+): Promise<InvoicePaymentResponse> => {
+  const paymentId = await prisma.$transaction(async (tx) => {
+    const history = await tx.invoicePaymentHistory.findFirst({
+      where: {
+        uuid: historyUuid,
+        invoicePayment: { invoice: { pharmacyId, deletedAt: null } },
+      },
+      select: {
+        id: true,
+        amount: true,
+        invoicePaymentId: true,
+        invoicePayment: {
+          select: {
+            id: true,
+            paidAmount: true,
+            invoiceId: true,
+          },
+        },
+      },
+    })
+
+    if (!history) throw new NotFoundException('Payment record not found')
+
+    const payment = history.invoicePayment
+    const newPaid = Math.max(0, parseFloat(payment.paidAmount.toString()) - parseFloat(history.amount.toString()))
+
+    const newPaymentStatus = newPaid <= 0
+      ? PaymentStatus.UNPAID
+      : PaymentStatus.PARTIAL
+
+    await tx.invoicePayment.update({
+      where: { id: payment.id },
+      data: {
+        paidAmount: new Decimal(newPaid.toFixed(2)),
+        paymentStatus: newPaymentStatus,
+        updatedById: userId,
+      },
+    })
+
+    await tx.invoice.update({
+      where: { id: payment.invoiceId },
+      data: {
+        paidAmount: new Decimal(newPaid.toFixed(2)),
+        paymentStatus: newPaymentStatus,
+        updatedById: userId,
+      },
+    })
+
+    await tx.invoicePaymentHistory.delete({ where: { id: history.id } })
+
+    return payment.id
+  }, { timeout: 10000, maxWait: 5000 })
+
+  const updatedPayment = await prisma.invoicePayment.findUnique({
+    where: { id: paymentId },
+    select: paymentSelect,
+  })
+
+  return formatPayment(updatedPayment)
 }

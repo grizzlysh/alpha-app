@@ -80,7 +80,7 @@ const ensureUniqueCode = async (code: string, excludeUuid?: string): Promise<voi
   const existing = await prisma.pharmacy.findFirst({
     where: {
       code,
-      status: { not: 'DELETED' },
+      deletedAt: null,
       ...(excludeUuid && { NOT: { uuid: excludeUuid } }),
     },
   })
@@ -105,7 +105,8 @@ export const getPharmacies = async (
 
   const where = {
     ...pharmacyFilter,
-    status: status ?? { not: 'DELETED' as const },
+    deletedAt: null,
+    ...(status && { status }),
     ...(category && { category }),
     ...(search && {
       name: { contains: search, mode: 'insensitive' as const },
@@ -140,8 +141,8 @@ export const getPharmacyByUuid = async (
 ): Promise<PharmacyResponse> => {
   const where =
     platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { uuid, status: { not: 'DELETED' as const } }
-      : { uuid, id: pharmacyId!, status: { not: 'DELETED' as const } }
+      ? { uuid, deletedAt: null }
+      : { uuid, id: pharmacyId!, deletedAt: null }
 
   const pharmacy = await prisma.pharmacy.findFirst({
     where,
@@ -192,7 +193,7 @@ export const updatePharmacy = async (
   userId: number
 ): Promise<PharmacyResponse> => {
   const existing = await prisma.pharmacy.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true },
   })
   if (!existing) throw new NotFoundException('Pharmacy not found')
@@ -229,7 +230,7 @@ export const deletePharmacy = async (
   userId: number
 ): Promise<void> => {
   const existing = await prisma.pharmacy.findFirst({
-    where: { uuid, status: { not: 'DELETED' } },
+    where: { uuid, deletedAt: null },
     select: { id: true },
   })
   if (!existing) throw new NotFoundException('Pharmacy not found')
@@ -237,7 +238,6 @@ export const deletePharmacy = async (
   await prisma.pharmacy.update({
     where: { id: existing.id },
     data: {
-      status: 'DELETED',
       deletedAt: new Date(),
       deletedById: userId,
     },
@@ -276,7 +276,7 @@ async function resolvePharmacyForLicense(
   platformRole: PlatformRole | null
 ) {
   const pharmacy = await prisma.pharmacy.findFirst({
-    where: { uuid: pharmacyUuid, status: { not: 'DELETED' } },
+    where: { uuid: pharmacyUuid, deletedAt: null },
     select: { id: true },
   })
   if (!pharmacy) throw new NotFoundException('Pharmacy not found')
@@ -301,7 +301,8 @@ export const getBusinessLicenses = async (
 
   const where: Prisma.BusinessLicenseWhereInput = {
     pharmacyId: pharmacy.id,
-    status: status ?? { not: 'DELETED' },
+    deletedAt: null,
+    ...(status && { status }),
   }
 
   const [licenses, total] = await prisma.$transaction([
@@ -330,7 +331,7 @@ export const getBusinessLicenseByUuid = async (
   const pharmacy = await resolvePharmacyForLicense(pharmacyUuid, pharmacyId, platformRole)
 
   const license = await prisma.businessLicense.findFirst({
-    where: { uuid, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId: pharmacy.id, deletedAt: null },
     select: businessLicenseSelect,
   })
   if (!license) throw new NotFoundException('Business license not found')
@@ -348,7 +349,7 @@ export const createBusinessLicense = async (
   const pharmacy = await resolvePharmacyForLicense(pharmacyUuid, pharmacyId, platformRole)
 
   const conflict = await prisma.businessLicense.findFirst({
-    where: { pharmacyId: pharmacy.id, licenseNumber: data.licenseNumber, status: { not: 'DELETED' } },
+    where: { pharmacyId: pharmacy.id, licenseNumber: data.licenseNumber, deletedAt: null },
   })
   if (conflict) throw new ConflictException('Business license number already exists')
 
@@ -378,7 +379,7 @@ export const updateBusinessLicense = async (
   const pharmacy = await resolvePharmacyForLicense(pharmacyUuid, pharmacyId, platformRole)
 
   const existing = await prisma.businessLicense.findFirst({
-    where: { uuid, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId: pharmacy.id, deletedAt: null },
     select: { id: true, licenseNumber: true },
   })
   if (!existing) throw new NotFoundException('Business license not found')
@@ -388,7 +389,7 @@ export const updateBusinessLicense = async (
       where: {
         pharmacyId: pharmacy.id,
         licenseNumber: data.licenseNumber,
-        status: { not: 'DELETED' },
+        deletedAt: null,
         NOT: { uuid },
       },
     })
@@ -414,14 +415,14 @@ export const deleteBusinessLicense = async (
   const pharmacy = await resolvePharmacyForLicense(pharmacyUuid, pharmacyId, platformRole)
 
   const existing = await prisma.businessLicense.findFirst({
-    where: { uuid, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+    where: { uuid, pharmacyId: pharmacy.id, deletedAt: null },
     select: { id: true },
   })
   if (!existing) throw new NotFoundException('Business license not found')
 
   await prisma.businessLicense.update({
     where: { id: existing.id },
-    data: { status: 'DELETED', deletedAt: new Date(), deletedById: userId },
+    data: { deletedAt: new Date(), deletedById: userId },
   })
 }
 

@@ -42,7 +42,14 @@ export const saleQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
 })
 
+export const updatePaymentHistorySchema = z.object({
+  paymentMethod: z.enum(PaymentMethod).optional(),
+  paymentDate: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+})
+
 export type CreateSaleInput = z.infer<typeof createSaleSchema>
 export type CancelSaleInput = z.infer<typeof cancelSaleSchema>
 export type AddPaymentInput = z.infer<typeof addPaymentSchema>
+export type UpdatePaymentHistoryInput = z.infer<typeof updatePaymentHistorySchema>
 export type SaleQueryInput = z.infer<typeof saleQuerySchema>

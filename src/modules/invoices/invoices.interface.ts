@@ -1,6 +1,6 @@
 import { Request } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
-import { PaymentStatus } from '@prisma/client'
+import { PaymentMethod, PaymentStatus } from '@prisma/client'
 
 // ── Query/Param/Body Types ────────────────────────────
 
@@ -21,6 +21,11 @@ export interface InvoiceUuidParam extends ParamsDictionary {
   invoice_uuid: string
 }
 
+export interface InvoicePaymentHistoryUuidParam extends ParamsDictionary {
+  invoice_uuid: string
+  history_uuid: string
+}
+
 export interface CreateInvoiceDetailBody {
   medicineUuid: string
   batchNumber: string
@@ -38,7 +43,9 @@ export interface CreateInvoiceBody {
   signedByUuid?: string
   invoiceNumber: string
   invoiceDate: string
-  dueDate?: string
+  dueDate: string
+  receiveDate: string
+  ppnPercentage?: number
   description?: string
   details: CreateInvoiceDetailBody[]
 }
@@ -64,12 +71,65 @@ export type CreateInvoiceRequest = Request<
   {}
 >
 
+export interface AddInvoicePaymentBody {
+  amount: number
+  paymentMethod: PaymentMethod
+  paymentDate: string
+  description?: string
+}
+
 export type DeleteInvoiceRequest = Request<
   InvoiceUuidParam,
   {}, {}, {}
 >
 
+export type GetInvoicePaymentRequest = Request<
+  InvoiceUuidParam,
+  {}, {}, {}
+>
+
+export type AddInvoicePaymentRequest = Request<
+  InvoiceUuidParam,
+  {},
+  AddInvoicePaymentBody,
+  {}
+>
+
+export interface UpdatePaymentHistoryBody {
+  paymentMethod?: PaymentMethod
+  paymentDate?: string
+  description?: string
+}
+
+export type UpdatePaymentHistoryRequest = Request<
+  InvoicePaymentHistoryUuidParam,
+  {},
+  UpdatePaymentHistoryBody,
+  {}
+>
+
+export type DeletePaymentHistoryRequest = Request<
+  InvoicePaymentHistoryUuidParam,
+  {}, {}, {}
+>
+
 // ── Response Types ────────────────────────────────────
+
+export interface InvoicePaymentHistoryResponse {
+  uuid: string
+  amount: number
+  paymentMethod: PaymentMethod
+  paymentDate: Date
+  description: string | null
+}
+
+export interface InvoicePaymentResponse {
+  uuid: string
+  totalAmount: number
+  paidAmount: number
+  paymentStatus: PaymentStatus
+  history: InvoicePaymentHistoryResponse[]
+}
 
 export interface InvoiceDetailResponse {
   uuid: string
@@ -95,7 +155,11 @@ export interface InvoiceResponse {
   invoiceNumber: string
   invoiceDate: Date
   dueDate: Date | null
+  receiveDate: Date | null
   totalAmount: number
+  ppnPercentage: number
+  ppnAmount: number
+  grandTotal: number
   paidAmount: number
   paymentStatus: PaymentStatus
   description: string | null
@@ -113,4 +177,5 @@ export interface InvoiceResponse {
     name: string
   } | null
   details: InvoiceDetailResponse[]
+  payment: InvoicePaymentResponse | null
 }
