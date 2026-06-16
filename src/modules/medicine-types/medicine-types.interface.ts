@@ -20,12 +20,14 @@ export interface MedicineTypeUuidParam extends ParamsDictionary {
 
 export interface CreateMedicineTypeBody {
   name: string
+  requiredPrescription: boolean
   status: RecordStatus
-  pharmacyUuid?: string   // ← PLATFORM_ADMIN only, optional
+  pharmacyUuid?: string
 }
 
 export interface UpdateMedicineTypeBody {
   name?: string
+  requiredPrescription?: boolean
   status?: RecordStatus
 }
 
@@ -67,6 +69,7 @@ export type DeleteMedicineTypeRequest = Request<
 export interface MedicineTypeResponse {
   uuid: string
   name: string
+  requiredPrescription: boolean
   isGlobal: boolean
   status: RecordStatus
   createdAt: Date
@@ -76,5 +79,6 @@ export interface MedicineTypeResponse {
 export interface MedicineTypeDropdownItem {
   uuid: string
   name: string
+  requiredPrescription: boolean
   isGlobal: boolean
 }

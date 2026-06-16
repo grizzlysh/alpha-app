@@ -33,11 +33,18 @@ export interface CreateSaleDetailBody {
   isFefoOverride?: boolean
 }
 
+export interface CreateSalePaymentBody {
+  paymentMethod: PaymentMethod
+  description?: string
+}
+
 export interface CreateSaleBody {
   customerUuid?: string
   saleType?: SaleType
   description?: string
+  isPending?: boolean
   details: CreateSaleDetailBody[]
+  payment?: CreateSalePaymentBody
 }
 
 export interface CancelSaleBody {
@@ -77,6 +84,11 @@ export type CancelSaleRequest = Request<
   {},
   CancelSaleBody,
   {}
+>
+
+export type CompleteSaleRequest = Request<
+  SaleUuidParam,
+  {}, {}, {}
 >
 
 export type GetSalePaymentRequest = Request<

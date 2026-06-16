@@ -1,4 +1,4 @@
-import { PurchaseOrderStatus, RecordStatus, PharmacyRole } from '@prisma/client'
+import { PurchaseOrderStatus, RecordStatus, AppRole } from '@prisma/client'
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import {
@@ -485,7 +485,7 @@ export const getPurchaseOrderPrintData = async (
               status: RecordStatus.ACTIVE,
               deletedAt: null,
               leftAt: null,
-              role: { type: PharmacyRole.HEAD_PHARMACIST },
+              role: { type: AppRole.HEAD_PHARMACIST },
             },
             take: 1,
             select: {

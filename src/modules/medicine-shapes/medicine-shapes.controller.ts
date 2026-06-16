@@ -84,7 +84,7 @@ export const updateMedicineShape = async (
   try {
     const medicine_shape = await MedicineShapeService.updateMedicineShape(
       parseUuid(req.params.medicine_shape_uuid),
-      req.query as any,
+      req.body,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

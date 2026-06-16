@@ -1,5 +1,5 @@
 import { Request } from 'express'
-import { PlatformRole, PharmacyRole } from '@prisma/client'
+import { PlatformRole, AppRole } from '@prisma/client'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
 
 // ── Param/Body Types ──────────────────────────────────
@@ -74,7 +74,7 @@ export type PermissionMap = Record<string, Record<string, boolean>>
 export interface PharmacyRoleItem {
   uuid: string
   name: string
-  type: PharmacyRole
+  type: AppRole
 }
 
 export interface CurrentPharmacyData {

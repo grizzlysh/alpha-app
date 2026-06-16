@@ -84,7 +84,7 @@ export const updateMedicineClass = async (
   try {
     const medicine_class = await MedicineClassService.updateMedicineClass(
       parseUuid(req.params.medicine_class_uuid),
-      req.query as any,
+      req.body,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

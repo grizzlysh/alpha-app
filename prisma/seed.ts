@@ -1,7 +1,7 @@
 import {
   PrismaClient,
   PlatformRole,
-  PharmacyRole,
+  AppRole,
   PharmacyCategory,
   RecordStatus,
   DataType,
@@ -236,7 +236,7 @@ async function main() {
       data: {
         pharmacyId: null,
         name: 'Owner',
-        type: PharmacyRole.OWNER,
+        type: AppRole.OWNER,
         description: 'Pharmacy owner with full access',
         requiresLicense: false,
         status: RecordStatus.ACTIVE,
@@ -249,7 +249,7 @@ async function main() {
       data: {
         pharmacyId: null,
         name: 'Pharmacist',
-        type: PharmacyRole.PHARMACIST,
+        type: AppRole.PHARMACIST,
         description: 'Licensed pharmacist with dispensing access',
         requiresLicense: true,
         status: RecordStatus.ACTIVE,

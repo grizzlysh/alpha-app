@@ -5,6 +5,8 @@ import { requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard
 import { validateBody, validateQuery } from '@middlewares/validate'
 import { PERMISSIONS } from '@constants/permissions'
 import {
+  stockDetailQuerySchema,
+  stockCatalogQuerySchema,
   stockQuerySchema,
   stockMovementQuerySchema,
   updatePriceSchema,
@@ -19,6 +21,8 @@ router.get('/', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockQu
 router.get('/alerts', requirePermission(PERMISSIONS.STOCK_READ), StockController.getStockAlerts)
 router.get('/movements', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockMovementQuerySchema), StockController.getStockMovements)
 router.get('/cross-pharmacy/:medicine_uuid', requirePermission(PERMISSIONS.STOCK_READ), StockController.getCrossPharmacyStock)
+router.get('/details', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockDetailQuerySchema), StockController.getStockDetails)
+router.get('/catalog', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockCatalogQuerySchema), StockController.getStockCatalog)
 router.get('/:stock_uuid', requirePermission(PERMISSIONS.STOCK_READ), StockController.getStock)
 router.patch('/:stock_uuid/price', requirePermission(PERMISSIONS.STOCK_ADJUST), validateBody(updatePriceSchema), StockController.updateSellingPrice)
 router.patch('/:stock_uuid/reorder-level', requirePermission(PERMISSIONS.STOCK_ADJUST), validateBody(updateReorderLevelSchema), StockController.updateReorderLevel)

@@ -8,14 +8,26 @@ export const createSaleDetailSchema = z.object({
   isFefoOverride: z.boolean().optional().default(false),
 })
 
-export const createSaleSchema = z.object({
-  customerUuid: z.string().trim().uuid().optional(),
-  saleType: z.enum(SaleType).optional().default(SaleType.CASH),
+export const createSalePaymentSchema = z.object({
+  paymentMethod: z.enum(PaymentMethod),
   description: z.string().trim().optional(),
-  details: z
-    .array(createSaleDetailSchema)
-    .min(1, { message: 'At least one item is required' }),
 })
+
+export const createSaleSchema = z
+  .object({
+    customerUuid: z.string().trim().uuid().optional(),
+    saleType: z.enum(SaleType).optional().default(SaleType.CASH),
+    description: z.string().trim().optional(),
+    isPending: z.boolean().optional().default(false),
+    details: z
+      .array(createSaleDetailSchema)
+      .min(1, { message: 'At least one item is required' }),
+    payment: createSalePaymentSchema.optional(),
+  })
+  .refine((data) => data.saleType !== SaleType.CASH || !!data.payment, {
+    message: 'Payment information is required for CASH sales',
+    path: ['payment'],
+  })
 
 export const cancelSaleSchema = z.object({
   description: z.string().trim().min(1, { message: 'Description is required' }),

@@ -1,6 +1,6 @@
 import { Request } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
-import { PharmacyRole, RecordStatus } from '@prisma/client'
+import { AppRole, RecordStatus } from '@prisma/client'
 import { PermissionResponse } from '@modules/permissions/permissions.interface'
 
 // ── Query/Param/Body Types ────────────────────────────
@@ -21,7 +21,7 @@ export interface RoleUuidParam extends ParamsDictionary {
 
 export interface CreateRoleBody {
   name: string
-  type: PharmacyRole
+  type: AppRole
   requiresLicense?: boolean
   pharmacyUuid?: string   // PLATFORM_ADMIN only, null = global
 }
@@ -81,7 +81,7 @@ export type DeleteRoleRequest = Request<
 export interface RoleResponse {
   uuid: string
   name: string
-  type: PharmacyRole
+  type: AppRole
   isGlobal: boolean
   requiresLicense: boolean
   status: RecordStatus
@@ -97,7 +97,7 @@ export interface RoleDetailResponse extends RoleResponse {
 export interface RoleDdlItem {
   uuid: string
   name: string
-  type: PharmacyRole
+  type: AppRole
   isGlobal: boolean
   requiresLicense: boolean
 }

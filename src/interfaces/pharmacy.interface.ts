@@ -1,8 +1,8 @@
-import { PharmacyRole } from '@prisma/client'
+import { AppRole } from '@prisma/client'
 
 export interface PharmacyRoleBasic {
   name: string
-  type: PharmacyRole
+  type: AppRole
 }
 
 export interface PharmacyItem {

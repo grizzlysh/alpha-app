@@ -336,9 +336,17 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Stock detail fetched successfully',
     id: 'Detail stok berhasil diambil',
   },
+  STOCK_CATALOG_FETCHED: {
+    en: 'Stock catalog fetched successfully',
+    id: 'Katalog stok berhasil diambil',
+  },
   STOCK_MOVEMENTS_FETCHED: {
     en: 'Stock movements fetched successfully',
     id: 'Data pergerakan stok berhasil diambil',
+  },
+  STOCK_MOVEMENT_FETCHED: {
+    en: 'Stock movement fetched successfully',
+    id: 'Detail pergerakan stok berhasil diambil',
   },
   STOCK_ALERTS_FETCHED: {
     en: 'Stock alerts fetched successfully',
@@ -377,6 +385,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   SALE_CREATED: {
     en: 'Sale created successfully',
     id: 'Penjualan berhasil dibuat',
+  },
+  SALE_COMPLETED: {
+    en: 'Sale completed successfully',
+    id: 'Penjualan berhasil diselesaikan',
   },
   SALE_CANCELLED: {
     en: 'Sale cancelled successfully',
@@ -431,6 +443,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   STOCK_RETURN_COMPLETED: {
     en: 'Stock return completed successfully',
     id: 'Retur stok berhasil diselesaikan',
+  },
+  STOCK_RETURN_REJECTED: {
+    en: 'Stock return rejected successfully',
+    id: 'Retur stok berhasil ditolak',
   },
   STOCK_RETURN_CANCELLED: {
     en: 'Stock return cancelled successfully',
@@ -757,6 +773,32 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   PRACTICE_LICENSE_PLACEMENT_NOT_FOUND: {
     en: 'Placement not found',
     id: 'Penempatan tidak ditemukan',
+  },
+
+  // ─── Reports ───────────────────────────────────────────────────────────────
+  REPORT_SALES_FETCHED: {
+    en: 'Sales report fetched successfully',
+    id: 'Laporan penjualan berhasil diambil',
+  },
+  REPORT_PURCHASES_FETCHED: {
+    en: 'Purchase report fetched successfully',
+    id: 'Laporan pembelian berhasil diambil',
+  },
+  REPORT_INVENTORY_FETCHED: {
+    en: 'Inventory report fetched successfully',
+    id: 'Laporan inventori berhasil diambil',
+  },
+  REPORT_STOCK_MOVEMENTS_FETCHED: {
+    en: 'Stock movement report fetched successfully',
+    id: 'Laporan pergerakan stok berhasil diambil',
+  },
+  REPORT_DISPOSALS_FETCHED: {
+    en: 'Disposal report fetched successfully',
+    id: 'Laporan pemusnahan berhasil diambil',
+  },
+  REPORT_RETURNS_FETCHED: {
+    en: 'Return report fetched successfully',
+    id: 'Laporan retur berhasil diambil',
   },
 
   // ─── Pharmacies ────────────────────────────────────────────────────────────

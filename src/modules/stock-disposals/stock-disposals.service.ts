@@ -211,29 +211,7 @@ export const createStockDisposal = async (
       pharmacyCode: pharmacy.code,
     })
 
-    const detailsData = await Promise.all(
-      data.details.map(async (detail) => {
-        const stockDetail = await resolveStockDetail(
-          detail.stockDetailUuid,
-          pharmacyId,
-          detail.quantityPieces,
-          tx
-        )
-
-        return {
-          stockDetailId: stockDetail.id,
-          medicineId: stockDetail.stock.medicineId,
-          quantityPieces: detail.quantityPieces,
-          quantityBox: Math.floor(
-            detail.quantityPieces / stockDetail.quantityPerBox
-          ),
-          reason: detail.reason,
-          createdById: userId,
-        }
-      })
-    )
-
-    return tx.stockDisposal.create({
+    const disposal = await tx.stockDisposal.create({
       data: {
         pharmacyId,
         signedById,
@@ -241,12 +219,64 @@ export const createStockDisposal = async (
         status: StockDisposalStatus.DRAFT,
         description: data.description,
         createdById: userId,
-        details: {
-          create: detailsData,
-        },
       },
       select: { id: true },
     })
+
+    // Create each detail sequentially: lock stock + create movement
+    for (const item of data.details) {
+      const stockDetail = await resolveStockDetail(item.stockDetailUuid, pharmacyId, item.quantityPieces, tx)
+
+      const quantityBefore = stockDetail.stock.totalPieces
+      const quantityAfter = quantityBefore - item.quantityPieces
+      const newDetailQty = stockDetail.quantityPieces - item.quantityPieces
+
+      const createdDetail = await tx.stockDisposalDetail.create({
+        data: {
+          stockDisposalId: disposal.id,
+          stockDetailId: stockDetail.id,
+          medicineId: stockDetail.stock.medicineId,
+          quantityPieces: item.quantityPieces,
+          quantityBox: Math.floor(item.quantityPieces / stockDetail.quantityPerBox),
+          reason: item.reason,
+          createdById: userId,
+        },
+        select: { id: true },
+      })
+
+      await tx.stockDetail.update({
+        where: { id: stockDetail.id },
+        data: {
+          quantityPieces: newDetailQty,
+          quantityBox: Math.floor(newDetailQty / stockDetail.quantityPerBox),
+          updatedById: userId,
+        },
+      })
+
+      await tx.stock.update({
+        where: { id: stockDetail.stockId },
+        data: { totalPieces: { decrement: item.quantityPieces }, updatedById: userId },
+      })
+
+      const movementReason = item.reason === 'DAMAGED' ? 'DAMAGED' : 'DISPOSAL'
+      await tx.stockMovement.create({
+        data: {
+          pharmacyId,
+          medicineId: stockDetail.stock.medicineId,
+          stockId: stockDetail.stockId,
+          stockDetailId: stockDetail.id,
+          stockDisposalDetailId: createdDetail.id,
+          type: 'OUT',
+          reason: movementReason,
+          quantity: item.quantityPieces,
+          quantityBefore,
+          quantityAfter,
+          createdById: userId,
+        },
+      })
+    }
+
+    return disposal
   }, { timeout: 10000, maxWait: 5000 }))
 
   const fullDisposal = await prisma.stockDisposal.findUnique({
@@ -266,11 +296,29 @@ export const updateStockDisposal = async (
   const stockDisposal = await prisma.$transaction(async (tx) => {
     const existing = await tx.stockDisposal.findFirst({
       where: { uuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        details: {
+          select: {
+            id: true,
+            quantityPieces: true,
+            medicineId: true,
+            stockDetail: {
+              select: {
+                id: true,
+                stockId: true,
+                quantityPieces: true,
+                quantityPerBox: true,
+                stock: { select: { id: true, totalPieces: true } },
+              },
+            },
+          },
+        },
+      },
     })
 
     if (!existing) throw new NotFoundException('Stock disposal not found')
-
     if (existing.status !== StockDisposalStatus.DRAFT) {
       throw new BadRequestException('Stock disposal can only be edited in DRAFT status')
     }
@@ -281,33 +329,105 @@ export const updateStockDisposal = async (
       signedById = signer.id
     }
 
-    let detailsCreate: any[] | undefined
     if (data.details) {
-      detailsCreate = await Promise.all(
-        data.details.map(async (detail) => {
-          const stockDetail = await tx.stockDetail.findFirst({
-            where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
-            select: {
-              id: true,
-              quantityPieces: true,
-              quantityPerBox: true,
-              stock: { select: { medicineId: true } },
-            },
-          })
-          if (!stockDetail) throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
-          if (stockDetail.quantityPieces < detail.quantityPieces) {
-            throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
-          }
-          return {
+      const oldDetailIds = existing.details.map((d) => d.id)
+
+      // Restore stock for existing details
+      for (const oldDetail of existing.details) {
+        const stockDetail = oldDetail.stockDetail
+        const quantityBefore = stockDetail.stock.totalPieces
+        const quantityAfter = quantityBefore + oldDetail.quantityPieces
+        const newDetailQty = stockDetail.quantityPieces + oldDetail.quantityPieces
+
+        await tx.stockDetail.update({
+          where: { id: stockDetail.id },
+          data: {
+            quantityPieces: newDetailQty,
+            quantityBox: Math.floor(newDetailQty / stockDetail.quantityPerBox),
+            updatedById: userId,
+          },
+        })
+        await tx.stock.update({
+          where: { id: stockDetail.stockId },
+          data: { totalPieces: { increment: oldDetail.quantityPieces }, updatedById: userId },
+        })
+        await tx.stockMovement.create({
+          data: {
+            pharmacyId,
+            medicineId: oldDetail.medicineId,
+            stockId: stockDetail.stockId,
+            stockDetailId: stockDetail.id,
+            stockDisposalDetailId: oldDetail.id,
+            type: 'IN',
+            reason: 'ADJUSTMENT',
+            quantity: oldDetail.quantityPieces,
+            quantityBefore,
+            quantityAfter,
+            description: 'Disposal draft updated - stock released',
+            createdById: userId,
+          },
+        })
+      }
+
+      // Unlink movements before deleting old details (nullable FK)
+      if (oldDetailIds.length > 0) {
+        await tx.stockMovement.updateMany({
+          where: { stockDisposalDetailId: { in: oldDetailIds } },
+          data: { stockDisposalDetailId: null },
+        })
+      }
+      await tx.stockDisposalDetail.deleteMany({ where: { stockDisposalId: existing.id } })
+
+      // Create new details + lock stock
+      for (const item of data.details) {
+        const stockDetail = await resolveStockDetail(item.stockDetailUuid, pharmacyId, item.quantityPieces, tx)
+        const quantityBefore = stockDetail.stock.totalPieces
+        const quantityAfter = quantityBefore - item.quantityPieces
+        const newDetailQty = stockDetail.quantityPieces - item.quantityPieces
+
+        const createdDetail = await tx.stockDisposalDetail.create({
+          data: {
+            stockDisposalId: existing.id,
             stockDetailId: stockDetail.id,
             medicineId: stockDetail.stock.medicineId,
-            quantityPieces: detail.quantityPieces,
-            quantityBox: Math.floor(detail.quantityPieces / stockDetail.quantityPerBox),
-            reason: detail.reason,
+            quantityPieces: item.quantityPieces,
+            quantityBox: Math.floor(item.quantityPieces / stockDetail.quantityPerBox),
+            reason: item.reason,
             createdById: userId,
-          }
+          },
+          select: { id: true },
         })
-      )
+
+        await tx.stockDetail.update({
+          where: { id: stockDetail.id },
+          data: {
+            quantityPieces: newDetailQty,
+            quantityBox: Math.floor(newDetailQty / stockDetail.quantityPerBox),
+            updatedById: userId,
+          },
+        })
+        await tx.stock.update({
+          where: { id: stockDetail.stockId },
+          data: { totalPieces: { decrement: item.quantityPieces }, updatedById: userId },
+        })
+
+        const movementReason = item.reason === 'DAMAGED' ? 'DAMAGED' : 'DISPOSAL'
+        await tx.stockMovement.create({
+          data: {
+            pharmacyId,
+            medicineId: stockDetail.stock.medicineId,
+            stockId: stockDetail.stockId,
+            stockDetailId: stockDetail.id,
+            stockDisposalDetailId: createdDetail.id,
+            type: 'OUT',
+            reason: movementReason,
+            quantity: item.quantityPieces,
+            quantityBefore,
+            quantityAfter,
+            createdById: userId,
+          },
+        })
+      }
     }
 
     return tx.stockDisposal.update({
@@ -316,13 +436,10 @@ export const updateStockDisposal = async (
         ...(signedById && { signedById }),
         ...(data.description !== undefined && { description: data.description }),
         updatedById: userId,
-        ...(detailsCreate && {
-          details: { deleteMany: {}, create: detailsCreate },
-        }),
       },
       select: stockDisposalSelect,
     })
-  }, { timeout: 10000, maxWait: 5000 })
+  }, { timeout: 15000, maxWait: 5000 })
 
   return stockDisposal as unknown as StockDisposalResponse
 }
@@ -336,106 +453,20 @@ export const completeStockDisposal = async (
 
     const stockDisposal = await tx.stockDisposal.findFirst({
       where: { uuid, pharmacyId, deletedAt: null },
-      select: {
-        id: true,
-        status: true,
-        signedById: true,
-        details: {
-          select: {
-            id: true,
-            quantityPieces: true,
-            reason: true,
-            medicineId: true,
-            stockDetailId: true,
-            stockDetail: {
-              select: {
-                id: true,
-                stockId: true,
-                quantityPieces: true,
-                quantityPerBox: true,
-                stock: {
-                  select: { id: true, totalPieces: true },
-                },
-              },
-            },
-          },
-        },
-      },
+      select: { id: true, status: true, signedById: true },
     })
 
     if (!stockDisposal) throw new NotFoundException('Stock disposal not found')
 
     if (stockDisposal.status !== StockDisposalStatus.DRAFT) {
-      throw new BadRequestException(
-        'Stock disposal can only be completed from DRAFT status'
-      )
+      throw new BadRequestException('Stock disposal can only be completed from DRAFT status')
     }
 
     if (!stockDisposal.signedById) {
-      throw new BadRequestException(
-        'Stock disposal must be signed before completing'
-      )
+      throw new BadRequestException('Stock disposal must be signed before completing')
     }
 
-    // ── Deduct Stock per Detail ───────────────────
-    for (const detail of stockDisposal.details) {
-      const stockDetail = detail.stockDetail
-      const quantityBefore = stockDetail.stock.totalPieces
-      const quantityAfter = quantityBefore - detail.quantityPieces
-
-      if (quantityAfter < 0) {
-        throw new BadRequestException(
-          'Insufficient stock for this disposal'
-        )
-      }
-
-      const newDetailQuantity =
-        stockDetail.quantityPieces - detail.quantityPieces
-
-      // update stock detail
-      await tx.stockDetail.update({
-        where: { id: stockDetail.id },
-        data: {
-          quantityPieces: newDetailQuantity,
-          quantityBox: Math.floor(
-            newDetailQuantity / stockDetail.quantityPerBox
-          ),
-          updatedById: userId,
-        },
-      })
-
-      // update stock header
-      await tx.stock.update({
-        where: { id: stockDetail.stockId },
-        data: {
-          totalPieces: { decrement: detail.quantityPieces },
-          updatedById: userId,
-        },
-      })
-
-      // determine movement reason
-      const movementReason =
-        detail.reason === 'DAMAGED' ? 'DAMAGED' : 'DISPOSAL'
-
-      // create stock movement
-      await tx.stockMovement.create({
-        data: {
-          pharmacyId,
-          medicineId: detail.medicineId,
-          stockId: stockDetail.stockId,
-          stockDetailId: stockDetail.id,
-          stockDisposalId: stockDisposal.id,
-          type: 'OUT',
-          reason: movementReason,
-          quantity: detail.quantityPieces,
-          quantityBefore,
-          quantityAfter,
-          createdById: userId,
-        },
-      })
-    }
-
-    // ── Update Status ─────────────────────────────
+    // Stock was already locked when the draft was created — just finalize status
     await tx.stockDisposal.update({
       where: { id: stockDisposal.id },
       data: {
@@ -500,55 +531,41 @@ export const cancelStockDisposal = async (
       throw new BadRequestException('Stock disposal is already cancelled')
     }
 
-    // ── Restore Stock if COMPLETED ────────────────
-    if (stockDisposal.status === StockDisposalStatus.COMPLETED) {
-      for (const detail of stockDisposal.details) {
-        const stockDetail = detail.stockDetail
-        const quantityBefore = stockDetail.stock.totalPieces
-        const quantityAfter = quantityBefore + detail.quantityPieces
+    // Stock was locked at draft time — always restore it on cancel
+    for (const detail of stockDisposal.details) {
+      const stockDetail = detail.stockDetail
+      const quantityBefore = stockDetail.stock.totalPieces
+      const quantityAfter = quantityBefore + detail.quantityPieces
+      const newDetailQuantity = stockDetail.quantityPieces + detail.quantityPieces
 
-        const newDetailQuantity =
-          stockDetail.quantityPieces + detail.quantityPieces
-
-        // restore stock detail
-        await tx.stockDetail.update({
-          where: { id: stockDetail.id },
-          data: {
-            quantityPieces: newDetailQuantity,
-            quantityBox: Math.floor(
-              newDetailQuantity / stockDetail.quantityPerBox
-            ),
-            updatedById: userId,
-          },
-        })
-
-        // restore stock header
-        await tx.stock.update({
-          where: { id: stockDetail.stockId },
-          data: {
-            totalPieces: { increment: detail.quantityPieces },
-            updatedById: userId,
-          },
-        })
-
-        // create stock movement (IN, ADJUSTMENT — restore)
-        await tx.stockMovement.create({
-          data: {
-            pharmacyId,
-            medicineId: detail.medicineId,
-            stockId: stockDetail.stockId,
-            stockDetailId: stockDetail.id,
-            stockDisposalId: stockDisposal.id,
-            type: 'IN',
-            reason: 'ADJUSTMENT',
-            quantity: detail.quantityPieces,
-            quantityBefore,
-            quantityAfter,
-            description: data.description,
-            createdById: userId,
-          },
-        })
-      }
+      await tx.stockDetail.update({
+        where: { id: stockDetail.id },
+        data: {
+          quantityPieces: newDetailQuantity,
+          quantityBox: Math.floor(newDetailQuantity / stockDetail.quantityPerBox),
+          updatedById: userId,
+        },
+      })
+      await tx.stock.update({
+        where: { id: stockDetail.stockId },
+        data: { totalPieces: { increment: detail.quantityPieces }, updatedById: userId },
+      })
+      await tx.stockMovement.create({
+        data: {
+          pharmacyId,
+          medicineId: detail.medicineId,
+          stockId: stockDetail.stockId,
+          stockDetailId: stockDetail.id,
+          stockDisposalDetailId: detail.id,
+          type: 'IN',
+          reason: 'ADJUSTMENT',
+          quantity: detail.quantityPieces,
+          quantityBefore,
+          quantityAfter,
+          description: data.description,
+          createdById: userId,
+        },
+      })
     }
 
     // ── Update Status ─────────────────────────────
@@ -580,24 +597,77 @@ export const deleteStockDisposal = async (
   pharmacyId: number,
   userId: number
 ): Promise<void> => {
-  const existing = await prisma.stockDisposal.findFirst({
-    where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true, status: true },
-  })
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.stockDisposal.findFirst({
+      where: { uuid, pharmacyId, deletedAt: null },
+      select: {
+        id: true,
+        status: true,
+        details: {
+          select: {
+            id: true,
+            quantityPieces: true,
+            medicineId: true,
+            stockDetail: {
+              select: {
+                id: true,
+                stockId: true,
+                quantityPieces: true,
+                quantityPerBox: true,
+                stock: { select: { id: true, totalPieces: true } },
+              },
+            },
+          },
+        },
+      },
+    })
 
-  if (!existing) throw new NotFoundException('Stock disposal not found')
+    if (!existing) throw new NotFoundException('Stock disposal not found')
 
-  if (existing.status !== StockDisposalStatus.DRAFT) {
-    throw new BadRequestException(
-      'Only DRAFT stock disposals can be deleted'
-    )
-  }
+    if (existing.status !== StockDisposalStatus.DRAFT) {
+      throw new BadRequestException('Only DRAFT stock disposals can be deleted')
+    }
 
-  await prisma.stockDisposal.update({
-    where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    },
-  })
+    // Restore stock locked at draft time
+    for (const detail of existing.details) {
+      const stockDetail = detail.stockDetail
+      const quantityBefore = stockDetail.stock.totalPieces
+      const quantityAfter = quantityBefore + detail.quantityPieces
+      const newDetailQty = stockDetail.quantityPieces + detail.quantityPieces
+
+      await tx.stockDetail.update({
+        where: { id: stockDetail.id },
+        data: {
+          quantityPieces: newDetailQty,
+          quantityBox: Math.floor(newDetailQty / stockDetail.quantityPerBox),
+          updatedById: userId,
+        },
+      })
+      await tx.stock.update({
+        where: { id: stockDetail.stockId },
+        data: { totalPieces: { increment: detail.quantityPieces }, updatedById: userId },
+      })
+      await tx.stockMovement.create({
+        data: {
+          pharmacyId,
+          medicineId: detail.medicineId,
+          stockId: stockDetail.stockId,
+          stockDetailId: stockDetail.id,
+          stockDisposalDetailId: detail.id,
+          type: 'IN',
+          reason: 'ADJUSTMENT',
+          quantity: detail.quantityPieces,
+          quantityBefore,
+          quantityAfter,
+          description: 'Disposal draft deleted - stock released',
+          createdById: userId,
+        },
+      })
+    }
+
+    await tx.stockDisposal.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), deletedById: userId },
+    })
+  }, { timeout: 10000, maxWait: 5000 })
 }

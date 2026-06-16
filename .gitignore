@@ -16,6 +16,9 @@ uncaughtExceptions.log
 # Prisma
 prisma/migrations/
 
+# Generated report files
+storage/
+
 # OS
 .DS_Store
 Thumbs.db

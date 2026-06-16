@@ -3,6 +3,17 @@ import { ParamsDictionary } from 'express-serve-static-core'
 
 // ── Query/Param/Body Types ────────────────────────────
 
+export interface StockDetailQueryParams {
+  search?: string
+}
+
+export interface StockCatalogQueryParams {
+  search?: string
+  medicineTypeUuid?: string
+  page?: string
+  limit?: string
+}
+
 export interface StockQueryParams {
   search?: string
   isLowStock?: string
@@ -52,6 +63,20 @@ export interface AdjustStockBody {
 
 // ── Typed Request Aliases ─────────────────────────────
 
+export type GetStockDetailsRequest = Request<
+  {},
+  {},
+  {},
+  StockDetailQueryParams
+>
+
+export type GetStockCatalogRequest = Request<
+  {},
+  {},
+  {},
+  StockCatalogQueryParams
+>
+
 export type GetStocksRequest = Request<
   {},
   {},
@@ -99,6 +124,28 @@ export type GetCrossPharmacyStockRequest = Request<
 
 // ── Response Types ────────────────────────────────────
 
+export interface StockDetailSearchResponse {
+  uuid: string
+  barcode: string | null
+  batchNumber: string
+  expiryDate: Date
+  quantityPieces: number
+  quantityBox: number
+  quantityPerBox: number
+  distributor: { uuid: string; name: string }
+  stock: {
+    uuid: string
+    effectiveSellingPrice: number
+  }
+  medicine: {
+    uuid: string
+    name: string
+    unit: string
+    shape: { name: string }
+    type: { name: string }
+  }
+}
+
 export interface StockDetailResponse {
   uuid: string
   batchNumber: string
@@ -133,6 +180,7 @@ export interface StockResponse {
     medicineClass: { name: string }
   }
   details: StockDetailResponse[]
+  createdAt: Date
   updatedAt: Date
 }
 
@@ -176,9 +224,18 @@ export interface StockMovementResponse {
     uuid: string
     invoice: { invoiceNumber: string }
   } | null
-  sale: { uuid: string; saleNumber: string } | null
-  stockReturn: { uuid: string; returnNumber: string } | null
-  stockDisposal: { uuid: string; disposalNumber: string } | null
+  saleDetail: {
+    uuid: string
+    sale: { uuid: string; saleNumber: string }
+  } | null
+  stockReturnDetail: {
+    uuid: string
+    stockReturn: { uuid: string; returnNumber: string }
+  } | null
+  stockDisposalDetail: {
+    uuid: string
+    stockDisposal: { uuid: string; disposalNumber: string }
+  } | null
 }
 
 export interface CrossPharmacyStockResponse {

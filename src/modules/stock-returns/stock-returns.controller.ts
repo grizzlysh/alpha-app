@@ -5,6 +5,7 @@ import {
   createStockReturnSchema,
   updateStockReturnSchema,
   cancelStockReturnSchema,
+  rejectStockReturnSchema,
   stockReturnQuerySchema,
 } from './stock-returns.validation'
 import {
@@ -14,6 +15,7 @@ import {
   UpdateStockReturnRequest,
   CompleteStockReturnRequest,
   CancelStockReturnRequest,
+  RejectStockReturnRequest,
   DeleteStockReturnRequest,
 } from './stock-returns.interface'
 import { ValidationException } from '@exceptions/ValidationException'
@@ -127,6 +129,25 @@ export const cancelStockReturn = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.STOCK_RETURN_CANCELLED, stockReturn)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const rejectStockReturn = async (
+  req: RejectStockReturnRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const stockReturn = await StockReturnService.rejectStockReturn(
+      parseUuid(req.params.stock_return_uuid),
+      req.body as any,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.STOCK_RETURN_REJECTED, stockReturn)
   } catch (err) {
     next(err)
   }

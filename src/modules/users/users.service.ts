@@ -1,4 +1,4 @@
-import { RecordStatus, PharmacyRole } from '@prisma/client';
+import { RecordStatus, AppRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@config/db';
 import { BadRequestException } from '@exceptions/BadRequestException';
@@ -67,6 +67,7 @@ const userBaseSelect = {
   mustChangePassword: true,
   status: true,
   createdAt: true,
+  updatedAt: true,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -113,7 +114,6 @@ export async function getMe(userId: number, pharmacyId?: number): Promise<MeItem
     where: { id: userId, deletedAt: null },
     select: {
       ...userBaseSelect,
-      updatedAt: true,
       placements: pharmacyId
         ? {
             where: { pharmacyId, deletedAt: null, status: RecordStatus.ACTIVE },
@@ -250,6 +250,7 @@ export async function listUsers(
       status: u.status,
       placementCount: u._count.placements,
       createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
     })),
     total,
   };
@@ -262,7 +263,6 @@ export async function getUser(userUuid: string): Promise<UserDetailItem> {
     where: { uuid: userUuid, deletedAt: null },
     select: {
       ...userBaseSelect,
-      updatedAt: true,
       _count: {
         select: {
           placements: {
@@ -338,17 +338,17 @@ export async function createUser(
   });
   if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
 
-  const licenseRequired = role.type === PharmacyRole.PHARMACIST || role.type === PharmacyRole.HEAD_PHARMACIST;
+  const licenseRequired = role.type === AppRole.PHARMACIST || role.type === AppRole.HEAD_PHARMACIST || role.type === AppRole.DOCTOR;
   if (licenseRequired && !body.placement.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
 
-  if (role.type === PharmacyRole.HEAD_PHARMACIST) {
+  if (role.type === AppRole.HEAD_PHARMACIST) {
     const existingPic = await prisma.placement.findFirst({
       where: {
         pharmacyId: pharmacy.id,
         deletedAt: null,
         leftAt: null,
         status: RecordStatus.ACTIVE,
-        role: { type: PharmacyRole.HEAD_PHARMACIST },
+        role: { type: AppRole.HEAD_PHARMACIST },
       },
     });
     if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
@@ -602,20 +602,20 @@ export async function createPlacement(
 
   // Max 1 SIGN_FULL role per pharmacy
   // Max 1 HEAD_PHARMACIST per pharmacy
-  if (role.type === PharmacyRole.HEAD_PHARMACIST) {
+  if (role.type === AppRole.HEAD_PHARMACIST) {
     const existingPic = await prisma.placement.findFirst({
       where: {
         pharmacyId: pharmacy.id,
         deletedAt: null,
         leftAt: null,
         status: RecordStatus.ACTIVE,
-        role: { type: PharmacyRole.HEAD_PHARMACIST },
+        role: { type: AppRole.HEAD_PHARMACIST },
       },
     });
     if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
   }
 
-  const licenseRequired = role.type === PharmacyRole.PHARMACIST || role.type === PharmacyRole.HEAD_PHARMACIST;
+  const licenseRequired = role.type === AppRole.PHARMACIST || role.type === AppRole.HEAD_PHARMACIST || role.type === AppRole.DOCTOR;
   if (licenseRequired && !body.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
 
   await checkPlacementOverlap(user.id, pharmacy.id, new Date(body.joinedAt), null);
@@ -673,7 +673,7 @@ export async function updatePlacement(
     const role = await prisma.role.findFirst({ where: { uuid: body.roleUuid, deletedAt: null } });
     if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
 
-    if (role.type === PharmacyRole.HEAD_PHARMACIST) {
+    if (role.type === AppRole.HEAD_PHARMACIST) {
       const existingPic = await prisma.placement.findFirst({
         where: {
           pharmacyId: placement.pharmacyId,
@@ -681,7 +681,7 @@ export async function updatePlacement(
           leftAt: null,
           status: RecordStatus.ACTIVE,
           id: { not: placement.id },
-          role: { type: PharmacyRole.HEAD_PHARMACIST },
+          role: { type: AppRole.HEAD_PHARMACIST },
         },
       });
       if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');

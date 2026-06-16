@@ -404,7 +404,7 @@ export const createSale = async (
         customerId,
         saleNumber,
         saleType: data.saleType ?? SaleType.CASH,
-        status: SaleStatus.COMPLETED,
+        status: data.isPending ? SaleStatus.PENDING : SaleStatus.COMPLETED,
         totalAmount: new Decimal(totalAmount.toFixed(2)),
         paidAmount: data.saleType === SaleType.CASH
           ? new Decimal(totalAmount.toFixed(2))
@@ -470,7 +470,7 @@ export const createSale = async (
           medicineId: detail.medicineId,
           stockId: detail._stockId,
           stockDetailId: detail._stockDetailId,
-          saleId: sale.id,
+          saleDetailId: saleDetail.id,
           type: 'OUT',
           reason: 'SALE',
           quantity: detail._quantityPieces,
@@ -497,8 +497,9 @@ export const createSale = async (
           history: {
             create: {
               amount: new Decimal(totalAmount.toFixed(2)),
-              paymentMethod: 'CASH',
+              paymentMethod: data.payment!.paymentMethod,
               paymentDate: soldAt,
+              description: data.payment!.description,
               createdById: userId,
             },
           },
@@ -511,6 +512,36 @@ export const createSale = async (
 
   const fullSale = await prisma.sale.findUnique({
     where: { id: createdSale.id },
+    select: saleSelect,
+  })
+
+  return formatSale(fullSale!)
+}
+
+export const completeSale = async (
+  uuid: string,
+  pharmacyId: number,
+  userId: number
+): Promise<SaleResponse> => {
+  const sale = await prisma.sale.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true, status: true },
+  })
+
+  if (!sale) throw new NotFoundException('Sale not found')
+
+  if (sale.status !== SaleStatus.PENDING) {
+    throw new BadRequestException('Only pending sales can be completed')
+  }
+
+  // Stock was already locked when the sale was created — just finalize status
+  await prisma.sale.update({
+    where: { id: sale.id },
+    data: { status: SaleStatus.COMPLETED, updatedById: userId },
+  })
+
+  const fullSale = await prisma.sale.findUnique({
+    where: { id: sale.id },
     select: saleSelect,
   })
 
@@ -561,10 +592,16 @@ export const cancelOrRefundSale = async (
 
     if (!sale) throw new NotFoundException('Sale not found')
 
-    if (sale.status !== SaleStatus.COMPLETED) {
-      throw new BadRequestException(
-        'Only completed sales can be cancelled or refunded'
-      )
+    if (status === SaleStatus.REFUNDED && sale.status !== SaleStatus.COMPLETED) {
+      throw new BadRequestException('Only completed sales can be refunded')
+    }
+
+    if (
+      status === SaleStatus.CANCELLED &&
+      sale.status !== SaleStatus.COMPLETED &&
+      sale.status !== SaleStatus.PENDING
+    ) {
+      throw new BadRequestException('Only completed or pending sales can be cancelled')
     }
 
     // ── Return Policy Check (refund only) ─────────
@@ -621,7 +658,7 @@ export const cancelOrRefundSale = async (
           medicineId: detail.medicineId,
           stockId: stockDetail.stockId,
           stockDetailId: stockDetail.id,
-          saleId: sale.id,
+          saleDetailId: detail.id,
           type: 'IN',
           reason: 'RETURN',
           quantity: detail.quantityPieces,

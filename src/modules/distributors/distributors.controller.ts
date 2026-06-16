@@ -81,7 +81,7 @@ export const updateDistributor = async (
   try {
     const distributor = await DistributorService.updateDistributor(
       parseUuid(req.params.distributor_uuid),
-      req.query as any,
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )

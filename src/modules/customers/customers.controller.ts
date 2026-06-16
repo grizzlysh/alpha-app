@@ -81,7 +81,7 @@ export const updateCustomer = async (
   try {
     const customer = await CustomerService.updateCustomer(
       parseUuid(req.params.customer_uuid),
-      req.query as any,
+      req.body,
       req.user!.pharmacyId!,
       req.user!.id
     )

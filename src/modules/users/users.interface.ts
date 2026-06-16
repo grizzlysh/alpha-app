@@ -142,6 +142,7 @@ export interface UserListItem {
   status: RecordStatus;
   placementCount: number;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface UserDetailItem extends UserListItem {

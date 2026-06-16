@@ -84,7 +84,7 @@ export const updateMedicineType = async (
   try {
     const medicine_type = await MedicineTypeService.updateMedicineType(
       parseUuid(req.params.medicine_type_uuid),
-      req.query as any,
+      req.body,
       req.user!.pharmacyId,
       req.user!.platformRole,
       req.user!.id

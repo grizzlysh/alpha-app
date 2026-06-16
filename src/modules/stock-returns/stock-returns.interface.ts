@@ -29,6 +29,7 @@ export interface CreateStockReturnDetailBody {
 export interface CreateStockReturnBody {
   distributorUuid: string
   signedByUuid?: string
+  reason?: string
   description?: string
   details: CreateStockReturnDetailBody[]
 }
@@ -36,11 +37,16 @@ export interface CreateStockReturnBody {
 export interface UpdateStockReturnBody {
   distributorUuid?: string
   signedByUuid?: string
+  reason?: string
   description?: string
   details?: CreateStockReturnDetailBody[]
 }
 
 export interface CancelStockReturnBody {
+  description: string
+}
+
+export interface RejectStockReturnBody {
   description: string
 }
 
@@ -84,6 +90,13 @@ export type CancelStockReturnRequest = Request<
   {}
 >
 
+export type RejectStockReturnRequest = Request<
+  StockReturnUuidParam,
+  {},
+  RejectStockReturnBody,
+  {}
+>
+
 export type DeleteStockReturnRequest = Request<
   StockReturnUuidParam,
   {}, {}, {}
@@ -95,6 +108,8 @@ export interface StockReturnDetailResponse {
   uuid: string
   quantityPieces: number
   quantityBox: number
+  price: string
+  totalAmount: string
   reason: string | null
   medicine: {
     uuid: string
@@ -119,8 +134,11 @@ export interface StockReturnResponse {
   uuid: string
   returnNumber: string
   status: StockReturnStatus
+  reason: string | null
   description: string | null
+  totalAmount: string
   cancellationReason: string | null
+  rejectionReason: string | null
   returnedAt: Date | null
   createdAt: Date
   updatedAt: Date

@@ -5,6 +5,7 @@ import {
   CreateStockReturnInput,
   UpdateStockReturnInput,
   CancelStockReturnInput,
+  RejectStockReturnInput,
   StockReturnQueryInput,
 } from './stock-returns.validation'
 import { StockReturnResponse } from './stock-returns.interface'
@@ -21,8 +22,11 @@ const stockReturnSelect = {
   uuid: true,
   returnNumber: true,
   status: true,
+  reason: true,
   description: true,
+  totalAmount: true,
   cancellationReason: true,
+  rejectionReason: true,
   returnedAt: true,
   createdAt: true,
   updatedAt: true,
@@ -37,6 +41,8 @@ const stockReturnSelect = {
       uuid: true,
       quantityPieces: true,
       quantityBox: true,
+      price: true,
+      totalAmount: true,
       reason: true,
       medicine: {
         select: { uuid: true, name: true, unit: true },
@@ -121,6 +127,9 @@ const resolveStockDetail = async (
       quantityPieces: true,
       quantityPerBox: true,
       stockId: true,
+      invoiceDetail: {
+        select: { finalPrice: true },
+      },
       stock: {
         select: {
           id: true,
@@ -144,6 +153,63 @@ const resolveStockDetail = async (
   }
 
   return stockDetail
+}
+
+const restoreStockForReturn = async (
+  stockReturnId: number,
+  pharmacyId: number,
+  userId: number,
+  tx: Prisma.TransactionClient
+): Promise<void> => {
+  const details = await tx.stockReturnDetail.findMany({
+    where: { stockReturnId },
+    select: {
+      id: true,
+      medicineId: true,
+      quantityPieces: true,
+      stockDetail: {
+        select: {
+          id: true,
+          stockId: true,
+          quantityPieces: true,
+          quantityPerBox: true,
+          stock: { select: { id: true, totalPieces: true } },
+        },
+      },
+    },
+  })
+
+  for (const d of details) {
+    const sd = d.stockDetail
+    const restoredQty = sd.quantityPieces + d.quantityPieces
+    await tx.stockDetail.update({
+      where: { id: sd.id },
+      data: {
+        quantityPieces: restoredQty,
+        quantityBox: Math.floor(restoredQty / sd.quantityPerBox),
+        updatedById: userId,
+      },
+    })
+    await tx.stock.update({
+      where: { id: sd.stockId },
+      data: { totalPieces: { increment: d.quantityPieces }, updatedById: userId },
+    })
+    await tx.stockMovement.create({
+      data: {
+        pharmacyId,
+        medicineId: d.medicineId,
+        stockId: sd.stockId,
+        stockDetailId: sd.id,
+        stockReturnDetailId: d.id,
+        type: 'IN',
+        reason: 'RETURN',
+        quantity: d.quantityPieces,
+        quantityBefore: sd.stock.totalPieces,
+        quantityAfter: sd.stock.totalPieces + d.quantityPieces,
+        createdById: userId,
+      },
+    })
+  }
 }
 
 // ── Services ──────────────────────────────────────────
@@ -264,44 +330,86 @@ export const createStockReturn = async (
       pharmacyCode: pharmacy.code,
     })
 
-    // resolve all details
-    const detailsData = await Promise.all(
-      data.details.map(async (detail) => {
-        const stockDetail = await resolveStockDetail(
-          detail.stockDetailUuid,
-          pharmacyId,
-          detail.quantityPieces,
-          tx
-        )
-
-        return {
-          stockDetailId: stockDetail.id,
-          medicineId: stockDetail.stock.medicineId,
-          quantityPieces: detail.quantityPieces,
-          quantityBox: Math.floor(
-            detail.quantityPieces / stockDetail.quantityPerBox
-          ),
-          reason: detail.reason,
-          createdById: userId,
-        }
-      })
-    )
-
-    return tx.stockReturn.create({
+    // Create header first so we have its ID for detail + movement linking
+    const stockReturn = await tx.stockReturn.create({
       data: {
         pharmacyId,
         distributorId: distributor.id,
         signedById,
         returnNumber,
-        status: StockReturnStatus.DRAFT,
+        status: StockReturnStatus.ON_PROCESS,
+        reason: data.reason,
         description: data.description,
+        totalAmount: 0,
         createdById: userId,
-        details: {
-          create: detailsData,
-        },
       },
       select: { id: true },
     })
+
+    // Create each detail sequentially: lock stock + create movement
+    let totalAmount = new Decimal(0)
+    for (const item of data.details) {
+      const sd = await resolveStockDetail(item.stockDetailUuid, pharmacyId, item.quantityPieces, tx)
+
+      const price = sd.invoiceDetail.finalPrice
+      const detailAmount = price.mul(item.quantityPieces)
+      totalAmount = totalAmount.add(detailAmount)
+
+      const quantityBefore = sd.stock.totalPieces
+      const quantityAfter = quantityBefore - item.quantityPieces
+      const newDetailQty = sd.quantityPieces - item.quantityPieces
+
+      const createdDetail = await tx.stockReturnDetail.create({
+        data: {
+          stockReturnId: stockReturn.id,
+          stockDetailId: sd.id,
+          medicineId: sd.stock.medicineId,
+          quantityPieces: item.quantityPieces,
+          quantityBox: Math.floor(item.quantityPieces / sd.quantityPerBox),
+          price,
+          totalAmount: detailAmount,
+          reason: item.reason,
+          createdById: userId,
+        },
+        select: { id: true },
+      })
+
+      await tx.stockDetail.update({
+        where: { id: sd.id },
+        data: {
+          quantityPieces: newDetailQty,
+          quantityBox: Math.floor(newDetailQty / sd.quantityPerBox),
+          updatedById: userId,
+        },
+      })
+      await tx.stock.update({
+        where: { id: sd.stockId },
+        data: { totalPieces: { decrement: item.quantityPieces }, updatedById: userId },
+      })
+      await tx.stockMovement.create({
+        data: {
+          pharmacyId,
+          medicineId: sd.stock.medicineId,
+          stockId: sd.stockId,
+          stockDetailId: sd.id,
+          stockReturnDetailId: createdDetail.id,
+          type: 'OUT',
+          reason: 'RETURN',
+          quantity: item.quantityPieces,
+          quantityBefore,
+          quantityAfter,
+          createdById: userId,
+        },
+      })
+    }
+
+    // Update header with final totalAmount
+    await tx.stockReturn.update({
+      where: { id: stockReturn.id },
+      data: { totalAmount: totalAmount.toDecimalPlaces(0, Decimal.ROUND_HALF_UP) },
+    })
+
+    return stockReturn
   }, { timeout: 10000, maxWait: 5000 }))
 
   const fullReturn = await prisma.stockReturn.findUnique({
@@ -326,8 +434,8 @@ export const updateStockReturn = async (
 
     if (!existing) throw new NotFoundException('Stock return not found')
 
-    if (existing.status !== StockReturnStatus.DRAFT) {
-      throw new BadRequestException('Stock return can only be edited in DRAFT status')
+    if (existing.status !== StockReturnStatus.ON_PROCESS) {
+      throw new BadRequestException('Stock return can only be edited in ON_PROCESS status')
     }
 
     let distributorId: number | undefined
@@ -346,33 +454,72 @@ export const updateStockReturn = async (
       signedById = signer.id
     }
 
-    let detailsCreate: any[] | undefined
+    let newTotalAmount: Decimal | undefined
     if (data.details) {
-      detailsCreate = await Promise.all(
-        data.details.map(async (detail) => {
-          const stockDetail = await tx.stockDetail.findFirst({
-            where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
-            select: {
-              id: true,
-              quantityPieces: true,
-              quantityPerBox: true,
-              stock: { select: { medicineId: true } },
-            },
-          })
-          if (!stockDetail) throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
-          if (stockDetail.quantityPieces < detail.quantityPieces) {
-            throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
-          }
-          return {
-            stockDetailId: stockDetail.id,
-            medicineId: stockDetail.stock.medicineId,
-            quantityPieces: detail.quantityPieces,
-            quantityBox: Math.floor(detail.quantityPieces / stockDetail.quantityPerBox),
-            reason: detail.reason,
+      // Restore stock for existing details
+      await restoreStockForReturn(existing.id, pharmacyId, userId, tx)
+
+      // Delete old details
+      await tx.stockReturnDetail.deleteMany({ where: { stockReturnId: existing.id } })
+
+      // Create new details sequentially: lock stock + create movement
+      newTotalAmount = new Decimal(0)
+      for (const item of data.details) {
+        const sd = await resolveStockDetail(item.stockDetailUuid, pharmacyId, item.quantityPieces, tx)
+
+        const price = sd.invoiceDetail.finalPrice
+        const detailAmount = price.mul(item.quantityPieces)
+        newTotalAmount = newTotalAmount.add(detailAmount)
+
+        const quantityBefore = sd.stock.totalPieces
+        const quantityAfter = quantityBefore - item.quantityPieces
+        const newDetailQty = sd.quantityPieces - item.quantityPieces
+
+        const createdDetail = await tx.stockReturnDetail.create({
+          data: {
+            stockReturnId: existing.id,
+            stockDetailId: sd.id,
+            medicineId: sd.stock.medicineId,
+            quantityPieces: item.quantityPieces,
+            quantityBox: Math.floor(item.quantityPieces / sd.quantityPerBox),
+            price,
+            totalAmount: detailAmount,
+            reason: item.reason,
             createdById: userId,
-          }
+          },
+          select: { id: true },
         })
-      )
+
+        await tx.stockDetail.update({
+          where: { id: sd.id },
+          data: {
+            quantityPieces: newDetailQty,
+            quantityBox: Math.floor(newDetailQty / sd.quantityPerBox),
+            updatedById: userId,
+          },
+        })
+        await tx.stock.update({
+          where: { id: sd.stockId },
+          data: { totalPieces: { decrement: item.quantityPieces }, updatedById: userId },
+        })
+        await tx.stockMovement.create({
+          data: {
+            pharmacyId,
+            medicineId: sd.stock.medicineId,
+            stockId: sd.stockId,
+            stockDetailId: sd.id,
+            stockReturnDetailId: createdDetail.id,
+            type: 'OUT',
+            reason: 'RETURN',
+            quantity: item.quantityPieces,
+            quantityBefore,
+            quantityAfter,
+            createdById: userId,
+          },
+        })
+      }
+
+      newTotalAmount = newTotalAmount.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
     }
 
     return tx.stockReturn.update({
@@ -380,11 +527,10 @@ export const updateStockReturn = async (
       data: {
         ...(distributorId && { distributorId }),
         ...(signedById && { signedById }),
+        ...(data.reason !== undefined && { reason: data.reason }),
         ...(data.description !== undefined && { description: data.description }),
+        ...(newTotalAmount !== undefined && { totalAmount: newTotalAmount }),
         updatedById: userId,
-        ...(detailsCreate && {
-          details: { deleteMany: {}, create: detailsCreate },
-        }),
       },
       select: stockReturnSelect,
     })
@@ -398,123 +544,61 @@ export const completeStockReturn = async (
   pharmacyId: number,
   userId: number
 ): Promise<StockReturnResponse> => {
-  const result = await prisma.$transaction(async (tx) => {
+  const existing = await prisma.stockReturn.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true, status: true, signedById: true },
+  })
 
-    const stockReturn = await tx.stockReturn.findFirst({
-      where: { uuid, pharmacyId, deletedAt: null },
-      select: {
-        id: true,
-        status: true,
-        signedById: true,
-        details: {
-          select: {
-            id: true,
-            quantityPieces: true,
-            quantityBox: true,
-            medicineId: true,
-            stockDetailId: true,
-            stockDetail: {
-              select: {
-                id: true,
-                stockId: true,
-                quantityPieces: true,
-                quantityPerBox: true,
-                stock: {
-                  select: { id: true, totalPieces: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    })
+  if (!existing) throw new NotFoundException('Stock return not found')
 
-    if (!stockReturn) throw new NotFoundException('Stock return not found')
+  if (existing.status !== StockReturnStatus.ON_PROCESS) {
+    throw new BadRequestException('Stock return can only be completed from ON_PROCESS status')
+  }
 
-    if (stockReturn.status !== StockReturnStatus.DRAFT) {
-      throw new BadRequestException(
-        'Stock return can only be completed from DRAFT status'
-      )
-    }
+  if (!existing.signedById) {
+    throw new BadRequestException('Stock return must be signed before completing')
+  }
 
-    if (!stockReturn.signedById) {
-      throw new BadRequestException(
-        'Stock return must be signed before completing'
-      )
-    }
-
-    // ── Deduct Stock per Detail ───────────────────
-    for (const detail of stockReturn.details) {
-      const stockDetail = detail.stockDetail
-      const quantityBefore = stockDetail.stock.totalPieces
-      const quantityAfter = quantityBefore - detail.quantityPieces
-
-      if (quantityAfter < 0) {
-        throw new BadRequestException(
-          `Insufficient stock for this return`
-        )
-      }
-
-      const newDetailQuantity =
-        stockDetail.quantityPieces - detail.quantityPieces
-
-      // update stock detail
-      await tx.stockDetail.update({
-        where: { id: stockDetail.id },
-        data: {
-          quantityPieces: newDetailQuantity,
-          quantityBox: Math.floor(
-            newDetailQuantity / stockDetail.quantityPerBox
-          ),
-          updatedById: userId,
-        },
-      })
-
-      // update stock header
-      await tx.stock.update({
-        where: { id: stockDetail.stockId },
-        data: {
-          totalPieces: { decrement: detail.quantityPieces },
-          updatedById: userId,
-        },
-      })
-
-      // create stock movement
-      await tx.stockMovement.create({
-        data: {
-          pharmacyId,
-          medicineId: detail.medicineId,
-          stockId: stockDetail.stockId,
-          stockDetailId: stockDetail.id,
-          stockReturnId: stockReturn.id,
-          type: 'OUT',
-          reason: 'RETURN',
-          quantity: detail.quantityPieces,
-          quantityBefore,
-          quantityAfter,
-          createdById: userId,
-        },
-      })
-    }
-
-    // ── Update Stock Return Status ────────────────
-    await tx.stockReturn.update({
-      where: { id: stockReturn.id },
-      data: {
-        status: StockReturnStatus.COMPLETED,
-        returnedAt: new Date(),
-        updatedById: userId,
-      },
-    })
-
-    return stockReturn.id
-  }, {
-    timeout: 10000,
-    maxWait: 5000,
+  await prisma.stockReturn.update({
+    where: { id: existing.id },
+    data: { status: StockReturnStatus.COMPLETED, returnedAt: new Date(), updatedById: userId },
   })
 
   const fullReturn = await prisma.stockReturn.findUnique({
-    where: { id: result },
+    where: { id: existing.id },
+    select: stockReturnSelect,
+  })
+
+  return fullReturn as unknown as StockReturnResponse
+}
+
+export const rejectStockReturn = async (
+  uuid: string,
+  data: RejectStockReturnInput,
+  pharmacyId: number,
+  userId: number
+): Promise<StockReturnResponse> => {
+  const existing = await prisma.stockReturn.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true, status: true },
+  })
+
+  if (!existing) throw new NotFoundException('Stock return not found')
+
+  if (existing.status !== StockReturnStatus.ON_PROCESS) {
+    throw new BadRequestException('Stock return can only be rejected while ON_PROCESS')
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await restoreStockForReturn(existing.id, pharmacyId, userId, tx)
+    await tx.stockReturn.update({
+      where: { id: existing.id },
+      data: { status: StockReturnStatus.REJECTED, rejectionReason: data.description, updatedById: userId },
+    })
+  }, { timeout: 10000, maxWait: 5000 })
+
+  const fullReturn = await prisma.stockReturn.findUnique({
+    where: { id: existing.id },
     select: stockReturnSelect,
   })
 
@@ -527,110 +611,27 @@ export const cancelStockReturn = async (
   pharmacyId: number,
   userId: number
 ): Promise<StockReturnResponse> => {
-  const result = await prisma.$transaction(async (tx) => {
-
-    const stockReturn = await tx.stockReturn.findFirst({
-      where: { uuid, pharmacyId, deletedAt: null },
-      select: {
-        id: true,
-        status: true,
-        details: {
-          select: {
-            id: true,
-            quantityPieces: true,
-            medicineId: true,
-            stockDetailId: true,
-            stockDetail: {
-              select: {
-                id: true,
-                stockId: true,
-                quantityPieces: true,
-                quantityPerBox: true,
-                stock: {
-                  select: { id: true, totalPieces: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    })
-
-    if (!stockReturn) throw new NotFoundException('Stock return not found')
-
-    if (stockReturn.status === StockReturnStatus.CANCELLED) {
-      throw new BadRequestException('Stock return is already cancelled')
-    }
-
-    // ── Restore Stock if COMPLETED ────────────────
-    if (stockReturn.status === StockReturnStatus.COMPLETED) {
-      for (const detail of stockReturn.details) {
-        const stockDetail = detail.stockDetail
-        const quantityBefore = stockDetail.stock.totalPieces
-        const quantityAfter = quantityBefore + detail.quantityPieces
-
-        const newDetailQuantity =
-          stockDetail.quantityPieces + detail.quantityPieces
-
-        // restore stock detail
-        await tx.stockDetail.update({
-          where: { id: stockDetail.id },
-          data: {
-            quantityPieces: newDetailQuantity,
-            quantityBox: Math.floor(
-              newDetailQuantity / stockDetail.quantityPerBox
-            ),
-            updatedById: userId,
-          },
-        })
-
-        // restore stock header
-        await tx.stock.update({
-          where: { id: stockDetail.stockId },
-          data: {
-            totalPieces: { increment: detail.quantityPieces },
-            updatedById: userId,
-          },
-        })
-
-        // create stock movement (IN, RETURN — restore)
-        await tx.stockMovement.create({
-          data: {
-            pharmacyId,
-            medicineId: detail.medicineId,
-            stockId: stockDetail.stockId,
-            stockDetailId: stockDetail.id,
-            stockReturnId: stockReturn.id,
-            type: 'IN',
-            reason: 'RETURN',
-            quantity: detail.quantityPieces,
-            quantityBefore,
-            quantityAfter,
-            description: data.description,
-            createdById: userId,
-          },
-        })
-      }
-    }
-
-    // ── Update Status ─────────────────────────────
-    await tx.stockReturn.update({
-      where: { id: stockReturn.id },
-      data: {
-        status: StockReturnStatus.CANCELLED,
-        cancellationReason: data.description,
-        updatedById: userId,
-      },
-    })
-
-    return stockReturn.id
-  }, {
-    timeout: 10000,
-    maxWait: 5000,
+  const existing = await prisma.stockReturn.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true, status: true },
   })
 
+  if (!existing) throw new NotFoundException('Stock return not found')
+
+  if (existing.status !== StockReturnStatus.ON_PROCESS) {
+    throw new BadRequestException('Stock return can only be cancelled while ON_PROCESS')
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await restoreStockForReturn(existing.id, pharmacyId, userId, tx)
+    await tx.stockReturn.update({
+      where: { id: existing.id },
+      data: { status: StockReturnStatus.CANCELLED, cancellationReason: data.description, updatedById: userId },
+    })
+  }, { timeout: 10000, maxWait: 5000 })
+
   const fullReturn = await prisma.stockReturn.findUnique({
-    where: { id: result },
+    where: { id: existing.id },
     select: stockReturnSelect,
   })
 
@@ -649,17 +650,15 @@ export const deleteStockReturn = async (
 
   if (!existing) throw new NotFoundException('Stock return not found')
 
-  if (existing.status !== StockReturnStatus.DRAFT) {
-    throw new BadRequestException(
-      'Only DRAFT stock returns can be deleted'
-    )
+  if (existing.status !== StockReturnStatus.ON_PROCESS) {
+    throw new BadRequestException('Only ON_PROCESS stock returns can be deleted')
   }
 
-  await prisma.stockReturn.update({
-    where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    },
-  })
+  await prisma.$transaction(async (tx) => {
+    await restoreStockForReturn(existing.id, pharmacyId, userId, tx)
+    await tx.stockReturn.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), deletedById: userId },
+    })
+  }, { timeout: 10000, maxWait: 5000 })
 }

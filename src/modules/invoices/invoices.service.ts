@@ -2,6 +2,7 @@ import { PaymentStatus, PurchaseOrderStatus } from '@prisma/client'
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import { withDocNumberRetry } from '@utils/generateDocNumbers'
+import { generateBarcode } from '@utils/generateBarcode'
 import { AddPaymentInput, CreateInvoiceInput, InvoiceQueryInput, UpdatePaymentHistoryInput } from './invoices.validation'
 import { InvoicePaymentResponse, InvoiceResponse } from './invoices.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
@@ -51,6 +52,9 @@ const invoiceSelect = {
       totalAmount: true,
       medicine: {
         select: { uuid: true, name: true, unit: true },
+      },
+      stockDetail: {
+        select: { uuid: true, quantityPieces: true },
       },
     },
   },
@@ -489,6 +493,7 @@ export const createInvoice = async (
           distributorId: distributor.id,
           invoiceDetailId: detail.id,
           batchNumber: detail.batchNumber,
+          barcode: generateBarcode(),
           expiryDate: detail.expiryDate,
           quantityPieces: detail.quantityPieces,
           quantityBox: detail.quantityBox,

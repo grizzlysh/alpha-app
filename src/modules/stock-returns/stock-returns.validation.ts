@@ -10,6 +10,7 @@ export const createStockReturnDetailSchema = z.object({
 export const createStockReturnSchema = z.object({
   distributorUuid: z.string().trim().uuid({ message: 'Invalid distributor UUID' }),
   signedByUuid: z.string().trim().uuid().optional(),
+  reason: z.string().trim().optional(),
   description: z.string().trim().optional(),
   details: z
     .array(createStockReturnDetailSchema)
@@ -19,12 +20,17 @@ export const createStockReturnSchema = z.object({
 export const updateStockReturnSchema = z.object({
   distributorUuid: z.string().trim().uuid().optional(),
   signedByUuid: z.string().trim().uuid().optional(),
+  reason: z.string().trim().optional(),
   description: z.string().trim().optional(),
   details: z.array(createStockReturnDetailSchema).min(1).optional(),
 })
 
 export const cancelStockReturnSchema = z.object({
   description: z.string().trim().min(1, { message: 'Description is required' }),
+})
+
+export const rejectStockReturnSchema = z.object({
+  description: z.string().trim().min(1, { message: 'Rejection reason is required' }),
 })
 
 export const stockReturnQuerySchema = z.object({
@@ -45,4 +51,5 @@ export const stockReturnQuerySchema = z.object({
 export type CreateStockReturnInput = z.infer<typeof createStockReturnSchema>
 export type UpdateStockReturnInput = z.infer<typeof updateStockReturnSchema>
 export type CancelStockReturnInput = z.infer<typeof cancelStockReturnSchema>
+export type RejectStockReturnInput = z.infer<typeof rejectStockReturnSchema>
 export type StockReturnQueryInput = z.infer<typeof stockReturnQuerySchema>

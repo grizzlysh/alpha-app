@@ -40,6 +40,9 @@ export const PERMISSIONS = {
   STOCK_READ: 'stock.read',
   STOCK_ADJUST: 'stock.adjust',
 
+  // stock movements
+  STOCK_MOVEMENTS_READ: 'stock_movements.read',
+
   // purchase orders
   PURCHASE_ORDERS_READ: 'purchase_orders.read',
   PURCHASE_ORDERS_CREATE: 'purchase_orders.create',

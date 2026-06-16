@@ -1,6 +1,8 @@
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import {
+  StockDetailQueryInput,
+  StockCatalogQueryInput,
   StockQueryInput,
   StockMovementQueryInput,
   UpdatePriceInput,
@@ -8,6 +10,7 @@ import {
   AdjustStockInput,
 } from './stock.validation'
 import {
+  StockDetailSearchResponse,
   StockResponse,
   StockAlertResponse,
   StockMovementResponse,
@@ -67,6 +70,7 @@ const stockSelect = {
   calculatedPrice: true,
   sellingPrice: true,
   isManualPrice: true,
+  createdAt: true,
   updatedAt: true,
   medicine: {
     select: {
@@ -101,6 +105,165 @@ const formatStock = (stock: any, lowStockThreshold: number = 0): StockResponse =
 })
 
 // ── Services ──────────────────────────────────────────
+
+export const searchStockDetails = async (
+  pharmacyId: number,
+  query: StockDetailQueryInput
+): Promise<StockDetailSearchResponse[]> => {
+  const { search } = query
+
+  const where: any = {
+    stock: { pharmacyId },
+    quantityPieces: { gt: 0 },
+    ...(search && {
+      OR: [
+        { stock: { medicine: { name: { contains: search, mode: 'insensitive' } } } },
+        { barcode: { contains: search, mode: 'insensitive' } },
+      ],
+    }),
+  }
+
+  const details = await prisma.stockDetail.findMany({
+    where,
+    select: {
+      uuid: true,
+      barcode: true,
+      batchNumber: true,
+      expiryDate: true,
+      quantityPieces: true,
+      quantityBox: true,
+      quantityPerBox: true,
+      distributor: { select: { uuid: true, name: true } },
+      stock: {
+        select: {
+          uuid: true,
+          calculatedPrice: true,
+          sellingPrice: true,
+          medicine: {
+            select: {
+              uuid: true,
+              name: true,
+              unit: true,
+              shape: { select: { name: true } },
+              type: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [
+      { stock: { medicine: { name: 'asc' } } },
+      { expiryDate: 'asc' },
+    ],
+    take: 20,
+  })
+
+  return details.map((d) => ({
+    uuid: d.uuid,
+    barcode: d.barcode,
+    batchNumber: d.batchNumber,
+    expiryDate: d.expiryDate,
+    quantityPieces: d.quantityPieces,
+    quantityBox: d.quantityBox,
+    quantityPerBox: d.quantityPerBox,
+    distributor: d.distributor,
+    stock: {
+      uuid: d.stock.uuid,
+      effectiveSellingPrice: getEffectiveSellingPrice(d.stock.sellingPrice, d.stock.calculatedPrice),
+    },
+    medicine: d.stock.medicine,
+  }))
+}
+
+export const getStockCatalog = async (
+  pharmacyId: number,
+  query: StockCatalogQueryInput
+): Promise<{ data: StockDetailSearchResponse[]; meta: PaginationMeta }> => {
+  const { search, medicineTypeUuid, page, limit } = query
+
+  const skip = (page - 1) * limit
+
+  const where: any = {
+    stock: {
+      pharmacyId,
+      ...(medicineTypeUuid && { medicine: { type: { uuid: medicineTypeUuid } } }),
+    },
+    quantityPieces: { gt: 0 },
+    expiryDate: { gt: new Date() },
+    ...(search && {
+      OR: [
+        { stock: { medicine: { name: { contains: search, mode: 'insensitive' } } } },
+        { barcode: { contains: search, mode: 'insensitive' } },
+      ],
+    }),
+  }
+
+  const select = {
+    uuid: true,
+    barcode: true,
+    batchNumber: true,
+    expiryDate: true,
+    quantityPieces: true,
+    quantityBox: true,
+    quantityPerBox: true,
+    distributor: { select: { uuid: true, name: true } },
+    stock: {
+      select: {
+        uuid: true,
+        calculatedPrice: true,
+        sellingPrice: true,
+        medicine: {
+          select: {
+            uuid: true,
+            name: true,
+            unit: true,
+            shape: { select: { name: true } },
+            type: { select: { name: true } },
+          },
+        },
+      },
+    },
+  }
+
+  const [details, total] = await prisma.$transaction([
+    prisma.stockDetail.findMany({
+      where,
+      select,
+      orderBy: [
+        { stock: { medicine: { name: 'asc' } } },
+        { expiryDate: 'asc' },
+      ],
+      skip,
+      take: limit,
+    }),
+    prisma.stockDetail.count({ where }),
+  ])
+
+  const meta: PaginationMeta = {
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  }
+
+  const data = details.map((d) => ({
+    uuid: d.uuid,
+    barcode: d.barcode,
+    batchNumber: d.batchNumber,
+    expiryDate: d.expiryDate,
+    quantityPieces: d.quantityPieces,
+    quantityBox: d.quantityBox,
+    quantityPerBox: d.quantityPerBox,
+    distributor: d.distributor,
+    stock: {
+      uuid: d.stock.uuid,
+      effectiveSellingPrice: getEffectiveSellingPrice(d.stock.sellingPrice, d.stock.calculatedPrice),
+    },
+    medicine: d.stock.medicine,
+  }))
+
+  return { data, meta }
+}
 
 export const getStocks = async (
   pharmacyId: number,
@@ -299,14 +462,14 @@ export const getStockMovements = async (
             invoice: { select: { invoiceNumber: true } },
           },
         },
-        sale: {
-          select: { uuid: true, saleNumber: true },
+        saleDetail: {
+          select: { uuid: true, sale: { select: { uuid: true, saleNumber: true } } },
         },
-        stockReturn: {
-          select: { uuid: true, returnNumber: true },
+        stockReturnDetail: {
+          select: { uuid: true, stockReturn: { select: { uuid: true, returnNumber: true } } },
         },
-        stockDisposal: {
-          select: { uuid: true, disposalNumber: true },
+        stockDisposalDetail: {
+          select: { uuid: true, stockDisposal: { select: { uuid: true, disposalNumber: true } } },
         },
       },
       orderBy: { createdAt: sortOrder },

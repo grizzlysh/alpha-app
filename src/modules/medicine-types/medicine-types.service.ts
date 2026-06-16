@@ -16,6 +16,7 @@ import { PaginationMeta } from '@interfaces/common.interface'
 const medicineTypeSelect = {
   uuid: true,
   name: true,
+  requiredPrescription: true,
   pharmacyId: true,
   status: true,
   createdAt: true,
@@ -25,6 +26,7 @@ const medicineTypeSelect = {
 const formatResponse = (medicine_type: Prisma.MedicineTypeGetPayload<{ select: typeof medicineTypeSelect }>): MedicineTypeResponse => ({
   uuid: medicine_type.uuid,
   name: medicine_type.name,
+  requiredPrescription: medicine_type.requiredPrescription,
   isGlobal: medicine_type.pharmacyId === null,
   status: medicine_type.status,
   createdAt: medicine_type.createdAt,
@@ -200,6 +202,7 @@ export const createMedicineType = async (
   const medicine_type = await prisma.medicineType.create({
     data: {
       name: data.name,
+      requiredPrescription: data.requiredPrescription,
       status: data.status,
       pharmacyId: resolvedPharmacyId,
       createdById: userId,
@@ -297,9 +300,9 @@ export const getMedicineTypesDropdown = async (
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, pharmacyId: true },
+    select: { uuid: true, name: true, requiredPrescription: true, pharmacyId: true },
     orderBy: { name: 'asc' },
   })
 
-  return rows.map(r => ({ uuid: r.uuid, name: r.name, isGlobal: r.pharmacyId === null }))
+  return rows.map(r => ({ uuid: r.uuid, name: r.name, requiredPrescription: r.requiredPrescription, isGlobal: r.pharmacyId === null }))
 }
