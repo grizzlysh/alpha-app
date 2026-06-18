@@ -801,6 +801,16 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Laporan retur berhasil diambil',
   },
 
+  // ─── Dashboard ─────────────────────────────────────────────────────────────
+  DASHBOARD_FETCHED: {
+    en: 'Dashboard data fetched successfully',
+    id: 'Data dashboard berhasil diambil',
+  },
+  DASHBOARD_ADVANCED_FETCHED: {
+    en: 'Advanced dashboard data fetched successfully',
+    id: 'Data dashboard lanjutan berhasil diambil',
+  },
+
   // ─── Pharmacies ────────────────────────────────────────────────────────────
   PHARMACIES_FETCHED: {
     en: 'Pharmacies fetched successfully',

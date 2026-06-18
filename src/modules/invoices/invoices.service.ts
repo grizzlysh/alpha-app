@@ -21,6 +21,8 @@ const invoiceSelect = {
   dueDate: true,
   receiveDate: true,
   totalAmount: true,
+  discountPercentage: true,
+  discountAmount: true,
   ppnPercentage: true,
   ppnAmount: true,
   grandTotal: true,
@@ -84,6 +86,8 @@ const toNum = (v: Decimal | number) => parseFloat(v.toString())
 const formatInvoice = (invoice: any): InvoiceResponse => ({
   ...invoice,
   totalAmount: toNum(invoice.totalAmount),
+  discountPercentage: toNum(invoice.discountPercentage),
+  discountAmount: toNum(invoice.discountAmount),
   ppnPercentage: toNum(invoice.ppnPercentage),
   ppnAmount: toNum(invoice.ppnAmount),
   grandTotal: toNum(invoice.grandTotal),
@@ -390,9 +394,12 @@ export const createInvoice = async (
       (sum, d) => sum + parseFloat(d.totalAmount.toString()),
       0
     )
+    const headerDiscountPct = data.discountPercentage ?? 0
+    const discountAmount = (totalAmount * headerDiscountPct) / 100
+    const netAmount = totalAmount - discountAmount
     const ppnPercentage = data.ppnPercentage ?? 0
-    const ppnAmount = (totalAmount * ppnPercentage) / 100
-    const grandTotal = totalAmount + ppnAmount
+    const ppnAmount = (netAmount * ppnPercentage) / 100
+    const grandTotal = netAmount + ppnAmount
 
     // ── Create Invoice + Details ──────────────────
     const invoice = await tx.invoice.create({
@@ -406,6 +413,8 @@ export const createInvoice = async (
         dueDate: new Date(data.dueDate),
         receiveDate: new Date(data.receiveDate),
         totalAmount: round(totalAmount, 2),
+        discountPercentage: round(headerDiscountPct, 2),
+        discountAmount: round(discountAmount, 2),
         ppnPercentage: round(ppnPercentage, 2),
         ppnAmount: round(ppnAmount, 0),
         grandTotal: round(grandTotal, 0),

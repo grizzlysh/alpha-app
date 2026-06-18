@@ -20,6 +20,7 @@ export const createInvoiceSchema = z.object({
   invoiceDate: z.string().trim().min(1, { message: 'Invoice date is required' }),
   dueDate: z.string().trim().min(1, { message: 'Due date is required' }),
   receiveDate: z.string().trim().min(1, { message: 'Receive date is required' }),
+  discountPercentage: z.number().min(0).max(100).optional().default(0),
   ppnPercentage: z.number().min(0).max(100).optional().default(0),
   description: z.string().trim().optional(),
   details: z

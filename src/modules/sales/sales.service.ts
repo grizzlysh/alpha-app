@@ -23,9 +23,12 @@ const saleSelect = {
   saleType: true,
   status: true,
   totalAmount: true,
+  discountPercentage: true,
+  discountAmount: true,
+  ppnPercentage: true,
+  ppnAmount: true,
+  grandTotal: true,
   paidAmount: true,
-  taxPercentage: true,
-  taxAmount: true,
   dueDate: true,
   description: true,
   soldAt: true,
@@ -39,7 +42,8 @@ const saleSelect = {
       quantityPieces: true,
       quantityBox: true,
       sellingPrice: true,
-      discount: true,
+      discountPercentage: true,
+      discountAmount: true,
       totalAmount: true,
       isFefoOverride: true,
       medicine: {
@@ -76,7 +80,8 @@ type SaleDetailDraft = {
   quantityPieces: number
   quantityBox: number
   sellingPrice: Decimal
-  discount: Decimal
+  discountPercentage: Decimal
+  discountAmount: Decimal
   totalAmount: Decimal
   isFefoOverride: boolean
   createdById: number
@@ -91,13 +96,17 @@ type SaleDetailDraft = {
 const formatSale = (sale: Prisma.SaleGetPayload<{ select: typeof saleSelect }>): SaleResponse => ({
   ...sale,
   totalAmount: parseFloat(sale.totalAmount.toString()),
+  discountPercentage: parseFloat(sale.discountPercentage.toString()),
+  discountAmount: parseFloat(sale.discountAmount.toString()),
+  ppnPercentage: parseFloat(sale.ppnPercentage.toString()),
+  ppnAmount: parseFloat(sale.ppnAmount.toString()),
+  grandTotal: parseFloat(sale.grandTotal.toString()),
   paidAmount: parseFloat(sale.paidAmount.toString()),
-  taxPercentage: parseFloat(sale.taxPercentage.toString()),
-  taxAmount: parseFloat(sale.taxAmount.toString()),
   details: sale.details.map((d) => ({
     ...d,
     sellingPrice: parseFloat(d.sellingPrice.toString()),
-    discount: parseFloat(d.discount.toString()),
+    discountPercentage: parseFloat(d.discountPercentage.toString()),
+    discountAmount: parseFloat(d.discountAmount.toString()),
     totalAmount: parseFloat(d.totalAmount.toString()),
   })),
   payment: sale.payment
@@ -244,7 +253,7 @@ export const createSale = async (
       select: { value: true },
     }),
     prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'TAX_PERCENTAGE' } },
+      where: { pharmacyId_key: { pharmacyId, key: 'PPN_PERCENTAGE_SELL' } },
       select: { value: true },
     }),
     prisma.businessParameter.findUnique({
@@ -262,7 +271,7 @@ export const createSale = async (
   ])
 
   const allowExpiredSale = allowExpiredParam?.value === 'true'
-  const taxPercentage = parseFloat(taxParam?.value ?? '0')
+  const ppnPercentage = parseFloat(taxParam?.value ?? '0')
   const maxDiscountPct = parseFloat(maxDiscountParam?.value ?? '100')
   const allowFefoOverride = allowFefoParam?.value !== 'false'
   const creditPaymentDays = parseInt(creditDaysParam?.value ?? '30', 10)
@@ -307,9 +316,9 @@ export const createSale = async (
 
     for (const detail of data.details) {
       // validate discount cap
-      if (detail.discount > maxDiscountPct) {
+      if (detail.discountPercentage > maxDiscountPct) {
         throw new BadRequestException(
-          `Discount ${detail.discount}% exceeds maximum allowed ${maxDiscountPct}%`
+          `Discount ${detail.discountPercentage}% exceeds maximum allowed ${maxDiscountPct}%`
         )
       }
 
@@ -359,7 +368,7 @@ export const createSale = async (
       const basePrice = parseFloat(
         (stockDetail.stock.sellingPrice ?? stockDetail.stock.calculatedPrice).toString()
       )
-      const discountAmount = (basePrice * detail.discount) / 100
+      const discountAmount = (basePrice * detail.discountPercentage) / 100
       const sellingPrice = basePrice - discountAmount
       const itemTotal = sellingPrice * detail.quantityPieces
       subtotal += itemTotal
@@ -372,7 +381,8 @@ export const createSale = async (
         quantityPieces: detail.quantityPieces,
         quantityBox,
         sellingPrice: new Decimal(sellingPrice.toFixed(2)),
-        discount: new Decimal(detail.discount.toFixed(2)),
+        discountPercentage: new Decimal(detail.discountPercentage.toFixed(2)),
+        discountAmount: new Decimal(discountAmount.toFixed(2)),
         totalAmount: new Decimal(itemTotal.toFixed(2)),
         isFefoOverride: detail.isFefoOverride ?? false,
         createdById: userId,
@@ -385,9 +395,13 @@ export const createSale = async (
       })
     }
 
-    // ── Compute Tax ───────────────────────────────
-    const taxAmount = (subtotal * taxPercentage) / 100
-    const totalAmount = subtotal + taxAmount
+    // ── Compute Header Discount & PPN ────────────
+    const headerDiscountPct = data.discountPercentage ?? 0
+    const discountAmount = (subtotal * headerDiscountPct) / 100
+    const netAmount = subtotal - discountAmount
+    const ppnAmount = (netAmount * ppnPercentage) / 100
+    const grandTotal = netAmount + ppnAmount
+    const totalAmount = subtotal
 
     // ── Compute Due Date for Credit ───────────────
     const soldAt = new Date()
@@ -406,11 +420,14 @@ export const createSale = async (
         saleType: data.saleType ?? SaleType.CASH,
         status: data.isPending ? SaleStatus.PENDING : SaleStatus.COMPLETED,
         totalAmount: new Decimal(totalAmount.toFixed(2)),
+        discountPercentage: new Decimal(headerDiscountPct.toFixed(2)),
+        discountAmount: new Decimal(discountAmount.toFixed(2)),
+        ppnPercentage: new Decimal(ppnPercentage.toFixed(2)),
+        ppnAmount: new Decimal(ppnAmount.toFixed(2)),
+        grandTotal: new Decimal(grandTotal.toFixed(2)),
         paidAmount: data.saleType === SaleType.CASH
-          ? new Decimal(totalAmount.toFixed(2))
+          ? new Decimal(grandTotal.toFixed(2))
           : new Decimal(0),
-        taxPercentage: new Decimal(taxPercentage.toFixed(2)),
-        taxAmount: new Decimal(taxAmount.toFixed(2)),
         dueDate,
         soldAt,
         description: data.description,
@@ -485,9 +502,9 @@ export const createSale = async (
     await tx.salePayment.create({
       data: {
         saleId: sale.id,
-        totalAmount: new Decimal(totalAmount.toFixed(2)),
+        totalAmount: new Decimal(grandTotal.toFixed(2)),
         paidAmount: data.saleType === SaleType.CASH
-          ? new Decimal(totalAmount.toFixed(2))
+          ? new Decimal(grandTotal.toFixed(2))
           : new Decimal(0),
         paymentStatus: data.saleType === SaleType.CASH
           ? PaymentStatus.PAID

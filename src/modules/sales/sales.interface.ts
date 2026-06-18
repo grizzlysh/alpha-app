@@ -30,6 +30,7 @@ export interface SalePaymentHistoryUuidParam extends ParamsDictionary {
 export interface CreateSaleDetailBody {
   stockDetailUuid: string
   quantityPieces: number
+  discountPercentage?: number
   isFefoOverride?: boolean
 }
 
@@ -41,6 +42,7 @@ export interface CreateSalePaymentBody {
 export interface CreateSaleBody {
   customerUuid?: string
   saleType?: SaleType
+  discountPercentage?: number
   description?: string
   isPending?: boolean
   details: CreateSaleDetailBody[]
@@ -128,7 +130,8 @@ export interface SaleDetailResponse {
   quantityPieces: number
   quantityBox: number
   sellingPrice: number
-  discount: number
+  discountPercentage: number
+  discountAmount: number
   totalAmount: number
   isFefoOverride: boolean
   medicine: {
@@ -165,9 +168,12 @@ export interface SaleResponse {
   saleType: SaleType
   status: SaleStatus
   totalAmount: number
+  discountPercentage: number
+  discountAmount: number
+  ppnPercentage: number
+  ppnAmount: number
+  grandTotal: number
   paidAmount: number
-  taxPercentage: number
-  taxAmount: number
   dueDate: Date | null
   description: string | null
   soldAt: Date

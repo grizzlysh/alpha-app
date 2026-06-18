@@ -29,6 +29,7 @@ import businessParameterRoutes from '@modules/business-parameters/business-param
 import { meRouter, userRouter } from '@modules/users/users.routes'
 import stockMovementRoutes from '@modules/stock-movements/stock-movements.routes'
 import reportRoutes from '@modules/reports/reports.routes'
+import dashboardRoutes from '@modules/dashboard/dashboard.routes'
 
 
 
@@ -80,6 +81,7 @@ app.use('/api/stock-disposals', stockDisposalRoutes)
 app.use('/api/sales', salesRoutes)
 app.use('/api/stock-movements', stockMovementRoutes)
 app.use('/api/reports', reportRoutes)
+app.use('/api/dashboard', dashboardRoutes)
 
 // ── Health Check ─────────────────────────────
 app.get('/', (req: Request, res: Response): void => {

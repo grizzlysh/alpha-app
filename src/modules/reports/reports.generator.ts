@@ -70,9 +70,12 @@ const salesColumns: ExportColumn<SalesExportRow>[] = [
   { header: 'Customer',       key: 'customerName',   width: 25 },
   { header: 'Type',           key: 'saleType',       width: 12 },
   { header: 'Status',         key: 'status',         width: 14 },
-  { header: 'Total Amount',   key: 'totalAmount',    width: 16 },
-  { header: 'Tax Amount',     key: 'taxAmount',      width: 14 },
-  { header: 'Paid Amount',    key: 'paidAmount',     width: 14 },
+  { header: 'Subtotal',         key: 'totalAmount',        width: 16 },
+  { header: 'Discount %',       key: 'discountPercentage', width: 12 },
+  { header: 'Discount Amount',  key: 'discountAmount',     width: 16 },
+  { header: 'PPN Amount',       key: 'ppnAmount',          width: 14 },
+  { header: 'Grand Total',      key: 'grandTotal',         width: 16 },
+  { header: 'Paid Amount',      key: 'paidAmount',         width: 14 },
   { header: 'Payment Status', key: 'paymentStatus',  width: 16 },
 ]
 

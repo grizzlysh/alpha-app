@@ -3,14 +3,13 @@ import {
   PlatformRole,
   AppRole,
   PharmacyCategory,
-  RecordStatus,
+  RecordStatus, // ACTIVE | INACTIVE (DELETED removed)
   DataType,
   PurchaseOrderStatus,
   PaymentStatus,
   PaymentMethod,
   SaleStatus,
   SaleType,
-  SignAuthority,
 } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -20,102 +19,105 @@ const prisma = new PrismaClient()
 // ── Permission Definitions ────────────────────────────────────────────────────
 
 const PERMISSIONS = [
-  { module: 'medicine_shapes', action: 'view' },
+  { module: 'medicine_shapes', action: 'read' },
   { module: 'medicine_shapes', action: 'create' },
-  { module: 'medicine_shapes', action: 'edit' },
+  { module: 'medicine_shapes', action: 'update' },
   { module: 'medicine_shapes', action: 'delete' },
-  { module: 'medicine_types', action: 'view' },
+  { module: 'medicine_types', action: 'read' },
   { module: 'medicine_types', action: 'create' },
-  { module: 'medicine_types', action: 'edit' },
+  { module: 'medicine_types', action: 'update' },
   { module: 'medicine_types', action: 'delete' },
-  { module: 'medicine_classes', action: 'view' },
+  { module: 'medicine_classes', action: 'read' },
   { module: 'medicine_classes', action: 'create' },
-  { module: 'medicine_classes', action: 'edit' },
+  { module: 'medicine_classes', action: 'update' },
   { module: 'medicine_classes', action: 'delete' },
-  { module: 'medicines', action: 'view' },
+  { module: 'medicines', action: 'read' },
   { module: 'medicines', action: 'create' },
-  { module: 'medicines', action: 'edit' },
+  { module: 'medicines', action: 'update' },
   { module: 'medicines', action: 'delete' },
-  { module: 'distributors', action: 'view' },
+  { module: 'distributors', action: 'read' },
   { module: 'distributors', action: 'create' },
-  { module: 'distributors', action: 'edit' },
+  { module: 'distributors', action: 'update' },
   { module: 'distributors', action: 'delete' },
-  { module: 'customers', action: 'view' },
+  { module: 'customers', action: 'read' },
   { module: 'customers', action: 'create' },
-  { module: 'customers', action: 'edit' },
+  { module: 'customers', action: 'update' },
   { module: 'customers', action: 'delete' },
-  { module: 'stock', action: 'view' },
+  { module: 'stock', action: 'read' },
   { module: 'stock', action: 'adjust' },
-  { module: 'purchase_orders', action: 'view' },
+  { module: 'purchase_orders', action: 'read' },
   { module: 'purchase_orders', action: 'create' },
-  { module: 'purchase_orders', action: 'edit' },
+  { module: 'purchase_orders', action: 'update' },
   { module: 'purchase_orders', action: 'delete' },
-  { module: 'invoices', action: 'view' },
+  { module: 'invoices', action: 'read' },
   { module: 'invoices', action: 'create' },
-  { module: 'invoices', action: 'edit' },
+  { module: 'invoices', action: 'update' },
   { module: 'invoices', action: 'delete' },
   { module: 'invoices', action: 'verify' },
-  { module: 'sales', action: 'view' },
+  { module: 'sales', action: 'read' },
   { module: 'sales', action: 'create' },
-  { module: 'sales', action: 'edit' },
+  { module: 'sales', action: 'update' },
   { module: 'sales', action: 'delete' },
-  { module: 'stock_return', action: 'view' },
+  { module: 'stock_return', action: 'read' },
   { module: 'stock_return', action: 'create' },
-  { module: 'stock_return', action: 'edit' },
+  { module: 'stock_return', action: 'update' },
   { module: 'stock_return', action: 'delete' },
-  { module: 'stock_disposal', action: 'view' },
+  { module: 'stock_disposal', action: 'read' },
   { module: 'stock_disposal', action: 'create' },
-  { module: 'stock_disposal', action: 'edit' },
-  { module: 'reports', action: 'view' },
+  { module: 'stock_disposal', action: 'update' },
+  { module: 'reports', action: 'read' },
   { module: 'reports', action: 'export' },
-  { module: 'users', action: 'view' },
+  { module: 'users', action: 'read' },
   { module: 'users', action: 'create' },
-  { module: 'users', action: 'edit' },
+  { module: 'users', action: 'update' },
   { module: 'users', action: 'delete' },
-  { module: 'permissions', action: 'view' },
-  { module: 'roles', action: 'view' },
+  { module: 'permissions', action: 'read' },
+  { module: 'roles', action: 'read' },
   { module: 'roles', action: 'create' },
-  { module: 'roles', action: 'edit' },
+  { module: 'roles', action: 'update' },
   { module: 'roles', action: 'delete' },
-  { module: 'licenses', action: 'view' },
+  { module: 'licenses', action: 'read' },
   { module: 'licenses', action: 'create' },
-  { module: 'licenses', action: 'edit' },
+  { module: 'licenses', action: 'update' },
   { module: 'licenses', action: 'delete' },
-  { module: 'pharmacies', action: 'view' },
+  { module: 'pharmacies', action: 'read' },
   { module: 'pharmacies', action: 'create' },
-  { module: 'pharmacies', action: 'edit' },
+  { module: 'pharmacies', action: 'update' },
   { module: 'pharmacies', action: 'delete' },
-  { module: 'business_parameters', action: 'view' },
-  { module: 'business_parameters', action: 'edit' },
-  { module: 'system_parameters', action: 'view' },
-  { module: 'system_parameters', action: 'edit' },
-  { module: 'settings', action: 'view' },
-  { module: 'settings', action: 'edit' },
+  { module: 'business_parameters', action: 'read' },
+  { module: 'business_parameters', action: 'update' },
+  { module: 'system_parameters', action: 'read' },
+  { module: 'system_parameters', action: 'update' },
+  { module: 'settings', action: 'read' },
+  { module: 'settings', action: 'update' },
   { module: 'sign', action: 'standard' },
   { module: 'sign', action: 'full' },
+  { module: 'dashboard', action: 'read' },
+  { module: 'dashboard', action: 'advanced' },
 ]
 
 const OWNER_PERMISSIONS = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
 
 const PHARMACIST_PERMISSIONS = [
-  'medicine_shapes.view',
-  'medicine_types.view',
-  'medicine_classes.view',
-  'medicines.view',
-  'distributors.view',
-  'customers.view',
+  'medicine_shapes.read',
+  'medicine_types.read',
+  'medicine_classes.read',
+  'medicines.read',
+  'distributors.read',
+  'customers.read',
   'customers.create',
-  'customers.edit',
-  'stock.view',
-  'purchase_orders.view',
-  'invoices.view',
-  'sales.view',
+  'customers.update',
+  'stock.read',
+  'purchase_orders.read',
+  'invoices.read',
+  'sales.read',
   'sales.create',
-  'stock_return.view',
+  'stock_return.read',
   'stock_return.create',
-  'stock_disposal.view',
-  'reports.view',
+  'stock_disposal.read',
+  'reports.read',
   'sign.standard',
+  'dashboard.read',
 ]
 
 // ── Price helpers ─────────────────────────────────────────────────────────────
@@ -128,6 +130,144 @@ function calcPrices(pricePerPiece: number, discPct: number, marginPct: number) {
     discountAmount: new Decimal(discountAmount.toFixed(2)),
     finalPrice: new Decimal(finalPrice.toFixed(2)),
     calculatedPrice: new Decimal(calculatedPrice.toFixed(2)),
+  }
+}
+
+// ── Sale helper ───────────────────────────────────────────────────────────────
+
+async function createSale(params: {
+  pharmacyId: number
+  customerId: number
+  saleNumber: string
+  saleDate: Date
+  saleType: SaleType
+  lines: { medicine: string; pieces: number }[]
+  stockDetailMap: Record<string, { id: number; stockId: number }>
+  createdById: number
+  description?: string
+}): Promise<void> {
+  const PPN_PCT = 11
+
+  const lineData = await Promise.all(
+    params.lines.map(async (line) => {
+      const ref = params.stockDetailMap[line.medicine]
+      if (!ref) throw new Error(`No stock detail for ${line.medicine}`)
+
+      const stock = await prisma.stock.findUnique({
+        where: { id: ref.stockId },
+        select: { calculatedPrice: true, sellingPrice: true, isManualPrice: true, totalPieces: true, medicineId: true },
+      })
+      if (!stock) throw new Error(`Stock not found for ${line.medicine}`)
+
+      const stockDetail = await prisma.stockDetail.findUnique({
+        where: { id: ref.id },
+        select: { quantityPerBox: true },
+      })
+      if (!stockDetail) throw new Error(`StockDetail not found for ${line.medicine}`)
+
+      const unitPrice = stock.isManualPrice && stock.sellingPrice ? stock.sellingPrice : stock.calculatedPrice
+      const totalAmount = new Decimal((line.pieces * parseFloat(unitPrice.toString())).toFixed(2))
+      const quantityBox = Math.floor(line.pieces / stockDetail.quantityPerBox)
+
+      return {
+        medicine: line.medicine,
+        medicineId: stock.medicineId,
+        stockDetailId: ref.id,
+        stockId: ref.stockId,
+        quantityPieces: line.pieces,
+        quantityBox,
+        sellingPrice: unitPrice,
+        totalAmount,
+        stockTotalBefore: parseFloat(stock.totalPieces.toString()),
+      }
+    })
+  )
+
+  const subtotal = lineData.reduce((sum, l) => sum + parseFloat(l.totalAmount.toString()), 0)
+  const ppnAmount = (subtotal * PPN_PCT) / 100
+  const grandTotal = subtotal + ppnAmount
+
+  const sale = await prisma.sale.create({
+    data: {
+      pharmacyId: params.pharmacyId,
+      customerId: params.customerId,
+      saleNumber: params.saleNumber,
+      saleType: params.saleType,
+      status: SaleStatus.COMPLETED,
+      totalAmount: new Decimal(subtotal.toFixed(2)),
+      discountPercentage: new Decimal('0.00'),
+      discountAmount: new Decimal('0.00'),
+      ppnPercentage: new Decimal(PPN_PCT.toFixed(2)),
+      ppnAmount: new Decimal(ppnAmount.toFixed(2)),
+      grandTotal: new Decimal(grandTotal.toFixed(2)),
+      paidAmount: new Decimal(grandTotal.toFixed(2)),
+      soldAt: params.saleDate,
+      description: params.description ?? 'Sale',
+      createdById: params.createdById,
+      updatedById: params.createdById,
+      details: {
+        create: lineData.map((l) => ({
+          medicineId: l.medicineId,
+          stockDetailId: l.stockDetailId,
+          quantityPieces: l.quantityPieces,
+          quantityBox: l.quantityBox,
+          sellingPrice: l.sellingPrice,
+          discountPercentage: new Decimal('0.00'),
+          discountAmount: new Decimal('0.00'),
+          totalAmount: l.totalAmount,
+          createdById: params.createdById,
+        })),
+      },
+      payment: {
+        create: {
+          totalAmount: new Decimal(grandTotal.toFixed(2)),
+          paidAmount: new Decimal(grandTotal.toFixed(2)),
+          paymentStatus: PaymentStatus.PAID,
+          createdById: params.createdById,
+          history: {
+            create: {
+              amount: new Decimal(grandTotal.toFixed(2)),
+              paymentMethod: PaymentMethod.CASH,
+              paymentDate: params.saleDate,
+              description: 'Cash payment',
+              createdById: params.createdById,
+            },
+          },
+        },
+      },
+    },
+    include: { details: { select: { id: true, medicineId: true, stockDetailId: true, quantityPieces: true } } },
+  })
+
+  for (const detail of sale.details) {
+    const ld = lineData.find((l) => l.stockDetailId === detail.stockDetailId)!
+    const quantityBefore = ld.stockTotalBefore
+    const quantityAfter = quantityBefore - detail.quantityPieces
+
+    await prisma.stock.update({
+      where: { id: ld.stockId },
+      data: { totalPieces: { decrement: detail.quantityPieces }, updatedById: params.createdById },
+    })
+    await prisma.stockDetail.update({
+      where: { id: detail.stockDetailId },
+      data: { quantityPieces: { decrement: detail.quantityPieces } },
+    })
+    await prisma.stockMovement.create({
+      data: {
+        pharmacyId: params.pharmacyId,
+        medicineId: detail.medicineId,
+        stockId: ld.stockId,
+        stockDetailId: detail.stockDetailId,
+        saleDetailId: detail.id,
+        type: 'OUT',
+        reason: 'SALE',
+        quantity: detail.quantityPieces,
+        quantityBefore,
+        quantityAfter,
+        description: `Sale from ${params.saleNumber}`,
+        createdById: params.createdById,
+      },
+    })
   }
 }
 
@@ -212,7 +352,7 @@ async function main() {
   // ── 5a. Business license ──────────────────────────────────────────────────
   console.log('Creating business license...')
   const existingBl = await prisma.businessLicense.findFirst({
-    where: { pharmacyId: pharmacy.id, licenseNumber: 'SIA-JKT-2024-001', status: { not: 'DELETED' } },
+    where: { pharmacyId: pharmacy.id, licenseNumber: 'SIA-JKT-2024-001', status: RecordStatus.ACTIVE },
   })
   if (!existingBl) {
     await prisma.businessLicense.create({
@@ -286,7 +426,7 @@ async function main() {
   // ── 8. Placement memberships ──────────────────────────────────────────────
   console.log('Assigning users to pharmacy...')
   const ownerPlacement = await prisma.placement.findFirst({
-    where: { userId: owner.id, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+    where: { userId: owner.id, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
   })
   if (!ownerPlacement) {
     await prisma.placement.create({
@@ -294,7 +434,7 @@ async function main() {
     })
   }
   const pharmacistPlacement = await prisma.placement.findFirst({
-    where: { userId: pharmacist.id, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+    where: { userId: pharmacist.id, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
   })
   if (!pharmacistPlacement) {
     await prisma.placement.create({
@@ -336,7 +476,8 @@ async function main() {
   const businessParams = [
     // Pricing
     { key: 'MARGIN_PERCENTAGE',         value: '20',                    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
-    { key: 'TAX_PERCENTAGE',            value: '11',                    dataType: DataType.PERCENTAGE, description: 'VAT/PPN percentage applied to sales (Indonesian standard 11%)' },
+    { key: 'PPN_PERCENTAGE_SELL',       value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to customers on sales (output VAT)' },
+    { key: 'PPN_PERCENTAGE_BUY',        value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
     { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',                    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
     // Stock management
     { key: 'REORDER_LEVEL_DEFAULT',     value: '10',                    dataType: DataType.NUMBER,  description: 'Default low-stock alert threshold in pieces' },
@@ -372,7 +513,7 @@ async function main() {
   const shapes: Record<string, { id: number }> = {}
   for (const name of shapeNames) {
     const existing = await prisma.medicineShape.findFirst({
-      where: { name, pharmacyId: null, status: { not: 'DELETED' } },
+      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
     })
     const shape = existing ?? await prisma.medicineShape.create({
       data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
@@ -384,7 +525,7 @@ async function main() {
   const types: Record<string, { id: number }> = {}
   for (const name of typeNames) {
     const existing = await prisma.medicineType.findFirst({
-      where: { name, pharmacyId: null, status: { not: 'DELETED' } },
+      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
     })
     const type = existing ?? await prisma.medicineType.create({
       data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
@@ -402,7 +543,7 @@ async function main() {
   const classes: Record<string, { id: number }> = {}
   for (const name of classNames) {
     const existing = await prisma.medicineClass.findFirst({
-      where: { name, pharmacyId: null, status: { not: 'DELETED' } },
+      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
     })
     const cls = existing ?? await prisma.medicineClass.create({
       data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
@@ -422,7 +563,7 @@ async function main() {
   const medicines: Record<string, { id: number }> = {}
   for (const def of medicineDefs) {
     const existing = await prisma.medicine.findFirst({
-      where: { name: def.name, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+      where: { name: def.name, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
     })
     const medicine = existing ?? await prisma.medicine.create({
       data: {
@@ -463,7 +604,7 @@ async function main() {
   const distributors: Record<string, { id: number }> = {}
   for (const def of distributorDefs) {
     const existing = await prisma.distributor.findFirst({
-      where: { name: def.name, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+      where: { name: def.name, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
     })
     const dist = existing ?? await prisma.distributor.create({
       data: {
@@ -487,7 +628,7 @@ async function main() {
   const customers: Record<string, { id: number }> = {}
   for (const def of customerDefs) {
     const existing = await prisma.customer.findFirst({
-      where: { name: def.name, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
+      where: { name: def.name, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
     })
     const customer = existing ?? await prisma.customer.create({
       data: {
@@ -504,64 +645,6 @@ async function main() {
     customers[def.name] = customer
   }
 
-  // ── 15. Positions & Employees ─────────────────────────────────────────────
-  console.log('Creating positions and employees...')
-  const positionDefs = [
-    { name: 'Apoteker Penanggung Jawab', signAuthority: SignAuthority.FULL, description: 'Licensed pharmacist responsible for the pharmacy' },
-    { name: 'Apoteker Pendamping', signAuthority: SignAuthority.STANDARD, description: 'Supporting licensed pharmacist' },
-    { name: 'Asisten Apoteker', signAuthority: SignAuthority.NONE, description: 'Pharmacy assistant' },
-    { name: 'Kasir', signAuthority: SignAuthority.NONE, description: 'Cashier' },
-  ]
-  const positions: Record<string, { id: number }> = {}
-  for (const def of positionDefs) {
-    const existing = await prisma.position.findFirst({
-      where: { name: def.name, pharmacyId: null, status: { not: 'DELETED' } },
-    })
-    const pos = existing ?? await prisma.position.create({
-      data: {
-        pharmacyId: null,
-        name: def.name,
-        signAuthority: def.signAuthority,
-        description: def.description,
-        status: RecordStatus.ACTIVE,
-        createdById: platformAdmin.id,
-        updatedById: platformAdmin.id,
-      },
-    })
-    positions[def.name] = pos
-  }
-
-  // Create licensed pharmacist employee linked to pharmacist user
-  let pharmacistEmployee = await prisma.employee.findFirst({
-    where: { userId: pharmacist.id, pharmacyId: pharmacy.id, status: { not: 'DELETED' } },
-  })
-  if (!pharmacistEmployee) {
-    pharmacistEmployee = await prisma.employee.create({
-      data: {
-        pharmacyId: pharmacy.id,
-        userId: pharmacist.id,
-        positionId: positions['Apoteker Penanggung Jawab'].id,
-        name: 'Ahmad Yusuf, S.Farm., Apt.',
-        phone: '081300000001',
-        status: RecordStatus.ACTIVE,
-        createdById: owner.id,
-        updatedById: owner.id,
-        employeePharmacies: {
-          create: {
-            pharmacyId: pharmacy.id,
-            licenseNumber: 'SIPA-JKT-2024-001',
-            isPrimary: true,
-            validFrom: new Date('2024-01-01'),
-            validUntil: new Date('2027-12-31'),
-            status: RecordStatus.ACTIVE,
-            createdById: owner.id,
-            updatedById: owner.id,
-          },
-        },
-      },
-    })
-  }
-
   // ── 16. Purchase order ────────────────────────────────────────────────────
   console.log('Creating purchase order...')
   const kimiaFarma = distributors['PT. Kimia Farma Trading & Distribution']
@@ -574,7 +657,7 @@ async function main() {
       data: {
         pharmacyId: pharmacy.id,
         distributorId: kimiaFarma.id,
-        signedById: pharmacistEmployee.id,
+        signedById: pharmacist.id,
         orderNumber: poNumber,
         status: PurchaseOrderStatus.COMPLETED,
         description: 'Monthly restocking order',
@@ -646,12 +729,13 @@ async function main() {
         pharmacyId: pharmacy.id,
         distributorId: kimiaFarma.id,
         purchaseOrderId: purchaseOrder.id,
-        signedById: pharmacistEmployee.id,
+        signedById: pharmacist.id,
         invoiceNumber,
         paymentStatus: PaymentStatus.PAID,
         invoiceDate: new Date('2026-01-01'),
         dueDate: new Date('2026-01-31'),
         totalAmount: new Decimal(invoiceTotalAmount.toFixed(2)),
+        grandTotal: new Decimal(invoiceTotalAmount.toFixed(2)),
         paidAmount: new Decimal(invoiceTotalAmount.toFixed(2)),
         description: 'Monthly restocking invoice',
         createdById: owner.id,
@@ -715,6 +799,7 @@ async function main() {
           stockId: stock.id,
           distributorId: kimiaFarma.id,
           invoiceDetailId: detail.id,
+          barcode: `BC-${detail.batchNumber}`,
           batchNumber: detail.batchNumber,
           expiryDate: detail.expiryDate,
           quantityPieces: detail.quantityPieces,
@@ -757,139 +842,68 @@ async function main() {
     }
   }
 
-  // ── 18. Sale ──────────────────────────────────────────────────────────────
-  console.log('Creating sample sale...')
+  // ── 18. Initial reference sale (Jan 15) ──────────────────────────────────
+  console.log('Creating initial reference sale...')
   const saleNumber = 'SL-APK1-20260115-001'
-  const saleExists = await prisma.sale.findFirst({ where: { saleNumber } })
-
-  if (!saleExists) {
-    const saleLines = [
-      { medicine: 'Paracetamol 500mg', pieces: 10 },
-      { medicine: 'Vitamin C 1000mg', pieces: 5 },
-    ]
-
-    // Fetch selling prices from stock
-    const saleLinesData = await Promise.all(
-      saleLines.map(async (line) => {
-        const stockDetailRef = stockDetailMap[line.medicine]
-        if (!stockDetailRef) throw new Error(`No stock detail found for ${line.medicine}`)
-
-        const stock = await prisma.stock.findUnique({
-          where: { id: stockDetailRef.stockId },
-          select: { calculatedPrice: true, sellingPrice: true, isManualPrice: true, totalPieces: true, medicineId: true },
-        })
-        if (!stock) throw new Error(`Stock not found for ${line.medicine}`)
-
-        const stockDetailRec = await prisma.stockDetail.findUnique({
-          where: { id: stockDetailRef.id },
-          select: { quantityPerBox: true },
-        })
-        if (!stockDetailRec) throw new Error(`StockDetail not found for ${line.medicine}`)
-
-        const unitPrice = stock.isManualPrice && stock.sellingPrice
-          ? stock.sellingPrice
-          : stock.calculatedPrice
-        const totalAmount = new Decimal((line.pieces * parseFloat(unitPrice.toString())).toFixed(2))
-        const quantityBox = Math.floor(line.pieces / stockDetailRec.quantityPerBox)
-
-        return {
-          medicine: line.medicine,
-          medicineId: stock.medicineId,
-          stockDetailId: stockDetailRef.id,
-          stockId: stockDetailRef.stockId,
-          quantityPieces: line.pieces,
-          quantityBox,
-          sellingPrice: unitPrice,
-          totalAmount,
-          stockTotalBefore: stock.totalPieces,
-        }
-      })
-    )
-
-    const saleTotalAmount = saleLinesData.reduce(
-      (sum, l) => sum + parseFloat(l.totalAmount.toString()),
-      0
-    )
-
-    const sale = await prisma.sale.create({
-      data: {
-        pharmacyId: pharmacy.id,
-        customerId: customers['Budi Santoso'].id,
-        saleNumber,
-        saleType: SaleType.CASH,
-        status: SaleStatus.COMPLETED,
-        totalAmount: new Decimal(saleTotalAmount.toFixed(2)),
-        paidAmount: new Decimal(saleTotalAmount.toFixed(2)),
-        soldAt: new Date('2026-01-15T10:30:00Z'),
-        description: 'Walk-in cash sale',
-        createdById: pharmacist.id,
-        updatedById: pharmacist.id,
-        details: {
-          create: saleLinesData.map((l) => ({
-            medicineId: l.medicineId,
-            stockDetailId: l.stockDetailId,
-            quantityPieces: l.quantityPieces,
-            quantityBox: l.quantityBox,
-            sellingPrice: l.sellingPrice,
-            discount: new Decimal('0.00'),
-            totalAmount: l.totalAmount,
-            createdById: pharmacist.id,
-          })),
-        },
-        payment: {
-          create: {
-            totalAmount: new Decimal(saleTotalAmount.toFixed(2)),
-            paidAmount: new Decimal(saleTotalAmount.toFixed(2)),
-            paymentStatus: PaymentStatus.PAID,
-            createdById: pharmacist.id,
-            history: {
-              create: {
-                amount: new Decimal(saleTotalAmount.toFixed(2)),
-                paymentMethod: PaymentMethod.CASH,
-                paymentDate: new Date('2026-01-15T10:30:00Z'),
-                description: 'Cash payment',
-                createdById: pharmacist.id,
-              },
-            },
-          },
-        },
-      },
-      include: { details: { select: { id: true, medicineId: true, stockDetailId: true, quantityPieces: true } } },
+  if (!(await prisma.sale.findFirst({ where: { saleNumber } }))) {
+    await createSale({
+      pharmacyId: pharmacy.id,
+      customerId: customers['Budi Santoso'].id,
+      saleNumber,
+      saleDate: new Date('2026-01-15T10:30:00Z'),
+      saleType: SaleType.CASH,
+      lines: [
+        { medicine: 'Paracetamol 500mg', pieces: 10 },
+        { medicine: 'Vitamin C 1000mg',  pieces: 5 },
+      ],
+      stockDetailMap,
+      createdById: pharmacist.id,
+      description: 'Walk-in cash sale',
     })
+  }
 
-    // Deduct stock after sale
-    let offset = 0
-    for (const detail of sale.details) {
-      const line = saleLinesData.find((l) => l.stockDetailId === detail.stockDetailId)!
-      const quantityBefore = line.stockTotalBefore - offset
-      const quantityAfter = quantityBefore - detail.quantityPieces
-      offset += detail.quantityPieces
+  // ── 19. 30-day sales for dashboard testing ────────────────────────────────
+  console.log('Creating 30-day sales for dashboard testing...')
 
-      await prisma.stock.update({
-        where: { id: line.stockId },
-        data: { totalPieces: { decrement: detail.quantityPieces }, updatedById: pharmacist.id },
-      })
-      await prisma.stockDetail.update({
-        where: { id: detail.stockDetailId },
-        data: { quantityPieces: { decrement: detail.quantityPieces } },
-      })
-      await prisma.stockMovement.create({
-        data: {
-          pharmacyId: pharmacy.id,
-          medicineId: detail.medicineId,
-          stockId: line.stockId,
-          stockDetailId: detail.stockDetailId,
-          saleDetailId: detail.id,
-          type: 'OUT',
-          reason: 'SALE',
-          quantity: detail.quantityPieces,
-          quantityBefore,
-          quantityAfter,
-          description: `Sale from ${saleNumber}`,
-          createdById: pharmacist.id,
-        },
-      })
-    }
+  // 5 rotating patterns; over 30 days each appears 6×
+  // Total usage: Paracetamol 96, Vitamin C 42, Ibuprofen 30, Amoxicillin 12, Amlodipin 6
+  // All fit within the stock loaded by the invoice
+  const SALE_PATTERNS = [
+    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 5 }, { medicine: 'Vitamin C 1000mg',   pieces: 3 }], customer: 'Walk-in Customer' },
+    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 3 }, { medicine: 'Ibuprofen 400mg',     pieces: 2 }], customer: 'Budi Santoso'     },
+    { lines: [{ medicine: 'Amoxicillin 500mg', pieces: 2 }, { medicine: 'Paracetamol 500mg',   pieces: 4 }], customer: 'Siti Rahayu'      },
+    { lines: [{ medicine: 'Vitamin C 1000mg',  pieces: 4 }, { medicine: 'Amlodipin 10mg',      pieces: 1 }], customer: 'Walk-in Customer' },
+    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 4 }, { medicine: 'Ibuprofen 400mg',     pieces: 3 }], customer: 'Budi Santoso'     },
+  ]
+
+  const existingSaleNumbers = new Set(
+    (await prisma.sale.findMany({ where: { pharmacyId: pharmacy.id }, select: { saleNumber: true } }))
+      .map((s) => s.saleNumber)
+  )
+
+  // Days 0–29 → 2026-05-20 to 2026-06-18 (today)
+  for (let dayIdx = 0; dayIdx < 30; dayIdx++) {
+    const saleDate = new Date('2026-05-20T09:00:00Z')
+    saleDate.setUTCDate(saleDate.getUTCDate() + dayIdx)
+
+    const dateStr = saleDate.toISOString().slice(0, 10).replace(/-/g, '') // YYYYMMDD
+    const saleNum  = `SL-APK1-${dateStr}-001`
+
+    if (existingSaleNumbers.has(saleNum)) continue
+
+    const pattern = SALE_PATTERNS[dayIdx % SALE_PATTERNS.length]
+
+    await createSale({
+      pharmacyId: pharmacy.id,
+      customerId: customers[pattern.customer].id,
+      saleNumber: saleNum,
+      saleDate,
+      saleType: SaleType.CASH,
+      lines: pattern.lines,
+      stockDetailMap,
+      createdById: pharmacist.id,
+      description: 'Daily sale',
+    })
   }
 
   // ── Summary ───────────────────────────────────────────────────────────────
@@ -902,7 +916,7 @@ async function main() {
   console.log('Medicines       →  5 (Paracetamol, Amoxicillin, Vitamin C, Ibuprofen, Amlodipin)')
   console.log('Distributor     →  Kimia Farma, Enseval')
   console.log('Invoice         →  INV-APK1-20260101-001 (PAID, stock loaded)')
-  console.log('Sale            →  SL-APK1-20260115-001 (COMPLETED, cash)')
+  console.log('Sales           →  SL-APK1-20260115-001 + 30 daily (2026-05-20 → 2026-06-18)')
   console.log('─────────────────────────────────────────────────────────────')
 }
 

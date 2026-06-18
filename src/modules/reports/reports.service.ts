@@ -87,8 +87,8 @@ const fetchSalesReport = async (
     select: {
       uuid: true,
       soldAt: true,
-      totalAmount: true,
-      taxAmount: true,
+      grandTotal: true,
+      ppnAmount: true,
       paidAmount: true,
       payment: {
         select: {
@@ -155,12 +155,12 @@ const fetchSalesReport = async (
     const date = DateTime.fromJSDate(sale.soldAt).toISODate()!
     const existing = dailyMap.get(date) ?? { revenue: 0, count: 0 }
     dailyMap.set(date, {
-      revenue: existing.revenue + toNum(sale.totalAmount),
+      revenue: existing.revenue + toNum(sale.grandTotal),
       count: existing.count + 1,
     })
   }
 
-  const totalRevenue = sales.reduce((sum, s) => sum + toNum(s.totalAmount), 0)
+  const totalRevenue = sales.reduce((sum, s) => sum + toNum(s.grandTotal), 0)
 
   return {
     summary: {
@@ -206,7 +206,10 @@ export const getSalesExportRows = async (
       saleType: true,
       status: true,
       totalAmount: true,
-      taxAmount: true,
+      discountPercentage: true,
+      discountAmount: true,
+      ppnAmount: true,
+      grandTotal: true,
       paidAmount: true,
       customer: { select: { name: true } },
       payment: { select: { paymentStatus: true } },
@@ -221,7 +224,10 @@ export const getSalesExportRows = async (
     saleType: s.saleType,
     status: s.status,
     totalAmount: toNum(s.totalAmount),
-    taxAmount: toNum(s.taxAmount),
+    discountPercentage: toNum(s.discountPercentage),
+    discountAmount: toNum(s.discountAmount),
+    ppnAmount: toNum(s.ppnAmount),
+    grandTotal: toNum(s.grandTotal),
     paidAmount: toNum(s.paidAmount),
     paymentStatus: s.payment?.paymentStatus ?? '-',
   }))

@@ -4,7 +4,7 @@ import { z } from 'zod'
 export const createSaleDetailSchema = z.object({
   stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity must be positive' }),
-  discount: z.number().min(0).max(100).optional().default(0),
+  discountPercentage: z.number().min(0).max(100).optional().default(0),
   isFefoOverride: z.boolean().optional().default(false),
 })
 
@@ -17,6 +17,7 @@ export const createSaleSchema = z
   .object({
     customerUuid: z.string().trim().uuid().optional(),
     saleType: z.enum(SaleType).optional().default(SaleType.CASH),
+    discountPercentage: z.number().min(0).max(100).optional().default(0),
     description: z.string().trim().optional(),
     isPending: z.boolean().optional().default(false),
     details: z

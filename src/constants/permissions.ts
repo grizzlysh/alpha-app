@@ -117,6 +117,10 @@ export const PERMISSIONS = {
   SETTINGS_READ: 'settings.read',
   SETTINGS_UPDATE: 'settings.update',
 
+  // dashboard
+  DASHBOARD_READ: 'dashboard.read',
+  DASHBOARD_ADVANCED: 'dashboard.advanced',
+
   // signing
   SIGN_STANDARD: 'sign.standard',
   SIGN_FULL: 'sign.full',

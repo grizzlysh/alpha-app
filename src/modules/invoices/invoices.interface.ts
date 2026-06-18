@@ -157,6 +157,8 @@ export interface InvoiceResponse {
   dueDate: Date | null
   receiveDate: Date | null
   totalAmount: number
+  discountPercentage: number
+  discountAmount: number
   ppnPercentage: number
   ppnAmount: number
   grandTotal: number

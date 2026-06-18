@@ -60,7 +60,10 @@ export interface SalesExportRow {
   saleType: string
   status: string
   totalAmount: number
-  taxAmount: number
+  discountPercentage: number
+  discountAmount: number
+  ppnAmount: number
+  grandTotal: number
   paidAmount: number
   paymentStatus: string
 }
