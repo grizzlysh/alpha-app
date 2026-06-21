@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export const createInvoiceDetailSchema = z.object({
   medicineUuid: z.string().trim().uuid({ message: 'Invalid medicine UUID' }),
-  batchNumber: z.string().trim().min(1, { message: 'Batch number is required' }),
+  batchNumber: z.string().trim().toLowerCase().min(1, { message: 'Batch number is required' }),
   expiryDate: z.string().trim().min(1, { message: 'Expiry date is required' }),
   quantityBox: z.number().int().positive({ message: 'Quantity box must be positive' }),
   quantityPerBox: z.number().int().positive({ message: 'Quantity per box must be positive' }),
@@ -16,7 +16,7 @@ export const createInvoiceSchema = z.object({
   distributorUuid: z.string().trim().uuid({ message: 'Invalid distributor UUID' }),
   purchaseOrderUuid: z.string().trim().uuid().optional(),
   signedByUuid: z.string().trim().uuid().optional(),
-  invoiceNumber: z.string().trim().min(1, { message: 'Invoice number is required' }),
+  invoiceNumber: z.string().trim().toLowerCase().min(1, { message: 'Invoice number is required' }),
   invoiceDate: z.string().trim().min(1, { message: 'Invoice date is required' }),
   dueDate: z.string().trim().min(1, { message: 'Due date is required' }),
   receiveDate: z.string().trim().min(1, { message: 'Receive date is required' }),

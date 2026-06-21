@@ -12,7 +12,7 @@ export const pharmacyQuerySchema = z.object({
 })
 
 export const createPharmacySchema = z.object({
-  name: z.string().trim().min(1, { message: 'Name is required' }),
+  name: z.string().trim().toLowerCase().min(1, { message: 'Name is required' }),
   code: z
     .string()
     .trim()
@@ -26,7 +26,7 @@ export const createPharmacySchema = z.object({
 })
 
 export const updatePharmacySchema = z.object({
-  name: z.string().trim().min(1).optional(),
+  name: z.string().trim().toLowerCase().min(1).optional(),
   code: z
     .string()
     .trim()

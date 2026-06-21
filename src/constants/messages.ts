@@ -386,6 +386,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Sale created successfully',
     id: 'Penjualan berhasil dibuat',
   },
+  SALE_UPDATED: {
+    en: 'Sale updated successfully',
+    id: 'Penjualan berhasil diperbarui',
+  },
   SALE_COMPLETED: {
     en: 'Sale completed successfully',
     id: 'Penjualan berhasil diselesaikan',

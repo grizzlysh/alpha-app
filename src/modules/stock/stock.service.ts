@@ -126,6 +126,7 @@ export const searchStockDetails = async (
   const details = await prisma.stockDetail.findMany({
     where,
     select: {
+      id: true,
       uuid: true,
       barcode: true,
       batchNumber: true,
@@ -158,12 +159,22 @@ export const searchStockDetails = async (
     take: 20,
   })
 
+  const reservationSums = await prisma.stockReservation.groupBy({
+    by: ['stockDetailId'],
+    where: { stockDetailId: { in: details.map((d) => d.id) } },
+    _sum: { quantityPieces: true },
+  })
+  const reservedMap = new Map(
+    reservationSums.map((r) => [r.stockDetailId, r._sum.quantityPieces ?? 0])
+  )
+
   return details.map((d) => ({
     uuid: d.uuid,
     barcode: d.barcode,
     batchNumber: d.batchNumber,
     expiryDate: d.expiryDate,
     quantityPieces: d.quantityPieces,
+    availablePieces: d.quantityPieces - (reservedMap.get(d.id) ?? 0),
     quantityBox: d.quantityBox,
     quantityPerBox: d.quantityPerBox,
     distributor: d.distributor,
@@ -199,6 +210,7 @@ export const getStockCatalog = async (
   }
 
   const select = {
+    id: true,
     uuid: true,
     barcode: true,
     batchNumber: true,
@@ -246,12 +258,22 @@ export const getStockCatalog = async (
     totalPages: Math.ceil(total / limit),
   }
 
+  const reservationSums = await prisma.stockReservation.groupBy({
+    by: ['stockDetailId'],
+    where: { stockDetailId: { in: details.map((d) => d.id) } },
+    _sum: { quantityPieces: true },
+  })
+  const reservedMap = new Map(
+    reservationSums.map((r) => [r.stockDetailId, r._sum.quantityPieces ?? 0])
+  )
+
   const data = details.map((d) => ({
     uuid: d.uuid,
     barcode: d.barcode,
     batchNumber: d.batchNumber,
     expiryDate: d.expiryDate,
     quantityPieces: d.quantityPieces,
+    availablePieces: d.quantityPieces - (reservedMap.get(d.id) ?? 0),
     quantityBox: d.quantityBox,
     quantityPerBox: d.quantityPerBox,
     distributor: d.distributor,

@@ -30,7 +30,10 @@ export interface SalePaymentHistoryUuidParam extends ParamsDictionary {
 export interface CreateSaleDetailBody {
   stockDetailUuid: string
   quantityPieces: number
+  sellingPrice: number
+  originalPrice: number
   discountPercentage?: number
+  discountAmount?: number
   isFefoOverride?: boolean
 }
 
@@ -43,6 +46,12 @@ export interface CreateSaleBody {
   customerUuid?: string
   saleType?: SaleType
   discountPercentage?: number
+  discountAmount?: number
+  ppnPercentage?: number
+  ppnAmount?: number
+  totalAmount: number
+  grandTotal: number
+  paidAmount?: number
   description?: string
   isPending?: boolean
   details: CreateSaleDetailBody[]
@@ -54,7 +63,7 @@ export interface CancelSaleBody {
 }
 
 export interface AddPaymentBody {
-  amount: number
+  paidAmount: number
   paymentMethod: PaymentMethod
   paymentDate: string
   description?: string
@@ -88,9 +97,31 @@ export type CancelSaleRequest = Request<
   {}
 >
 
+export interface UpdateSaleBody {
+  customerUuid?: string
+  saleType?: SaleType
+  discountPercentage?: number
+  discountAmount?: number
+  ppnPercentage?: number
+  ppnAmount?: number
+  totalAmount: number
+  grandTotal: number
+  description?: string
+  details: CreateSaleDetailBody[]
+}
+
 export type CompleteSaleRequest = Request<
   SaleUuidParam,
-  {}, {}, {}
+  {},
+  CreateSaleBody,
+  {}
+>
+
+export type UpdateSaleRequest = Request<
+  SaleUuidParam,
+  {},
+  UpdateSaleBody,
+  {}
 >
 
 export type GetSalePaymentRequest = Request<
@@ -130,6 +161,7 @@ export interface SaleDetailResponse {
   quantityPieces: number
   quantityBox: number
   sellingPrice: number
+  originalPrice: number
   discountPercentage: number
   discountAmount: number
   totalAmount: number

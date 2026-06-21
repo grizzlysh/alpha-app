@@ -3,12 +3,13 @@ import path from 'path'
 import { DateTime } from 'luxon'
 import ExcelJS from 'exceljs'
 import {
-  getSalesExportRows,
-  getPurchaseReport,
-  getInventoryReport,
-  getStockMovementReport,
-  getDisposalReport,
-  getReturnReport,
+  getSalesExport,
+  getPurchaseExport,
+  getInventoryExport,
+  getInventoryExpiryAlerts,
+  getStockMovementExport,
+  getDisposalExport,
+  getReturnExport,
 } from './reports.service'
 import {
   SalesExportRow,
@@ -151,14 +152,17 @@ const returnColumns: ExportColumn<ReturnDetailRow>[] = [
 // ── Builders ──────────────────────────────────────────────────
 
 async function buildInventoryExcel(pharmacyId: number): Promise<Buffer> {
-  const report = await getInventoryReport(pharmacyId, { expiryDays: 30 })
+  const [stockLevels, alerts] = await Promise.all([
+    getInventoryExport(pharmacyId, { expiryDays: 30, isLowStock: undefined }),
+    getInventoryExpiryAlerts(pharmacyId, { expiryDays: 30 }),
+  ])
 
   const wb = new ExcelJS.Workbook()
 
   const wsStock = wb.addWorksheet('Stock Levels')
   wsStock.columns = stockLevelColumns.map((c) => ({ header: c.header, key: c.key, width: c.width ?? 20 }))
   wsStock.getRow(1).font = { bold: true }
-  for (const row of report.stockLevels) {
+  for (const row of stockLevels) {
     const rd: Record<string, unknown> = {}
     for (const col of stockLevelColumns) {
       rd[col.key] = col.formatter ? col.formatter(row) : (row as unknown as Record<string, unknown>)[col.key]
@@ -169,7 +173,7 @@ async function buildInventoryExcel(pharmacyId: number): Promise<Buffer> {
   const wsExpiry = wb.addWorksheet('Expiry Alerts')
   wsExpiry.columns = expiryColumns.map((c) => ({ header: c.header, key: c.key, width: c.width ?? 20 }))
   wsExpiry.getRow(1).font = { bold: true }
-  for (const row of [...report.expiringSoon, ...report.expired]) {
+  for (const row of [...alerts.expiringSoon, ...alerts.expired]) {
     const rd: Record<string, unknown> = {}
     for (const col of expiryColumns) {
       rd[col.key] = col.formatter ? col.formatter(row) : (row as unknown as Record<string, unknown>)[col.key]
@@ -194,13 +198,13 @@ export async function generateReport(
 
   switch (type) {
     case 'sales': {
-      const rows = await getSalesExportRows(pharmacyId, query)
+      const rows = await getSalesExport(pharmacyId, query)
       buffer = await buildExcel('Sales', salesColumns, rows)
       break
     }
     case 'purchases': {
-      const report = await getPurchaseReport(pharmacyId, query)
-      buffer = await buildExcel('Purchases', purchaseColumns, report.invoiceList)
+      const rows = await getPurchaseExport(pharmacyId, query)
+      buffer = await buildExcel('Purchases', purchaseColumns, rows)
       break
     }
     case 'inventory': {
@@ -208,18 +212,18 @@ export async function generateReport(
       break
     }
     case 'stock-movements': {
-      const report = await getStockMovementReport(pharmacyId, query)
-      buffer = await buildExcel('Stock Movements', movementColumns, report.movements)
+      const rows = await getStockMovementExport(pharmacyId, query)
+      buffer = await buildExcel('Stock Movements', movementColumns, rows)
       break
     }
     case 'disposals': {
-      const report = await getDisposalReport(pharmacyId, query)
-      buffer = await buildExcel('Disposals', disposalColumns, report.disposals)
+      const rows = await getDisposalExport(pharmacyId, query)
+      buffer = await buildExcel('Disposals', disposalColumns, rows)
       break
     }
     case 'returns': {
-      const report = await getReturnReport(pharmacyId, query)
-      buffer = await buildExcel('Returns', returnColumns, report.returns)
+      const rows = await getReturnExport(pharmacyId, query)
+      buffer = await buildExcel('Returns', returnColumns, rows)
       break
     }
   }

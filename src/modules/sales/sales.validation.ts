@@ -4,7 +4,10 @@ import { z } from 'zod'
 export const createSaleDetailSchema = z.object({
   stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity must be positive' }),
+  sellingPrice: z.number().positive({ message: 'Selling price must be positive' }),
+  originalPrice: z.number().positive({ message: 'Original price must be positive' }),
   discountPercentage: z.number().min(0).max(100).optional().default(0),
+  discountAmount: z.number().min(0).optional().default(0),
   isFefoOverride: z.boolean().optional().default(false),
 })
 
@@ -18,6 +21,12 @@ export const createSaleSchema = z
     customerUuid: z.string().trim().uuid().optional(),
     saleType: z.enum(SaleType).optional().default(SaleType.CASH),
     discountPercentage: z.number().min(0).max(100).optional().default(0),
+    discountAmount: z.number().min(0).optional().default(0),
+    ppnPercentage: z.number().min(0).max(100).optional().default(0),
+    ppnAmount: z.number().min(0).optional().default(0),
+    totalAmount: z.number().positive({ message: 'Total amount is required' }),
+    grandTotal: z.number().positive({ message: 'Grand total is required' }),
+    paidAmount: z.number().min(0).optional().default(0),
     description: z.string().trim().optional(),
     isPending: z.boolean().optional().default(false),
     details: z
@@ -25,17 +34,33 @@ export const createSaleSchema = z
       .min(1, { message: 'At least one item is required' }),
     payment: createSalePaymentSchema.optional(),
   })
-  .refine((data) => data.saleType !== SaleType.CASH || !!data.payment, {
+  .refine((data) => data.isPending || data.saleType !== SaleType.CASH || !!data.payment, {
     message: 'Payment information is required for CASH sales',
     path: ['payment'],
   })
+
+// Used for PATCH /sales/:uuid — always a pending sale, no payment needed
+export const updateSaleSchema = z.object({
+  customerUuid: z.string().trim().uuid().optional(),
+  saleType: z.enum(SaleType).optional().default(SaleType.CASH),
+  discountPercentage: z.number().min(0).max(100).optional().default(0),
+  discountAmount: z.number().min(0).optional().default(0),
+  ppnPercentage: z.number().min(0).max(100).optional().default(0),
+  ppnAmount: z.number().min(0).optional().default(0),
+  totalAmount: z.number().positive({ message: 'Total amount is required' }),
+  grandTotal: z.number().positive({ message: 'Grand total is required' }),
+  description: z.string().trim().optional(),
+  details: z
+    .array(createSaleDetailSchema)
+    .min(1, { message: 'At least one item is required' }),
+})
 
 export const cancelSaleSchema = z.object({
   description: z.string().trim().min(1, { message: 'Description is required' }),
 })
 
 export const addPaymentSchema = z.object({
-  amount: z.number().positive({ message: 'Amount must be positive' }),
+  paidAmount: z.number().positive({ message: 'Paid amount must be positive' }),
   paymentMethod: z.enum(PaymentMethod),
   paymentDate: z.string().trim().min(1, { message: 'Payment date is required' }),
   description: z.string().trim().optional(),
@@ -62,6 +87,7 @@ export const updatePaymentHistorySchema = z.object({
 })
 
 export type CreateSaleInput = z.infer<typeof createSaleSchema>
+export type UpdateSaleInput = z.infer<typeof updateSaleSchema>
 export type CancelSaleInput = z.infer<typeof cancelSaleSchema>
 export type AddPaymentInput = z.infer<typeof addPaymentSchema>
 export type UpdatePaymentHistoryInput = z.infer<typeof updatePaymentHistorySchema>

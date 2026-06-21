@@ -276,6 +276,7 @@ model Pharmacy {
   medicineTypes       MedicineType[]
   medicineClasses     MedicineClass[]
   prescriptions       Prescription[]
+  stockReservations   StockReservation[]
 
   @@map("mst_pharmacies")
 }
@@ -472,6 +473,9 @@ model User {
   // ── Audit: SalePaymentHistory ─────────────────────
   salePaymentHistoriesCreated SalePaymentHistory[] @relation("SalePaymentHistoryCreatedBy")
   salePaymentHistoriesUpdated SalePaymentHistory[] @relation("SalePaymentHistoryUpdatedBy")
+
+  // ── Audit: StockReservation ───────────────────────
+  stockReservationsCreated StockReservation[] @relation("StockReservationCreatedBy")
 
   // ── Audit: Prescription ───────────────────────────
   doctorPrescriptions  Prescription[] @relation("PrescriptionDoctor")
@@ -687,6 +691,7 @@ model Medicine {
   stockDisposalDetails StockDisposalDetail[]
   saleDetails          SaleDetail[]
   prescriptionDetails  PrescriptionDetail[]
+  stockReservations    StockReservation[]
 
   @@map("mst_medicines")
 }
@@ -961,6 +966,7 @@ model Stock {
   updatedByUser  User?           @relation("StockUpdatedBy", fields: [updatedById], references: [id])
   details        StockDetail[]
   stockMovements StockMovement[]
+  reservations   StockReservation[]
 
   @@unique([pharmacyId, medicineId])
   @@map("inv_stocks")
@@ -992,6 +998,7 @@ model StockDetail {
   stockReturnDetails   StockReturnDetail[]
   stockDisposalDetails StockDisposalDetail[]
   saleDetails          SaleDetail[]
+  reservations         StockReservation[]
 
   @@map("inv_stock_details")
 }
@@ -1030,6 +1037,28 @@ model StockMovement {
   updatedByUser       User?                @relation("StockMovementUpdatedBy", fields: [updatedById], references: [id])
 
   @@map("inv_stock_movements")
+}
+
+model StockReservation {
+  id             Int      @id @default(autoincrement())
+  uuid           String   @unique @default(uuid())
+  pharmacyId     Int      @map("pharmacy_id")
+  saleId         Int      @map("sale_id")
+  stockId        Int      @map("stock_id")
+  stockDetailId  Int      @map("stock_detail_id")
+  medicineId     Int      @map("medicine_id")
+  quantityPieces Int      @map("quantity_pieces")
+  createdAt      DateTime @default(now()) @map("created_at")
+  createdById    Int?     @map("created_by_id")
+
+  pharmacy      Pharmacy    @relation(fields: [pharmacyId], references: [id])
+  sale          Sale        @relation(fields: [saleId], references: [id])
+  stock         Stock       @relation(fields: [stockId], references: [id])
+  stockDetail   StockDetail @relation(fields: [stockDetailId], references: [id])
+  medicine      Medicine    @relation(fields: [medicineId], references: [id])
+  createdByUser User?       @relation("StockReservationCreatedBy", fields: [createdById], references: [id])
+
+  @@map("inv_stock_reservations")
 }
 
 // ── TRX STOCK RETURN ─────────────────────────────────────
@@ -1182,6 +1211,7 @@ model Sale {
   deletedByUser         User?         @relation("SaleDeletedBy", fields: [deletedById], references: [id])
   details               SaleDetail[]
   payment               SalePayment?
+  reservations          StockReservation[]
 
   @@map("trx_sales")
 }
@@ -1196,6 +1226,7 @@ model SaleDetail {
   quantityBox        Int      @map("quantity_box")
   isFefoOverride     Boolean  @default(false) @map("is_fefo_override")
   sellingPrice       Decimal  @map("selling_price") @db.Decimal(12, 2)
+  originalPrice      Decimal  @default(0) @map("original_price") @db.Decimal(12, 2)
   discountPercentage Decimal  @default(0) @map("discount_percentage") @db.Decimal(5, 2)
   discountAmount     Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
   totalAmount        Decimal  @map("total_amount") @db.Decimal(12, 2)

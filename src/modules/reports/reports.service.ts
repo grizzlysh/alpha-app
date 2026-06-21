@@ -1,37 +1,48 @@
 import { DateTime } from 'luxon'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import { getOrSet } from '@utils/cache'
+import { PaginationMeta } from '@interfaces/common.interface'
 import {
-  SalesReportInput,
-  PurchaseReportInput,
-  InventoryReportInput,
-  StockMovementReportInput,
-  DisposalReportInput,
-  ReturnReportInput,
+  SalesSummaryInput,
+  SalesListInput,
+  SalesExportInput,
+  PurchaseSummaryInput,
+  PurchaseListInput,
+  PurchaseExportInput,
+  InventorySummaryInput,
+  InventoryListInput,
+  InventoryExportInput,
+  StockMovementSummaryInput,
+  StockMovementListInput,
+  StockMovementExportInput,
+  DisposalSummaryInput,
+  DisposalListInput,
+  DisposalExportInput,
+  ReturnSummaryInput,
+  ReturnListInput,
+  ReturnExportInput,
 } from './reports.validation'
 import {
-  SalesReport,
+  SalesSummary,
   SalesExportRow,
-  PurchaseReport,
+  PurchaseSummary,
+  PurchaseByDistributor,
   PurchaseInvoiceRow,
-  InventoryReport,
+  InventorySummary,
   InventoryStockLevel,
   InventoryExpiryAlert,
-  StockMovementReport,
+  StockMovementSummary,
   StockMovementRow,
-  DisposalReport,
+  DisposalSummary,
+  DisposalByReason,
   DisposalDetailRow,
-  ReturnReport,
+  ReturnSummary,
+  ReturnByDistributor,
   ReturnDetailRow,
 } from './reports.interface'
 
-const CACHE_TTL = 300 // 5 minutes
-
-function hasDateFilter(query: { period?: string; dateFrom?: string; dateTo?: string }): boolean {
-  return !!(query.period || query.dateFrom || query.dateTo)
-}
-
-// ── Helpers ───────────────────────────────────────────────────
+const CACHE_TTL = 300
 
 function resolveDateRange(
   period?: string,
@@ -50,156 +61,185 @@ function resolveDateRange(
   }
 }
 
-function toNum(d: { toString(): string }): number {
-  return parseFloat(d.toString())
-}
-
-// ── Sales Report ──────────────────────────────────────────────
-
-export const getSalesReport = async (
-  pharmacyId: number,
-  query: SalesReportInput
-): Promise<SalesReport> => {
-  if (!hasDateFilter(query)) {
-    return getOrSet(`report:${pharmacyId}:sales:all`, CACHE_TTL, () => fetchSalesReport(pharmacyId, query))
-  }
-  return fetchSalesReport(pharmacyId, query)
-}
-
-const fetchSalesReport = async (
-  pharmacyId: number,
-  query: SalesReportInput
-): Promise<SalesReport> => {
-  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
-
-  const dateFilter = {
+function buildDateFilter(from?: Date, to?: Date) {
+  if (!from && !to) return {}
+  return {
     ...(from && { gte: from }),
     ...(to && { lte: to }),
   }
+}
 
-  const sales = await prisma.sale.findMany({
-    where: {
-      pharmacyId,
-      deletedAt: null,
-      status: 'COMPLETED',
-      ...(Object.keys(dateFilter).length && { soldAt: dateFilter }),
-    },
-    select: {
-      uuid: true,
-      soldAt: true,
-      grandTotal: true,
-      ppnAmount: true,
-      paidAmount: true,
-      payment: {
-        select: {
-          paymentStatus: true,
-          history: {
-            select: { paymentMethod: true, amount: true },
-          },
-        },
-      },
-    },
-  })
+function toNum(d: { toString(): string } | null | undefined): number {
+  if (d == null) return 0
+  return parseFloat(d.toString())
+}
 
-  const saleDetails = await prisma.saleDetail.findMany({
-    where: {
-      sale: {
-        pharmacyId,
-        deletedAt: null,
-        status: 'COMPLETED',
-        ...(Object.keys(dateFilter).length && { soldAt: dateFilter }),
-      },
-    },
-    select: {
-      quantityPieces: true,
-      totalAmount: true,
-      medicine: { select: { uuid: true, name: true } },
-    },
-  })
+// ── Sales ─────────────────────────────────────────────────────
 
-  // Payment breakdown from payment history
-  const paymentMap = new Map<string, { count: number; amount: number }>()
-  for (const sale of sales) {
-    for (const h of sale.payment?.history ?? []) {
-      const key = h.paymentMethod
-      const existing = paymentMap.get(key) ?? { count: 0, amount: 0 }
-      paymentMap.set(key, {
-        count: existing.count + 1,
-        amount: existing.amount + toNum(h.amount),
+export const getSalesSummary = async (
+  pharmacyId: number,
+  query: SalesSummaryInput
+): Promise<{
+  summary: SalesSummary
+  topMedicines: { medicineUuid: string; medicineName: string; totalQuantityPieces: number; totalRevenue: number }[]
+  dailyRevenue: { date: string; revenue: number; count: number }[]
+}> => {
+  const fn = () => fetchSalesSummary(pharmacyId, query)
+  if (!query.period && !query.dateFrom && !query.dateTo) {
+    return getOrSet(`report:${pharmacyId}:sales:summary:all`, CACHE_TTL, fn)
+  }
+  return fn()
+}
+
+const fetchSalesSummary = async (
+  pharmacyId: number,
+  query: SalesSummaryInput
+) => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const dateFilter = buildDateFilter(from, to)
+  const saleWhere = { pharmacyId, deletedAt: null, status: 'COMPLETED' as const, ...(Object.keys(dateFilter).length && { soldAt: dateFilter }) }
+
+  const [saleTotals, paymentGroups, topMedicineGroups] = await Promise.all([
+    prisma.sale.aggregate({
+      where: saleWhere,
+      _count: { _all: true },
+      _sum: { grandTotal: true },
+    }),
+    prisma.salePaymentHistory.groupBy({
+      by: ['paymentMethod'],
+      where: { salePayment: { sale: saleWhere } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    prisma.saleDetail.groupBy({
+      by: ['medicineId'],
+      where: { sale: saleWhere },
+      _sum: { totalAmount: true, quantityPieces: true },
+      orderBy: { _sum: { totalAmount: 'desc' } },
+      take: 10,
+    }),
+  ])
+
+  const fromDate = from ?? new Date('2000-01-01')
+  const toDate = to ?? new Date('2100-01-01')
+
+  const dailyRows = await prisma.$queryRaw<{ date: string; revenue: string; count: string }[]>(
+    Prisma.sql`
+      SELECT
+        DATE(sold_at)::text AS date,
+        SUM(grand_total)::text AS revenue,
+        COUNT(*)::text AS count
+      FROM trx_sales
+      WHERE pharmacy_id = ${pharmacyId}
+        AND deleted_at IS NULL
+        AND status = 'COMPLETED'
+        AND sold_at >= ${fromDate}
+        AND sold_at <= ${toDate}
+      GROUP BY DATE(sold_at)
+      ORDER BY date ASC
+    `
+  )
+
+  const medicineIds = topMedicineGroups.map((g) => g.medicineId)
+  const medicines = medicineIds.length
+    ? await prisma.medicine.findMany({
+        where: { id: { in: medicineIds } },
+        select: { id: true, uuid: true, name: true },
       })
-    }
-  }
+    : []
+  const medicineMap = new Map(medicines.map((m) => [m.id, m]))
 
-  // Top medicines by revenue
-  const medicineMap = new Map<
-    string,
-    { medicineName: string; totalQuantityPieces: number; totalRevenue: number }
-  >()
-  for (const d of saleDetails) {
-    const key = d.medicine.uuid
-    const existing = medicineMap.get(key) ?? {
-      medicineName: d.medicine.name,
-      totalQuantityPieces: 0,
-      totalRevenue: 0,
-    }
-    medicineMap.set(key, {
-      medicineName: existing.medicineName,
-      totalQuantityPieces: existing.totalQuantityPieces + d.quantityPieces,
-      totalRevenue: existing.totalRevenue + toNum(d.totalAmount),
-    })
-  }
-
-  // Daily revenue
-  const dailyMap = new Map<string, { revenue: number; count: number }>()
-  for (const sale of sales) {
-    const date = DateTime.fromJSDate(sale.soldAt).toISODate()!
-    const existing = dailyMap.get(date) ?? { revenue: 0, count: 0 }
-    dailyMap.set(date, {
-      revenue: existing.revenue + toNum(sale.grandTotal),
-      count: existing.count + 1,
-    })
-  }
-
-  const totalRevenue = sales.reduce((sum, s) => sum + toNum(s.grandTotal), 0)
+  const totalRevenue = toNum(saleTotals._sum.grandTotal)
+  const totalSales = saleTotals._count._all
 
   return {
     summary: {
       totalRevenue,
-      totalSales: sales.length,
-      averageOrderValue: sales.length > 0 ? totalRevenue / sales.length : 0,
-      paymentBreakdown: Array.from(paymentMap.entries()).map(([method, v]) => ({
-        method,
-        count: v.count,
-        amount: v.amount,
+      totalSales,
+      averageOrderValue: totalSales > 0 ? totalRevenue / totalSales : 0,
+      paymentBreakdown: paymentGroups.map((g) => ({
+        method: g.paymentMethod,
+        count: g._count._all,
+        amount: toNum(g._sum.amount),
       })),
     },
-    topMedicines: Array.from(medicineMap.entries())
-      .map(([medicineUuid, v]) => ({ medicineUuid, ...v }))
-      .sort((a, b) => b.totalRevenue - a.totalRevenue)
-      .slice(0, 10),
-    dailyRevenue: Array.from(dailyMap.entries())
-      .map(([date, v]) => ({ date, ...v }))
-      .sort((a, b) => a.date.localeCompare(b.date)),
+    topMedicines: topMedicineGroups.map((g) => ({
+      medicineUuid: medicineMap.get(g.medicineId)?.uuid ?? '',
+      medicineName: medicineMap.get(g.medicineId)?.name ?? '',
+      totalQuantityPieces: g._sum.quantityPieces ?? 0,
+      totalRevenue: toNum(g._sum.totalAmount),
+    })),
+    dailyRevenue: dailyRows.map((r) => ({
+      date: r.date,
+      revenue: parseFloat(r.revenue),
+      count: parseInt(r.count, 10),
+    })),
   }
 }
 
-export const getSalesExportRows = async (
+export const getSalesList = async (
   pharmacyId: number,
-  query: SalesReportInput
+  query: SalesListInput
+): Promise<{ data: SalesExportRow[]; meta: PaginationMeta }> => {
+  const { page, limit, ...filters } = query
+  const { from, to } = resolveDateRange(filters.period, filters.dateFrom, filters.dateTo)
+  const dateFilter = buildDateFilter(from, to)
+  const where = { pharmacyId, deletedAt: null, status: 'COMPLETED' as const, ...(Object.keys(dateFilter).length && { soldAt: dateFilter }) }
+  const skip = (page - 1) * limit
+
+  const [sales, total] = await Promise.all([
+    prisma.sale.findMany({
+      where,
+      skip,
+      take: limit,
+      select: {
+        saleNumber: true,
+        soldAt: true,
+        saleType: true,
+        status: true,
+        totalAmount: true,
+        discountPercentage: true,
+        discountAmount: true,
+        ppnAmount: true,
+        grandTotal: true,
+        paidAmount: true,
+        customer: { select: { name: true } },
+        payment: { select: { paymentStatus: true } },
+      },
+      orderBy: { soldAt: 'desc' },
+    }),
+    prisma.sale.count({ where }),
+  ])
+
+  return {
+    data: sales.map((s) => ({
+      saleNumber: s.saleNumber,
+      soldAt: DateTime.fromJSDate(s.soldAt).toFormat('yyyy-MM-dd HH:mm'),
+      customerName: s.customer.name,
+      saleType: s.saleType,
+      status: s.status,
+      totalAmount: toNum(s.totalAmount),
+      discountPercentage: toNum(s.discountPercentage),
+      discountAmount: toNum(s.discountAmount),
+      ppnAmount: toNum(s.ppnAmount),
+      grandTotal: toNum(s.grandTotal),
+      paidAmount: toNum(s.paidAmount),
+      paymentStatus: s.payment?.paymentStatus ?? '-',
+    })),
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  }
+}
+
+export const getSalesExport = async (
+  pharmacyId: number,
+  query: SalesExportInput
 ): Promise<SalesExportRow[]> => {
   const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
-
-  const dateFilter = {
-    ...(from && { gte: from }),
-    ...(to && { lte: to }),
-  }
+  const dateFilter = buildDateFilter(from, to)
+  const where = { pharmacyId, deletedAt: null, status: 'COMPLETED' as const, ...(Object.keys(dateFilter).length && { soldAt: dateFilter }) }
 
   const sales = await prisma.sale.findMany({
-    where: {
-      pharmacyId,
-      deletedAt: null,
-      ...(Object.keys(dateFilter).length && { soldAt: dateFilter }),
-    },
+    where,
     select: {
       saleNumber: true,
       soldAt: true,
@@ -214,7 +254,7 @@ export const getSalesExportRows = async (
       customer: { select: { name: true } },
       payment: { select: { paymentStatus: true } },
     },
-    orderBy: { soldAt: 'asc' },
+    orderBy: { soldAt: 'desc' },
   })
 
   return sales.map((s) => ({
@@ -233,89 +273,45 @@ export const getSalesExportRows = async (
   }))
 }
 
-// ── Purchase Report ───────────────────────────────────────────
+// ── Purchases ─────────────────────────────────────────────────
 
-export const getPurchaseReport = async (
-  pharmacyId: number,
-  query: PurchaseReportInput
-): Promise<PurchaseReport> => {
-  if (!hasDateFilter(query)) {
-    const key = `report:${pharmacyId}:purchases:${query.distributorUuid ?? 'all'}`
-    return getOrSet(key, CACHE_TTL, () => fetchPurchaseReport(pharmacyId, query))
-  }
-  return fetchPurchaseReport(pharmacyId, query)
+async function resolveDistributorId(pharmacyId: number, uuid?: string): Promise<number | undefined> {
+  if (!uuid) return undefined
+  const d = await prisma.distributor.findFirst({ where: { uuid, pharmacyId }, select: { id: true } })
+  return d?.id
 }
 
-const fetchPurchaseReport = async (
-  pharmacyId: number,
-  query: PurchaseReportInput
-): Promise<PurchaseReport> => {
-  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
-
-  const dateFilter = {
-    ...(from && { gte: from }),
-    ...(to && { lte: to }),
+function buildInvoiceWhere(pharmacyId: number, distributorId?: number, dateFilter?: object) {
+  return {
+    pharmacyId,
+    deletedAt: null,
+    ...(distributorId && { distributorId }),
+    ...(dateFilter && Object.keys(dateFilter).length && { invoiceDate: dateFilter }),
   }
+}
 
-  let distributorId: number | undefined
-  if (query.distributorUuid) {
-    const d = await prisma.distributor.findFirst({
-      where: { uuid: query.distributorUuid, pharmacyId },
-      select: { id: true },
-    })
-    distributorId = d?.id
-  }
+const invoiceSelect = {
+  uuid: true,
+  invoiceNumber: true,
+  invoiceDate: true,
+  grandTotal: true,
+  paidAmount: true,
+  paymentStatus: true,
+  distributor: { select: { name: true } },
+  purchaseOrder: { select: { orderNumber: true } },
+} as const
 
-  const invoices = await prisma.invoice.findMany({
-    where: {
-      pharmacyId,
-      deletedAt: null,
-      ...(distributorId && { distributorId }),
-      ...(Object.keys(dateFilter).length && { invoiceDate: dateFilter }),
-    },
-    select: {
-      uuid: true,
-      invoiceNumber: true,
-      invoiceDate: true,
-      grandTotal: true,
-      paidAmount: true,
-      paymentStatus: true,
-      distributor: { select: { uuid: true, name: true } },
-      purchaseOrder: { select: { orderNumber: true } },
-    },
-    orderBy: { invoiceDate: 'asc' },
-  })
-
-  const distributorMap = new Map<
-    string,
-    {
-      distributorName: string
-      invoiceCount: number
-      totalAmount: number
-      paidAmount: number
-    }
-  >()
-
-  for (const inv of invoices) {
-    const key = inv.distributor.uuid
-    const existing = distributorMap.get(key) ?? {
-      distributorName: inv.distributor.name,
-      invoiceCount: 0,
-      totalAmount: 0,
-      paidAmount: 0,
-    }
-    distributorMap.set(key, {
-      distributorName: existing.distributorName,
-      invoiceCount: existing.invoiceCount + 1,
-      totalAmount: existing.totalAmount + toNum(inv.grandTotal),
-      paidAmount: existing.paidAmount + toNum(inv.paidAmount),
-    })
-  }
-
-  const totalAmount = invoices.reduce((sum, i) => sum + toNum(i.grandTotal), 0)
-  const paidAmount = invoices.reduce((sum, i) => sum + toNum(i.paidAmount), 0)
-
-  const invoiceList: PurchaseInvoiceRow[] = invoices.map((inv) => ({
+function formatInvoiceRow(inv: {
+  uuid: string
+  invoiceNumber: string
+  invoiceDate: Date
+  grandTotal: { toString(): string }
+  paidAmount: { toString(): string }
+  paymentStatus: string
+  distributor: { name: string }
+  purchaseOrder: { orderNumber: string } | null
+}): PurchaseInvoiceRow {
+  return {
     invoiceUuid: inv.uuid,
     invoiceNumber: inv.invoiceNumber,
     invoiceDate: inv.invoiceDate,
@@ -324,43 +320,231 @@ const fetchPurchaseReport = async (
     totalAmount: toNum(inv.grandTotal),
     paidAmount: toNum(inv.paidAmount),
     paymentStatus: inv.paymentStatus,
-  }))
+  }
+}
+
+export const getPurchaseSummary = async (
+  pharmacyId: number,
+  query: PurchaseSummaryInput
+): Promise<{ summary: PurchaseSummary; byDistributor: PurchaseByDistributor[] }> => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const distributorId = await resolveDistributorId(pharmacyId, query.distributorUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildInvoiceWhere(pharmacyId, distributorId, dateFilter)
+
+  const [totals, byDistributorGroups] = await Promise.all([
+    prisma.invoice.aggregate({
+      where,
+      _count: { _all: true },
+      _sum: { grandTotal: true, paidAmount: true },
+    }),
+    prisma.invoice.groupBy({
+      by: ['distributorId'],
+      where,
+      _count: { _all: true },
+      _sum: { grandTotal: true, paidAmount: true },
+    }),
+  ])
+
+  const distIds = byDistributorGroups.map((g) => g.distributorId)
+  const distributors = distIds.length
+    ? await prisma.distributor.findMany({
+        where: { id: { in: distIds } },
+        select: { id: true, uuid: true, name: true },
+      })
+    : []
+  const distMap = new Map(distributors.map((d) => [d.id, d]))
+
+  const totalAmount = toNum(totals._sum.grandTotal)
+  const paidAmount = toNum(totals._sum.paidAmount)
 
   return {
     summary: {
-      totalInvoices: invoices.length,
+      totalInvoices: totals._count._all,
       totalAmount,
       paidAmount,
       unpaidAmount: totalAmount - paidAmount,
     },
-    byDistributor: Array.from(distributorMap.entries()).map(([distributorUuid, v]) => ({
-      distributorUuid,
-      ...v,
-      unpaidAmount: v.totalAmount - v.paidAmount,
-    })),
-    invoiceList,
+    byDistributor: byDistributorGroups.map((g) => {
+      const total = toNum(g._sum.grandTotal)
+      const paid = toNum(g._sum.paidAmount)
+      return {
+        distributorUuid: distMap.get(g.distributorId)?.uuid ?? '',
+        distributorName: distMap.get(g.distributorId)?.name ?? '',
+        invoiceCount: g._count._all,
+        totalAmount: total,
+        paidAmount: paid,
+        unpaidAmount: total - paid,
+      }
+    }),
   }
 }
 
-// ── Inventory Report ──────────────────────────────────────────
-
-export const getInventoryReport = async (
+export const getPurchaseList = async (
   pharmacyId: number,
-  query: InventoryReportInput
-): Promise<InventoryReport> => {
-  const key = `report:${pharmacyId}:inventory:${query.expiryDays}`
-  return getOrSet(key, CACHE_TTL, () => fetchInventoryReport(pharmacyId, query))
+  query: PurchaseListInput
+): Promise<{ data: PurchaseInvoiceRow[]; meta: PaginationMeta }> => {
+  const { page, limit, ...filters } = query
+  const { from, to } = resolveDateRange(filters.period, filters.dateFrom, filters.dateTo)
+  const distributorId = await resolveDistributorId(pharmacyId, filters.distributorUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildInvoiceWhere(pharmacyId, distributorId, dateFilter)
+  const skip = (page - 1) * limit
+
+  const [invoices, total] = await Promise.all([
+    prisma.invoice.findMany({ where, skip, take: limit, select: invoiceSelect, orderBy: { invoiceDate: 'desc' } }),
+    prisma.invoice.count({ where }),
+  ])
+
+  return {
+    data: invoices.map(formatInvoiceRow),
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  }
 }
 
-const fetchInventoryReport = async (
+export const getPurchaseExport = async (
   pharmacyId: number,
-  query: InventoryReportInput
-): Promise<InventoryReport> => {
+  query: PurchaseExportInput
+): Promise<PurchaseInvoiceRow[]> => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const distributorId = await resolveDistributorId(pharmacyId, query.distributorUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildInvoiceWhere(pharmacyId, distributorId, dateFilter)
+
+  const invoices = await prisma.invoice.findMany({ where, select: invoiceSelect, orderBy: { invoiceDate: 'desc' } })
+  return invoices.map(formatInvoiceRow)
+}
+
+// ── Inventory ─────────────────────────────────────────────────
+
+export const getInventorySummary = async (
+  pharmacyId: number,
+  query: InventorySummaryInput
+): Promise<InventorySummary> => {
+  return getOrSet(`report:${pharmacyId}:inventory:summary:${query.expiryDays}`, CACHE_TTL, () =>
+    fetchInventorySummary(pharmacyId, query)
+  )
+}
+
+const fetchInventorySummary = async (
+  pharmacyId: number,
+  query: InventorySummaryInput
+): Promise<InventorySummary> => {
   const expiryThreshold = DateTime.now().plus({ days: query.expiryDays }).toJSDate()
   const now = new Date()
 
+  const [stockCount, totalValueAgg, lowStockCount, expiredCount, expiringSoonCount] = await Promise.all([
+    prisma.stock.count({ where: { pharmacyId } }),
+    prisma.$queryRaw<{ total: string }[]>(
+      Prisma.sql`
+        SELECT SUM(
+          total_pieces * CASE WHEN is_manual_price AND selling_price IS NOT NULL
+            THEN selling_price ELSE calculated_price END
+        )::text AS total
+        FROM inv_stocks
+        WHERE pharmacy_id = ${pharmacyId}
+      `
+    ),
+    prisma.$queryRaw<{ count: string }[]>(
+      Prisma.sql`
+        SELECT COUNT(*)::text AS count
+        FROM inv_stocks
+        WHERE pharmacy_id = ${pharmacyId}
+          AND total_pieces <= reorder_level
+      `
+    ),
+    prisma.stockDetail.count({
+      where: {
+        stock: { pharmacyId },
+        expiryDate: { lt: now },
+        quantityPieces: { gt: 0 },
+      },
+    }),
+    prisma.stockDetail.count({
+      where: {
+        stock: { pharmacyId },
+        expiryDate: { gte: now, lte: expiryThreshold },
+        quantityPieces: { gt: 0 },
+      },
+    }),
+  ])
+
+  return {
+    totalMedicines: stockCount,
+    totalStockValue: parseFloat(totalValueAgg[0]?.total ?? '0'),
+    lowStockCount: parseInt(lowStockCount[0]?.count ?? '0', 10),
+    expiredCount,
+    expiringSoonCount,
+  }
+}
+
+export const getInventoryList = async (
+  pharmacyId: number,
+  query: InventoryListInput
+): Promise<{ data: InventoryStockLevel[]; meta: PaginationMeta }> => {
+  const { page, limit, expiryDays: _expiryDays, isLowStock } = query
+  const skip = (page - 1) * limit
+
+  let where: Prisma.StockWhereInput = { pharmacyId }
+  if (isLowStock === true) {
+    const lowStockIds = await prisma.$queryRaw<{ id: number }[]>(
+      Prisma.sql`SELECT id FROM inv_stocks WHERE pharmacy_id = ${pharmacyId} AND total_pieces <= reorder_level`
+    )
+    where = { ...where, id: { in: lowStockIds.map((r) => r.id) } }
+  }
+
+  const [stocks, total] = await Promise.all([
+    prisma.stock.findMany({
+      where,
+      skip,
+      take: limit,
+      select: {
+        totalPieces: true,
+        reorderLevel: true,
+        basePrice: true,
+        calculatedPrice: true,
+        sellingPrice: true,
+        isManualPrice: true,
+        medicine: { select: { uuid: true, name: true, unit: true } },
+      },
+      orderBy: { medicine: { name: 'asc' } },
+    }),
+    prisma.stock.count({ where }),
+  ])
+
+  return {
+    data: stocks.map((s) => {
+      const effectivePrice = s.isManualPrice && s.sellingPrice ? toNum(s.sellingPrice) : toNum(s.calculatedPrice)
+      return {
+        medicineUuid: s.medicine.uuid,
+        medicineName: s.medicine.name,
+        unit: s.medicine.unit,
+        totalPieces: s.totalPieces,
+        reorderLevel: s.reorderLevel,
+        isLowStock: s.totalPieces <= s.reorderLevel,
+        basePrice: toNum(s.basePrice),
+        sellingPrice: effectivePrice,
+      }
+    }),
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  }
+}
+
+export const getInventoryExport = async (
+  pharmacyId: number,
+  query: InventoryExportInput
+): Promise<InventoryStockLevel[]> => {
+  const { isLowStock } = query
+  let where: Prisma.StockWhereInput = { pharmacyId }
+  if (isLowStock === true) {
+    const lowStockIds = await prisma.$queryRaw<{ id: number }[]>(
+      Prisma.sql`SELECT id FROM inv_stocks WHERE pharmacy_id = ${pharmacyId} AND total_pieces <= reorder_level`
+    )
+    where = { ...where, id: { in: lowStockIds.map((r) => r.id) } }
+  }
+
   const stocks = await prisma.stock.findMany({
-    where: { pharmacyId },
+    where,
     select: {
       totalPieces: true,
       reorderLevel: true,
@@ -369,23 +553,12 @@ const fetchInventoryReport = async (
       sellingPrice: true,
       isManualPrice: true,
       medicine: { select: { uuid: true, name: true, unit: true } },
-      details: {
-        where: { quantityPieces: { gt: 0 } },
-        select: {
-          batchNumber: true,
-          expiryDate: true,
-          quantityPieces: true,
-          distributor: { select: { name: true } },
-        },
-      },
     },
     orderBy: { medicine: { name: 'asc' } },
   })
 
-  const stockLevels: InventoryStockLevel[] = stocks.map((s) => {
-    const effectivePrice = s.isManualPrice && s.sellingPrice
-      ? toNum(s.sellingPrice)
-      : toNum(s.calculatedPrice)
+  return stocks.map((s) => {
+    const effectivePrice = s.isManualPrice && s.sellingPrice ? toNum(s.sellingPrice) : toNum(s.calculatedPrice)
     return {
       medicineUuid: s.medicine.uuid,
       medicineName: s.medicine.name,
@@ -397,209 +570,220 @@ const fetchInventoryReport = async (
       sellingPrice: effectivePrice,
     }
   })
+}
 
-  const lowStock = stockLevels.filter((s) => s.isLowStock)
+export const getInventoryExpiryAlerts = async (
+  pharmacyId: number,
+  query: InventorySummaryInput
+): Promise<{ expiringSoon: InventoryExpiryAlert[]; expired: InventoryExpiryAlert[] }> => {
+  const expiryThreshold = DateTime.now().plus({ days: query.expiryDays }).toJSDate()
+  const now = new Date()
+
+  const details = await prisma.stockDetail.findMany({
+    where: {
+      stock: { pharmacyId },
+      expiryDate: { lte: expiryThreshold },
+      quantityPieces: { gt: 0 },
+    },
+    select: {
+      batchNumber: true,
+      expiryDate: true,
+      quantityPieces: true,
+      distributor: { select: { name: true } },
+      stock: { select: { medicine: { select: { uuid: true, name: true } } } },
+    },
+    orderBy: { expiryDate: 'asc' },
+  })
 
   const expiringSoon: InventoryExpiryAlert[] = []
   const expired: InventoryExpiryAlert[] = []
 
-  for (const stock of stocks) {
-    for (const detail of stock.details) {
-      const daysUntilExpiry = Math.ceil(
-        (detail.expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      )
-      const alert: InventoryExpiryAlert = {
-        medicineUuid: stock.medicine.uuid,
-        medicineName: stock.medicine.name,
-        batchNumber: detail.batchNumber,
-        expiryDate: detail.expiryDate,
-        daysUntilExpiry,
-        quantityPieces: detail.quantityPieces,
-        distributorName: detail.distributor.name,
-      }
-      if (detail.expiryDate <= now) {
-        expired.push(alert)
-      } else if (detail.expiryDate <= expiryThreshold) {
-        expiringSoon.push(alert)
-      }
+  for (const d of details) {
+    const daysUntilExpiry = Math.ceil((d.expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    const alert: InventoryExpiryAlert = {
+      medicineUuid: d.stock.medicine.uuid,
+      medicineName: d.stock.medicine.name,
+      batchNumber: d.batchNumber,
+      expiryDate: d.expiryDate,
+      daysUntilExpiry,
+      quantityPieces: d.quantityPieces,
+      distributorName: d.distributor.name,
     }
+    if (d.expiryDate <= now) expired.push(alert)
+    else expiringSoon.push(alert)
   }
 
-  expiringSoon.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
-  expired.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
+  return { expiringSoon, expired }
+}
 
-  const totalStockValue = stocks.reduce((sum, s) => {
-    const price = s.isManualPrice && s.sellingPrice
-      ? toNum(s.sellingPrice)
-      : toNum(s.calculatedPrice)
-    return sum + price * s.totalPieces
-  }, 0)
+// ── Stock Movements ───────────────────────────────────────────
 
+async function resolveMedicineId(pharmacyId: number, uuid?: string): Promise<number | undefined> {
+  if (!uuid) return undefined
+  const m = await prisma.medicine.findFirst({ where: { uuid, pharmacyId }, select: { id: true } })
+  return m?.id
+}
+
+function buildMovementWhere(
+  pharmacyId: number,
+  medicineId?: number,
+  type?: string,
+  reason?: string,
+  dateFilter?: object
+) {
   return {
-    summary: {
-      totalMedicines: stocks.length,
-      totalStockValue,
-      lowStockCount: lowStock.length,
-      expiredCount: expired.length,
-      expiringSoonCount: expiringSoon.length,
-    },
-    stockLevels,
-    lowStock,
-    expiringSoon,
-    expired,
+    pharmacyId,
+    ...(medicineId && { medicineId }),
+    ...(type && { type: type as any }),
+    ...(reason && { reason: reason as any }),
+    ...(dateFilter && Object.keys(dateFilter).length && { createdAt: dateFilter }),
   }
 }
 
-// ── Stock Movement Report ─────────────────────────────────────
+const movementSelect = {
+  uuid: true,
+  createdAt: true,
+  type: true,
+  reason: true,
+  quantity: true,
+  quantityBefore: true,
+  quantityAfter: true,
+  description: true,
+  medicine: { select: { uuid: true, name: true } },
+  stockDetail: { select: { batchNumber: true } },
+  invoiceDetail: { select: { invoice: { select: { invoiceNumber: true } } } },
+  saleDetail: { select: { sale: { select: { saleNumber: true } } } },
+  stockReturnDetail: { select: { stockReturn: { select: { returnNumber: true } } } },
+  stockDisposalDetail: { select: { stockDisposal: { select: { disposalNumber: true } } } },
+} as const
 
-export const getStockMovementReport = async (
-  pharmacyId: number,
-  query: StockMovementReportInput
-): Promise<StockMovementReport> => {
-  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
-
-  const dateFilter = {
-    ...(from && { gte: from }),
-    ...(to && { lte: to }),
-  }
-
-  let medicineId: number | undefined
-  if (query.medicineUuid) {
-    const m = await prisma.medicine.findFirst({
-      where: { uuid: query.medicineUuid, pharmacyId },
-      select: { id: true },
-    })
-    medicineId = m?.id
-  }
-
-  const movements = await prisma.stockMovement.findMany({
-    where: {
-      pharmacyId,
-      ...(medicineId && { medicineId }),
-      ...(query.type && { type: query.type }),
-      ...(query.reason && { reason: query.reason }),
-      ...(Object.keys(dateFilter).length && { createdAt: dateFilter }),
-    },
-    select: {
-      uuid: true,
-      createdAt: true,
-      type: true,
-      reason: true,
-      quantity: true,
-      quantityBefore: true,
-      quantityAfter: true,
-      description: true,
-      medicine: { select: { uuid: true, name: true } },
-      stockDetail: { select: { batchNumber: true } },
-      invoiceDetail: {
-        select: { invoice: { select: { invoiceNumber: true } } },
-      },
-      saleDetail: {
-        select: { sale: { select: { saleNumber: true } } },
-      },
-      stockReturnDetail: {
-        select: { stockReturn: { select: { returnNumber: true } } },
-      },
-      stockDisposalDetail: {
-        select: { stockDisposal: { select: { disposalNumber: true } } },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  const rows: StockMovementRow[] = movements.map((m) => {
-    const referenceNumber =
+function formatMovementRow(m: {
+  uuid: string
+  createdAt: Date
+  type: string
+  reason: string
+  quantity: number
+  quantityBefore: number
+  quantityAfter: number
+  description: string | null
+  medicine: { uuid: string; name: string }
+  stockDetail: { batchNumber: string }
+  invoiceDetail: { invoice: { invoiceNumber: string } } | null
+  saleDetail: { sale: { saleNumber: string } } | null
+  stockReturnDetail: { stockReturn: { returnNumber: string } } | null
+  stockDisposalDetail: { stockDisposal: { disposalNumber: string } } | null
+}): StockMovementRow {
+  return {
+    movementUuid: m.uuid,
+    createdAt: m.createdAt,
+    medicineName: m.medicine.name,
+    medicineUuid: m.medicine.uuid,
+    type: m.type,
+    reason: m.reason,
+    quantity: m.quantity,
+    quantityBefore: m.quantityBefore,
+    quantityAfter: m.quantityAfter,
+    batchNumber: m.stockDetail.batchNumber,
+    description: m.description ?? null,
+    referenceNumber:
       m.invoiceDetail?.invoice?.invoiceNumber ??
       m.saleDetail?.sale?.saleNumber ??
       m.stockReturnDetail?.stockReturn?.returnNumber ??
       m.stockDisposalDetail?.stockDisposal?.disposalNumber ??
-      null
+      null,
+  }
+}
 
-    return {
-      movementUuid: m.uuid,
-      createdAt: m.createdAt,
-      medicineName: m.medicine.name,
-      medicineUuid: m.medicine.uuid,
-      type: m.type,
-      reason: m.reason,
-      quantity: m.quantity,
-      quantityBefore: m.quantityBefore,
-      quantityAfter: m.quantityAfter,
-      batchNumber: m.stockDetail.batchNumber,
-      description: m.description ?? null,
-      referenceNumber,
-    }
+export const getStockMovementSummary = async (
+  pharmacyId: number,
+  query: StockMovementSummaryInput
+): Promise<StockMovementSummary> => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const medicineId = await resolveMedicineId(pharmacyId, query.medicineUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildMovementWhere(pharmacyId, medicineId, query.type, query.reason, dateFilter)
+
+  const byType = await prisma.stockMovement.groupBy({
+    by: ['type'],
+    where,
+    _sum: { quantity: true },
+    _count: { _all: true },
   })
+
+  const total = byType.reduce((s, g) => s + g._count._all, 0)
+  const inGroup = byType.find((g) => g.type === 'IN')
+  const outGroup = byType.find((g) => g.type === 'OUT')
 
   return {
-    summary: {
-      totalMovements: rows.length,
-      totalInQty: rows.filter((r) => r.type === 'IN').reduce((s, r) => s + r.quantity, 0),
-      totalOutQty: rows.filter((r) => r.type === 'OUT').reduce((s, r) => s + r.quantity, 0),
-    },
-    movements: rows,
+    totalMovements: total,
+    totalInQty: inGroup?._sum.quantity ?? 0,
+    totalOutQty: outGroup?._sum.quantity ?? 0,
   }
 }
 
-// ── Disposal Report ───────────────────────────────────────────
-
-export const getDisposalReport = async (
+export const getStockMovementList = async (
   pharmacyId: number,
-  query: DisposalReportInput
-): Promise<DisposalReport> => {
-  if (!hasDateFilter(query)) {
-    return getOrSet(`report:${pharmacyId}:disposals:all`, CACHE_TTL, () => fetchDisposalReport(pharmacyId, query))
+  query: StockMovementListInput
+): Promise<{ data: StockMovementRow[]; meta: PaginationMeta }> => {
+  const { page, limit, ...filters } = query
+  const { from, to } = resolveDateRange(filters.period, filters.dateFrom, filters.dateTo)
+  const medicineId = await resolveMedicineId(pharmacyId, filters.medicineUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildMovementWhere(pharmacyId, medicineId, filters.type, filters.reason, dateFilter)
+  const skip = (page - 1) * limit
+
+  const [movements, total] = await Promise.all([
+    prisma.stockMovement.findMany({ where, skip, take: limit, select: movementSelect, orderBy: { createdAt: 'desc' } }),
+    prisma.stockMovement.count({ where }),
+  ])
+
+  return {
+    data: movements.map(formatMovementRow),
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   }
-  return fetchDisposalReport(pharmacyId, query)
 }
 
-const fetchDisposalReport = async (
+export const getStockMovementExport = async (
   pharmacyId: number,
-  query: DisposalReportInput
-): Promise<DisposalReport> => {
+  query: StockMovementExportInput
+): Promise<StockMovementRow[]> => {
   const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const medicineId = await resolveMedicineId(pharmacyId, query.medicineUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildMovementWhere(pharmacyId, medicineId, query.type, query.reason, dateFilter)
 
-  const dateFilter = {
-    ...(from && { gte: from }),
-    ...(to && { lte: to }),
-  }
+  const movements = await prisma.stockMovement.findMany({ where, select: movementSelect, orderBy: { createdAt: 'desc' } })
+  return movements.map(formatMovementRow)
+}
 
-  const details = await prisma.stockDisposalDetail.findMany({
-    where: {
-      stockDisposal: {
-        pharmacyId,
-        deletedAt: null,
-        ...(Object.keys(dateFilter).length && { disposedAt: dateFilter }),
-      },
+// ── Disposals ─────────────────────────────────────────────────
+
+function buildDisposalDetailWhere(pharmacyId: number, dateFilter?: object) {
+  return {
+    stockDisposal: {
+      pharmacyId,
+      deletedAt: null,
+      ...(dateFilter && Object.keys(dateFilter).length && { disposedAt: dateFilter }),
     },
-    select: {
-      quantityPieces: true,
-      reason: true,
-      stockDisposal: {
-        select: {
-          uuid: true,
-          disposalNumber: true,
-          status: true,
-          disposedAt: true,
-        },
-      },
-      medicine: { select: { name: true } },
-      stockDetail: { select: { batchNumber: true } },
-    },
-    orderBy: { stockDisposal: { disposedAt: 'asc' } },
-  })
-
-  const reasonMap = new Map<string, { count: number; totalQuantityPieces: number }>()
-  for (const d of details) {
-    const key = d.reason
-    const existing = reasonMap.get(key) ?? { count: 0, totalQuantityPieces: 0 }
-    reasonMap.set(key, {
-      count: existing.count + 1,
-      totalQuantityPieces: existing.totalQuantityPieces + d.quantityPieces,
-    })
   }
+}
 
-  const rows: DisposalDetailRow[] = details.map((d) => ({
+const disposalDetailSelect = {
+  quantityPieces: true,
+  reason: true,
+  stockDisposal: { select: { uuid: true, disposalNumber: true, status: true, disposedAt: true } },
+  medicine: { select: { name: true } },
+  stockDetail: { select: { batchNumber: true } },
+} as const
+
+function formatDisposalRow(d: {
+  quantityPieces: number
+  reason: string
+  stockDisposal: { uuid: string; disposalNumber: string; status: string; disposedAt: Date | null }
+  medicine: { name: string }
+  stockDetail: { batchNumber: string }
+}): DisposalDetailRow {
+  return {
     disposalUuid: d.stockDisposal.uuid,
     disposalNumber: d.stockDisposal.disposalNumber,
     disposedAt: d.stockDisposal.disposedAt,
@@ -608,104 +792,136 @@ const fetchDisposalReport = async (
     quantityPieces: d.quantityPieces,
     reason: d.reason,
     status: d.stockDisposal.status,
-  }))
+  }
+}
 
-  const uniqueDisposalIds = new Set(details.map((d) => d.stockDisposal.uuid))
+export const getDisposalSummary = async (
+  pharmacyId: number,
+  query: DisposalSummaryInput
+): Promise<{ summary: DisposalSummary; byReason: DisposalByReason[] }> => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildDisposalDetailWhere(pharmacyId, dateFilter)
+
+  const [totals, byReason, uniqueDisposals] = await Promise.all([
+    prisma.stockDisposalDetail.aggregate({
+      where,
+      _count: { _all: true },
+      _sum: { quantityPieces: true },
+    }),
+    prisma.stockDisposalDetail.groupBy({
+      by: ['reason'],
+      where,
+      _count: { _all: true },
+      _sum: { quantityPieces: true },
+    }),
+    prisma.stockDisposalDetail.findMany({
+      where,
+      distinct: ['stockDisposalId'],
+      select: { stockDisposalId: true },
+    }),
+  ])
 
   return {
     summary: {
-      totalDisposals: uniqueDisposalIds.size,
-      totalItems: details.length,
-      totalQuantityPieces: details.reduce((sum, d) => sum + d.quantityPieces, 0),
+      totalDisposals: uniqueDisposals.length,
+      totalItems: totals._count._all,
+      totalQuantityPieces: totals._sum.quantityPieces ?? 0,
     },
-    byReason: Array.from(reasonMap.entries()).map(([reason, v]) => ({ reason, ...v })),
-    disposals: rows,
+    byReason: byReason.map((g) => ({
+      reason: g.reason,
+      count: g._count._all,
+      totalQuantityPieces: g._sum.quantityPieces ?? 0,
+    })),
   }
 }
 
-// ── Return Report ─────────────────────────────────────────────
-
-export const getReturnReport = async (
+export const getDisposalList = async (
   pharmacyId: number,
-  query: ReturnReportInput
-): Promise<ReturnReport> => {
-  if (!hasDateFilter(query)) {
-    const key = `report:${pharmacyId}:returns:${query.distributorUuid ?? 'all'}`
-    return getOrSet(key, CACHE_TTL, () => fetchReturnReport(pharmacyId, query))
+  query: DisposalListInput
+): Promise<{ data: DisposalDetailRow[]; meta: PaginationMeta }> => {
+  const { page, limit, ...filters } = query
+  const { from, to } = resolveDateRange(filters.period, filters.dateFrom, filters.dateTo)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildDisposalDetailWhere(pharmacyId, dateFilter)
+  const skip = (page - 1) * limit
+
+  const [details, total] = await Promise.all([
+    prisma.stockDisposalDetail.findMany({
+      where,
+      skip,
+      take: limit,
+      select: disposalDetailSelect,
+      orderBy: { stockDisposal: { disposedAt: 'desc' } },
+    }),
+    prisma.stockDisposalDetail.count({ where }),
+  ])
+
+  return {
+    data: details.map(formatDisposalRow),
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   }
-  return fetchReturnReport(pharmacyId, query)
 }
 
-const fetchReturnReport = async (
+export const getDisposalExport = async (
   pharmacyId: number,
-  query: ReturnReportInput
-): Promise<ReturnReport> => {
+  query: DisposalExportInput
+): Promise<DisposalDetailRow[]> => {
   const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildDisposalDetailWhere(pharmacyId, dateFilter)
 
-  const dateFilter = {
-    ...(from && { gte: from }),
-    ...(to && { lte: to }),
-  }
-
-  let distributorId: number | undefined
-  if (query.distributorUuid) {
-    const d = await prisma.distributor.findFirst({
-      where: { uuid: query.distributorUuid, pharmacyId },
-      select: { id: true },
-    })
-    distributorId = d?.id
-  }
-
-  const details = await prisma.stockReturnDetail.findMany({
-    where: {
-      stockReturn: {
-        pharmacyId,
-        deletedAt: null,
-        ...(distributorId && { distributorId }),
-        ...(Object.keys(dateFilter).length && { returnedAt: dateFilter }),
-      },
-    },
-    select: {
-      quantityPieces: true,
-      reason: true,
-      stockReturn: {
-        select: {
-          uuid: true,
-          returnNumber: true,
-          status: true,
-          returnedAt: true,
-          distributor: { select: { uuid: true, name: true } },
-        },
-      },
-      medicine: { select: { name: true } },
-      stockDetail: { select: { batchNumber: true } },
-    },
-    orderBy: { stockReturn: { returnedAt: 'asc' } },
+  const details = await prisma.stockDisposalDetail.findMany({
+    where,
+    select: disposalDetailSelect,
+    orderBy: { stockDisposal: { disposedAt: 'desc' } },
   })
+  return details.map(formatDisposalRow)
+}
 
-  const distributorMap = new Map<
-    string,
-    { distributorName: string; returnCount: number; totalQuantityPieces: number }
-  >()
-  const seenReturnIds = new Set<string>()
+// ── Returns ───────────────────────────────────────────────────
 
-  for (const d of details) {
-    const key = d.stockReturn.distributor.uuid
-    const existing = distributorMap.get(key) ?? {
-      distributorName: d.stockReturn.distributor.name,
-      returnCount: 0,
-      totalQuantityPieces: 0,
-    }
-    const isNewReturn = !seenReturnIds.has(d.stockReturn.uuid)
-    seenReturnIds.add(d.stockReturn.uuid)
-    distributorMap.set(key, {
-      distributorName: existing.distributorName,
-      returnCount: existing.returnCount + (isNewReturn ? 1 : 0),
-      totalQuantityPieces: existing.totalQuantityPieces + d.quantityPieces,
-    })
+function buildReturnDetailWhere(pharmacyId: number, distributorId?: number, dateFilter?: object) {
+  return {
+    stockReturn: {
+      pharmacyId,
+      deletedAt: null,
+      ...(distributorId && { distributorId }),
+      ...(dateFilter && Object.keys(dateFilter).length && { returnedAt: dateFilter }),
+    },
   }
+}
 
-  const rows: ReturnDetailRow[] = details.map((d) => ({
+const returnDetailSelect = {
+  quantityPieces: true,
+  reason: true,
+  stockReturn: {
+    select: {
+      uuid: true,
+      returnNumber: true,
+      status: true,
+      returnedAt: true,
+      distributor: { select: { uuid: true, name: true } },
+    },
+  },
+  medicine: { select: { name: true } },
+  stockDetail: { select: { batchNumber: true } },
+} as const
+
+function formatReturnRow(d: {
+  quantityPieces: number
+  reason: string | null
+  stockReturn: {
+    uuid: string
+    returnNumber: string
+    status: string
+    returnedAt: Date | null
+    distributor: { uuid: string; name: string }
+  }
+  medicine: { name: string }
+  stockDetail: { batchNumber: string }
+}): ReturnDetailRow {
+  return {
     returnUuid: d.stockReturn.uuid,
     returnNumber: d.stockReturn.returnNumber,
     returnedAt: d.stockReturn.returnedAt,
@@ -715,18 +931,93 @@ const fetchReturnReport = async (
     quantityPieces: d.quantityPieces,
     reason: d.reason ?? null,
     status: d.stockReturn.status,
-  }))
+  }
+}
+
+export const getReturnSummary = async (
+  pharmacyId: number,
+  query: ReturnSummaryInput
+): Promise<{ summary: ReturnSummary; byDistributor: ReturnByDistributor[] }> => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const distributorId = await resolveDistributorId(pharmacyId, query.distributorUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildReturnDetailWhere(pharmacyId, distributorId, dateFilter)
+
+  const details = await prisma.stockReturnDetail.findMany({
+    where,
+    select: {
+      quantityPieces: true,
+      stockReturn: { select: { uuid: true, distributor: { select: { uuid: true, name: true } } } },
+    },
+  })
+
+  const distMap = new Map<string, { name: string; returnIds: Set<string>; totalQuantityPieces: number }>()
+  for (const d of details) {
+    const key = d.stockReturn.distributor.uuid
+    const existing = distMap.get(key) ?? { name: d.stockReturn.distributor.name, returnIds: new Set<string>(), totalQuantityPieces: 0 }
+    existing.returnIds.add(d.stockReturn.uuid)
+    existing.totalQuantityPieces += d.quantityPieces
+    distMap.set(key, existing)
+  }
+
+  const returnIds = new Set(details.map((d) => d.stockReturn.uuid))
 
   return {
     summary: {
-      totalReturns: seenReturnIds.size,
+      totalReturns: returnIds.size,
       totalItems: details.length,
-      totalQuantityPieces: details.reduce((sum, d) => sum + d.quantityPieces, 0),
+      totalQuantityPieces: details.reduce((s, d) => s + d.quantityPieces, 0),
     },
-    byDistributor: Array.from(distributorMap.entries()).map(([distributorUuid, v]) => ({
+    byDistributor: Array.from(distMap.entries()).map(([distributorUuid, v]) => ({
       distributorUuid,
-      ...v,
+      distributorName: v.name,
+      returnCount: v.returnIds.size,
+      totalQuantityPieces: v.totalQuantityPieces,
     })),
-    returns: rows,
   }
+}
+
+export const getReturnList = async (
+  pharmacyId: number,
+  query: ReturnListInput
+): Promise<{ data: ReturnDetailRow[]; meta: PaginationMeta }> => {
+  const { page, limit, ...filters } = query
+  const { from, to } = resolveDateRange(filters.period, filters.dateFrom, filters.dateTo)
+  const distributorId = await resolveDistributorId(pharmacyId, filters.distributorUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildReturnDetailWhere(pharmacyId, distributorId, dateFilter)
+  const skip = (page - 1) * limit
+
+  const [details, total] = await Promise.all([
+    prisma.stockReturnDetail.findMany({
+      where,
+      skip,
+      take: limit,
+      select: returnDetailSelect,
+      orderBy: { stockReturn: { returnedAt: 'desc' } },
+    }),
+    prisma.stockReturnDetail.count({ where }),
+  ])
+
+  return {
+    data: details.map(formatReturnRow),
+    meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  }
+}
+
+export const getReturnExport = async (
+  pharmacyId: number,
+  query: ReturnExportInput
+): Promise<ReturnDetailRow[]> => {
+  const { from, to } = resolveDateRange(query.period, query.dateFrom, query.dateTo)
+  const distributorId = await resolveDistributorId(pharmacyId, query.distributorUuid)
+  const dateFilter = buildDateFilter(from, to)
+  const where = buildReturnDetailWhere(pharmacyId, distributorId, dateFilter)
+
+  const details = await prisma.stockReturnDetail.findMany({
+    where,
+    select: returnDetailSelect,
+    orderBy: { stockReturn: { returnedAt: 'desc' } },
+  })
+  return details.map(formatReturnRow)
 }

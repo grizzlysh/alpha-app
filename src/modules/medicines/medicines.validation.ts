@@ -2,24 +2,24 @@ import { z } from 'zod'
 import { RecordStatus } from '@prisma/client'
 
 export const createMedicineSchema = z.object({
-  name: z.string().trim().min(1, { message: 'Name is required' }),
+  name: z.string().trim().toLowerCase().min(1, { message: 'Name is required' }),
   medicineShapeUuid: z.string().uuid({ message: 'Invalid shape UUID' }),
   medicineTypeUuid: z.string().uuid({ message: 'Invalid type UUID' }),
   medicineClassUuid: z.string().uuid({ message: 'Invalid medicine class UUID' }),
-  unit: z.string().trim().min(1, { message: 'Unit is required' }),
+  unit: z.string().trim().toLowerCase().min(1, { message: 'Unit is required' }),
   ingredients: z.array(
-    z.string().trim().min(1, { message: 'Ingredient name cannot be empty' })
+    z.string().trim().toLowerCase().min(1, { message: 'Ingredient name cannot be empty' })
   ).min(1, { message: 'At least one ingredient is required' }),
 })
 
 export const updateMedicineSchema = z.object({
-  name: z.string().trim().min(1).optional(),
+  name: z.string().trim().toLowerCase().min(1).optional(),
   medicineShapeUuid: z.string().uuid().optional(),
   medicineTypeUuid: z.string().uuid().optional(),
   medicineClassUuid: z.string().uuid().optional(),
-  unit: z.string().trim().min(1).optional(),
+  unit: z.string().trim().toLowerCase().min(1).optional(),
   ingredients: z.array(
-    z.string().trim().min(1)
+    z.string().trim().toLowerCase().min(1)
   ).min(1).optional(),
   status: z.enum(RecordStatus).optional(),
 })

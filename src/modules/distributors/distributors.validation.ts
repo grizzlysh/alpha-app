@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { RecordStatus } from '@prisma/client'
 
 export const createDistributorSchema = z.object({
-  name: z.string().trim().min(1, { message: 'Name is required' }),
+  name: z.string().trim().toLowerCase().min(1, { message: 'Name is required' }),
   phone: z.string().trim().min(1, { message: 'Phone is required' }),
   email: z.string().trim().email({ message: 'Invalid email format' }).optional(),
   address: z.string().trim().optional(),
@@ -12,7 +12,7 @@ export const createDistributorSchema = z.object({
 })
 
 export const updateDistributorSchema = z.object({
-  name: z.string().trim().min(1).optional(),
+  name: z.string().trim().toLowerCase().min(1).optional(),
   phone: z.string().trim().min(1).optional(),
   email: z.string().trim().email().optional(),
   address: z.string().trim().optional(),

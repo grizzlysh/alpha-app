@@ -12,6 +12,7 @@ import {
   GetSalesRequest,
   GetSaleRequest,
   CreateSaleRequest,
+  UpdateSaleRequest,
   CancelSaleRequest,
   CompleteSaleRequest,
   AddPaymentRequest,
@@ -79,6 +80,25 @@ export const createSale = async (
   }
 }
 
+export const updateSale = async (
+  req: UpdateSaleRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const sale = await SaleService.updateSale(
+      parseUuid(req.params.sale_uuid),
+      req.body as any,
+      req.user!.pharmacyId!,
+      req.user!.id
+    )
+
+    sendSuccess(res, MESSAGE_CODES.SALE_UPDATED, sale)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export const completeSale = async (
   req: CompleteSaleRequest,
   res: Response,
@@ -87,6 +107,7 @@ export const completeSale = async (
   try {
     const sale = await SaleService.completeSale(
       parseUuid(req.params.sale_uuid),
+      req.body as any,
       req.user!.pharmacyId!,
       req.user!.id
     )

@@ -130,6 +130,7 @@ export interface StockDetailSearchResponse {
   batchNumber: string
   expiryDate: Date
   quantityPieces: number
+  availablePieces: number
   quantityBox: number
   quantityPerBox: number
   distributor: { uuid: string; name: string }

@@ -1,21 +1,33 @@
 import { Request } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
-import {
-  SalesReportInput,
-  PurchaseReportInput,
-  StockMovementReportInput,
-  DisposalReportInput,
-  ReturnReportInput,
-} from './reports.validation'
 
 // ── Request Types ─────────────────────────────────────────────
 
-export type GetSalesReportRequest = Request<ParamsDictionary, {}, {}, SalesReportInput>
-export type GetPurchaseReportRequest = Request<ParamsDictionary, {}, {}, PurchaseReportInput>
-export type GetInventoryReportRequest = Request<ParamsDictionary, {}, {}, { expiryDays?: string }>
-export type GetStockMovementReportRequest = Request<ParamsDictionary, {}, {}, StockMovementReportInput>
-export type GetDisposalReportRequest = Request<ParamsDictionary, {}, {}, DisposalReportInput>
-export type GetReturnReportRequest = Request<ParamsDictionary, {}, {}, ReturnReportInput>
+type Q = Record<string, any>
+
+export type GetSalesSummaryRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetSalesListRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetSalesExportRequest = Request<ParamsDictionary, {}, {}, Q>
+
+export type GetPurchaseSummaryRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetPurchaseListRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetPurchaseExportRequest = Request<ParamsDictionary, {}, {}, Q>
+
+export type GetInventorySummaryRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetInventoryListRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetInventoryExportRequest = Request<ParamsDictionary, {}, {}, Q>
+
+export type GetStockMovementSummaryRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetStockMovementListRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetStockMovementExportRequest = Request<ParamsDictionary, {}, {}, Q>
+
+export type GetDisposalSummaryRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetDisposalListRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetDisposalExportRequest = Request<ParamsDictionary, {}, {}, Q>
+
+export type GetReturnSummaryRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetReturnListRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetReturnExportRequest = Request<ParamsDictionary, {}, {}, Q>
 
 // ── Response Types ────────────────────────────────────────────
 
@@ -45,12 +57,6 @@ export interface SalesSummary {
   totalSales: number
   averageOrderValue: number
   paymentBreakdown: SalesPaymentBreakdown[]
-}
-
-export interface SalesReport {
-  summary: SalesSummary
-  topMedicines: SalesTopMedicine[]
-  dailyRevenue: SalesDailyRevenue[]
 }
 
 export interface SalesExportRow {
@@ -97,12 +103,6 @@ export interface PurchaseSummary {
   unpaidAmount: number
 }
 
-export interface PurchaseReport {
-  summary: PurchaseSummary
-  byDistributor: PurchaseByDistributor[]
-  invoiceList: PurchaseInvoiceRow[]
-}
-
 // ── Inventory ────────────────────────────────────────────────
 
 export interface InventoryStockLevel {
@@ -134,14 +134,6 @@ export interface InventorySummary {
   expiringSoonCount: number
 }
 
-export interface InventoryReport {
-  summary: InventorySummary
-  stockLevels: InventoryStockLevel[]
-  lowStock: InventoryStockLevel[]
-  expiringSoon: InventoryExpiryAlert[]
-  expired: InventoryExpiryAlert[]
-}
-
 // ── Stock Movements ──────────────────────────────────────────
 
 export interface StockMovementRow {
@@ -163,11 +155,6 @@ export interface StockMovementSummary {
   totalMovements: number
   totalInQty: number
   totalOutQty: number
-}
-
-export interface StockMovementReport {
-  summary: StockMovementSummary
-  movements: StockMovementRow[]
 }
 
 // ── Disposals ────────────────────────────────────────────────
@@ -195,12 +182,6 @@ export interface DisposalSummary {
   totalQuantityPieces: number
 }
 
-export interface DisposalReport {
-  summary: DisposalSummary
-  byReason: DisposalByReason[]
-  disposals: DisposalDetailRow[]
-}
-
 // ── Returns ──────────────────────────────────────────────────
 
 export interface ReturnByDistributor {
@@ -226,10 +207,4 @@ export interface ReturnSummary {
   totalReturns: number
   totalItems: number
   totalQuantityPieces: number
-}
-
-export interface ReturnReport {
-  summary: ReturnSummary
-  byDistributor: ReturnByDistributor[]
-  returns: ReturnDetailRow[]
 }
