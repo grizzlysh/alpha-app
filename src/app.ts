@@ -7,6 +7,7 @@ import { env } from '@config/env'
 import { rateLimiter } from '@middlewares/rateLimiter'
 import { errorHandler } from '@middlewares/errorHandler'
 import { maintenanceMode } from '@middlewares/maintenanceMode'
+import { idempotency } from '@middlewares/idempotency'
 
 import authRoutes from '@modules/auth/auth.routes'
 import pharmacyRoutes from '@modules/pharmacies/pharmacies.routes'
@@ -40,7 +41,7 @@ const corsOptions: CorsOptions = {
   origin: env.CLIENT_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
 }
 
 // ── Security Middlewares ─────────────────────
@@ -56,6 +57,9 @@ app.use(express.urlencoded({ extended: true }))
 
 // ── Maintenance Mode ─────────────────────────
 app.use(maintenanceMode)
+
+// ── Idempotency ──────────────────────────────
+app.use(idempotency)
 
 // ── Routes ───────────────────────────────────
 app.use('/api/auth', authRoutes)

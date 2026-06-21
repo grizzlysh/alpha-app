@@ -98,27 +98,11 @@ const PERMISSIONS = [
 
 const OWNER_PERMISSIONS = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
 
-const PHARMACIST_PERMISSIONS = [
-  'medicine_shapes.read',
-  'medicine_types.read',
-  'medicine_classes.read',
-  'medicines.read',
-  'distributors.read',
-  'customers.read',
-  'customers.create',
-  'customers.update',
-  'stock.read',
-  'purchase_orders.read',
-  'invoices.read',
-  'sales.read',
-  'sales.create',
-  'stock_return.read',
-  'stock_return.create',
-  'stock_disposal.read',
-  'reports.read',
-  'sign.standard',
-  'dashboard.read',
-]
+// All permissions except user management, roles, permissions, pharmacy config, and system parameters
+const PHARMACY_USER_EXCLUDED_MODULES = ['users', 'roles', 'permissions', 'pharmacies', 'system_parameters']
+const PHARMACY_USER_PERMISSIONS = PERMISSIONS
+  .filter((p) => !PHARMACY_USER_EXCLUDED_MODULES.includes(p.module))
+  .map((p) => `${p.module}.${p.action}`)
 
 // ── Price helpers ─────────────────────────────────────────────────────────────
 
@@ -410,7 +394,7 @@ async function main() {
       })
     }
   }
-  for (const key of PHARMACIST_PERMISSIONS) {
+  for (const key of PHARMACY_USER_PERMISSIONS) {
     const permId = permMap.get(key)
     if (!permId) continue
     const exists = await prisma.rolePermission.findFirst({
@@ -433,12 +417,29 @@ async function main() {
       data: { userId: owner.id, pharmacyId: pharmacy.id, roleId: ownerRole.id, status: RecordStatus.ACTIVE },
     })
   }
-  const pharmacistPlacement = await prisma.placement.findFirst({
+  let pharmacistPlacement = await prisma.placement.findFirst({
     where: { userId: pharmacist.id, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
   })
   if (!pharmacistPlacement) {
-    await prisma.placement.create({
+    pharmacistPlacement = await prisma.placement.create({
       data: { userId: pharmacist.id, pharmacyId: pharmacy.id, roleId: pharmacistRole.id, status: RecordStatus.ACTIVE },
+    })
+  }
+  // PracticeLicense (SIPA) designates this pharmacist as the PIC of the pharmacy
+  const existingSipa = await prisma.practiceLicense.findFirst({
+    where: { placementId: pharmacistPlacement.id, status: RecordStatus.ACTIVE },
+  })
+  if (!existingSipa) {
+    await prisma.practiceLicense.create({
+      data: {
+        placementId: pharmacistPlacement.id,
+        licenseNumber: 'SIPA-JKT-2024-001',
+        validFrom: new Date('2024-01-01'),
+        validUntil: new Date('2027-12-31'),
+        status: RecordStatus.ACTIVE,
+        createdById: platformAdmin.id,
+        updatedById: platformAdmin.id,
+      },
     })
   }
 
@@ -909,10 +910,10 @@ async function main() {
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('\nSeed complete!')
   console.log('─────────────────────────────────────────────────────────────')
-  console.log('Platform Admin  →  admin@pharma.com        /  Admin@123')
-  console.log('Owner           →  owner@pharma.com        /  Owner@123')
-  console.log('Pharmacist      →  pharmacist@pharma.com   /  Pharmacist@123')
-  console.log('Pharmacy        →  Apotek Sejahtera (APK1)')
+  console.log('Platform Admin  →  admin@pharma.com        /  Admin@123      (all permissions, bypasses checks)')
+  console.log('Owner           →  owner@pharma.com        /  Owner@123      (all permissions)')
+  console.log('Pharmacist      →  pharmacist@pharma.com   /  Pharmacist@123 (all permissions except users/roles/permissions/pharmacies/system_parameters)')
+  console.log('Pharmacy        →  Apotek Sejahtera (APK1) — pharmacist is PIC (SIPA-JKT-2024-001)')
   console.log('Medicines       →  5 (Paracetamol, Amoxicillin, Vitamin C, Ibuprofen, Amlodipin)')
   console.log('Distributor     →  Kimia Farma, Enseval')
   console.log('Invoice         →  INV-APK1-20260101-001 (PAID, stock loaded)')
