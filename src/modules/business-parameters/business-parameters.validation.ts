@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const businessParameterQuerySchema = z.object({
   search: z.string().trim().optional(),
+  pharmacyUuid: z.string().uuid().optional(),
   sortBy: z.enum(['key', 'createdAt']).optional().default('key'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
   page: z.coerce.number().int().positive().optional().default(1),

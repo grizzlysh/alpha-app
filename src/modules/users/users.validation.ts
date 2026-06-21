@@ -1,3 +1,4 @@
+import { RecordStatus } from '@prisma/client';
 import { z } from 'zod';
 
 // ─── Shared ───────────────────────────────────────────────────────────────────
@@ -17,7 +18,7 @@ export const listUserSchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(RecordStatus).optional(),
   platformRole: z.enum(['PLATFORM_ADMIN', 'PLATFORM_VIEWER', 'PLATFORM_SUPPORT']).optional(),
 });
 
@@ -39,7 +40,7 @@ export const updateUserSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().max(20).optional(),
   address: z.string().max(255).optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(RecordStatus).optional(),
 });
 
 // ─── Me ───────────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ export const changePasswordSchema = z.object({
 // ─── Placements ──────────────────────────────────────────────────────────────
 
 export const listPlacementSchema = z.object({
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(RecordStatus).optional(),
 });
 
 export const createPlacementSchema = z.object({
@@ -77,7 +78,7 @@ export const updatePlacementSchema = z.object({
   roleUuid: z.string().uuid('Invalid role UUID').optional(),
   joinedAt: z.string().datetime().optional(),
   leftAt: z.string().datetime().nullable().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(RecordStatus).optional(),
 });
 
 // ─── Practice Licenses ────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ export const updatePlacementSchema = z.object({
 export const listLicenseSchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(RecordStatus).optional(),
 });
 
 export const createLicenseSchema = z.object({
@@ -101,7 +102,7 @@ export const updateLicenseSchema = z.object({
   licenseNumber: z.string().min(1).max(100).optional(),
   validFrom: z.string().datetime().optional(),
   validUntil: z.string().datetime().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+  status: z.enum(RecordStatus).optional(),
 }).refine(
   (data) => {
     if (data.validFrom && data.validUntil) {

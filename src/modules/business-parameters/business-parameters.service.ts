@@ -36,17 +36,27 @@ export const getBusinessParameters = async (
   platformRole: PlatformRole | null,
   query: BusinessParameterQueryInput
 ): Promise<{ data: BusinessParameterResponse[]; meta: PaginationMeta }> => {
-  const { search, sortBy, sortOrder, page, limit } = query
+  const { search, pharmacyUuid, sortBy, sortOrder, page, limit } = query
   const skip = (page - 1) * limit
 
-  // PLATFORM_ADMIN sees all, others see only their own pharmacy's
-  const pharmacyFilter =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? {}
-      : { pharmacyId: pharmacyId! }
+  let effectivePharmacyId: number | null
+  if (platformRole === PlatformRole.PLATFORM_ADMIN) {
+    if (pharmacyUuid) {
+      const pharmacy = await prisma.pharmacy.findFirst({
+        where: { uuid: pharmacyUuid, deletedAt: null },
+        select: { id: true },
+      })
+      if (!pharmacy) throw new NotFoundException('Pharmacy not found')
+      effectivePharmacyId = pharmacy.id
+    } else {
+      effectivePharmacyId = null
+    }
+  } else {
+    effectivePharmacyId = pharmacyId!
+  }
 
   const where = {
-    ...pharmacyFilter,
+    ...(effectivePharmacyId !== null && { pharmacyId: effectivePharmacyId }),
     ...(search && {
       key: { contains: search, mode: 'insensitive' as const },
     }),

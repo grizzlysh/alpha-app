@@ -1,4 +1,4 @@
-import { PlatformRole, Prisma } from '@prisma/client'
+import { DataType, PlatformRole, Prisma } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { prisma } from '@config/db'
 import {
@@ -14,6 +14,22 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
+
+// ── Default business parameters seeded on pharmacy creation ──────────────────
+
+const DEFAULT_BUSINESS_PARAMS: Array<{ key: string; value: string; dataType: DataType; description: string }> = [
+  { key: 'MARGIN_PERCENTAGE',         value: '20',    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
+  { key: 'PPN_PERCENTAGE_SELL',       value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to customers on sales (output VAT)' },
+  { key: 'PPN_PERCENTAGE_BUY',        value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
+  { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
+  { key: 'REORDER_LEVEL_DEFAULT',     value: '10',    dataType: DataType.NUMBER,     description: 'Default low-stock alert threshold in pieces' },
+  { key: 'LOW_STOCK_ALERT_THRESHOLD', value: '5',     dataType: DataType.NUMBER,     description: 'Critical stock threshold in pieces before urgent reorder alert' },
+  { key: 'ALLOW_FEFO_OVERRIDE',       value: 'true',  dataType: DataType.BOOLEAN,    description: 'Allow staff to select non-FEFO batches during sale' },
+  { key: 'CREDIT_PAYMENT_DAYS',       value: '30',    dataType: DataType.NUMBER,     description: 'Default credit term in days for non-cash sales' },
+  { key: 'RETURN_POLICY_DAYS',        value: '7',     dataType: DataType.NUMBER,     description: 'Number of days after sale within which a return is accepted' },
+  { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on customer receipts' },
+  { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on customer receipts' },
+]
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -159,20 +175,36 @@ export const createPharmacy = async (
   userId: number
 ): Promise<PharmacyResponse> => {
   try {
-    const pharmacy = await prisma.pharmacy.create({
-      data: {
-        name: data.name,
-        code: data.code,
-        category: data.category,
-        phone: data.phone,
-        address: data.address,
-        email: data.email,
-        createdById: userId,
-        updatedById: userId,
-      },
-      select: pharmacySelect,
+    const pharmacy = await prisma.$transaction(async (tx) => {
+      const created = await tx.pharmacy.create({
+        data: {
+          name: data.name,
+          code: data.code,
+          category: data.category,
+          phone: data.phone,
+          address: data.address,
+          email: data.email,
+          createdById: userId,
+          updatedById: userId,
+        },
+      })
+
+      await tx.businessParameter.createMany({
+        data: DEFAULT_BUSINESS_PARAMS.map((p) => ({
+          pharmacyId: created.id,
+          key: p.key,
+          value: p.key === 'RECEIPT_HEADER' ? data.name : p.value,
+          dataType: p.dataType,
+          description: p.description,
+          createdById: userId,
+          updatedById: userId,
+        })),
+      })
+
+      return tx.pharmacy.findFirst({ where: { id: created.id }, select: pharmacySelect })
     })
-    return formatResponse(pharmacy)
+
+    return formatResponse(pharmacy!)
   } catch (e) {
     if (
       e instanceof PrismaClientKnownRequestError &&
@@ -352,6 +384,21 @@ export const createBusinessLicense = async (
     where: { pharmacyId: pharmacy.id, licenseNumber: data.licenseNumber, deletedAt: null },
   })
   if (conflict) throw new ConflictException('Business license number already exists')
+
+  const overlapping = await prisma.businessLicense.findFirst({
+    where: {
+      pharmacyId: pharmacy.id,
+      deletedAt: null,
+      validFrom: { lt: data.validUntil },
+      validUntil: { gt: data.validFrom },
+    },
+    select: { licenseNumber: true, validFrom: true, validUntil: true },
+  })
+  if (overlapping) {
+    throw new ConflictException(
+      `License date range overlaps with existing license "${overlapping.licenseNumber}" (${overlapping.validFrom.toISOString().slice(0, 10)} – ${overlapping.validUntil.toISOString().slice(0, 10)})`
+    )
+  }
 
   const license = await prisma.businessLicense.create({
     data: {

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { RecordStatus } from '@prisma/client'
+import { AppRole, RecordStatus } from '@prisma/client'
 
 export const roleQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -13,7 +13,7 @@ export const roleQuerySchema = z.object({
 
 export const createRoleSchema = z.object({
   name: z.string().trim().toLowerCase().min(1, { message: 'Name is required' }).max(100),
-  type: z.enum(['OWNER', 'ADMIN', 'PHARMACIST', 'CASHIER', 'DOCTOR'], { message: 'Invalid role type' }),
+  type: z.enum(AppRole, { message: 'Invalid role type' }),
   requiresLicense: z.boolean().optional().default(false),
   pharmacyUuid: z.string().trim().uuid({ message: 'Invalid pharmacy UUID' }).optional(),
 })

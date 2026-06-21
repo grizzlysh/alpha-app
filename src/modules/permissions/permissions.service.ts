@@ -6,7 +6,6 @@ import {
   PermissionGroupedResponse,
 } from './permissions.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
-import { PaginationMeta } from '@interfaces/common.interface'
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -28,9 +27,8 @@ const formatResponse = (permission: Prisma.PermissionGetPayload<{ select: typeof
 
 export const getPermissions = async (
   query: PermissionQueryInput
-): Promise<{ data: PermissionGroupedResponse[]; meta: PaginationMeta }> => {
-  const { search, module, sortBy, sortOrder, page, limit } = query
-  const skip = (page - 1) * limit
+): Promise<PermissionGroupedResponse[]> => {
+  const { search, module, sortBy, sortOrder } = query
 
   const where = {
     ...(module && { module: { equals: module, mode: 'insensitive' as const } }),
@@ -42,18 +40,12 @@ export const getPermissions = async (
     }),
   }
 
-  const [permissions, total] = await prisma.$transaction([
-    prisma.permission.findMany({
-      where,
-      select: permissionSelect,
-      orderBy: [{ module: 'asc' }, { [sortBy]: sortOrder }],
-      skip,
-      take: limit,
-    }),
-    prisma.permission.count({ where }),
-  ])
+  const permissions = await prisma.permission.findMany({
+    where,
+    select: permissionSelect,
+    orderBy: [{ module: 'asc' }, { [sortBy]: sortOrder }],
+  })
 
-  // group by module
   const grouped = permissions.reduce<Record<string, PermissionResponse[]>>(
     (acc, p) => {
       if (!acc[p.module]) acc[p.module] = []
@@ -63,18 +55,7 @@ export const getPermissions = async (
     {}
   )
 
-  const data: PermissionGroupedResponse[] = Object.entries(grouped).map(
-    ([module, permissions]) => ({ module, permissions })
-  )
-
-  const meta: PaginationMeta = {
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-  }
-
-  return { data, meta }
+  return Object.entries(grouped).map(([module, permissions]) => ({ module, permissions }))
 }
 
 export const getPermissionByUuid = async (

@@ -16,9 +16,10 @@ export const createPharmacySchema = z.object({
   code: z
     .string()
     .trim()
-    .length(5, { message: 'Code must be exactly 5 characters' })
+    .min(1, { message: 'Code is required' })
+    .max(5, { message: 'Code must be at most 5 characters' })
     .toUpperCase()
-    .regex(/^[A-Z0-9]{5}$/, { message: 'Code must be 5 alphanumeric characters' }),
+    .regex(/^[A-Z0-9]{1,5}$/, { message: 'Code must be alphanumeric characters' }),
   category: z.enum(PharmacyCategory),
   phone: z.string().trim().min(1, { message: 'Phone is required' }),
   address: z.string().trim().min(1, { message: 'Address is required' }),
@@ -30,9 +31,10 @@ export const updatePharmacySchema = z.object({
   code: z
     .string()
     .trim()
-    .length(5)
+    .min(1)
+    .max(5, { message: 'Code must be at most 5 characters' })
     .toUpperCase()
-    .regex(/^[A-Z0-9]{5}$/, { message: 'Code must be 5 alphanumeric characters' })
+    .regex(/^[A-Z0-9]{1,5}$/, { message: 'Code must be alphanumeric characters' })
     .optional(),
   category: z.enum(PharmacyCategory).optional(),
   phone: z.string().trim().optional(),

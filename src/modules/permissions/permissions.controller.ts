@@ -7,7 +7,7 @@ import {
   GetPermissionRequest,
 } from './permissions.interface'
 import { ValidationException } from '@exceptions/ValidationException'
-import { sendSuccess, sendPaginated } from '@utils/responseHelper'
+import { sendSuccess } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 
 export const getPermissions = async (
@@ -16,9 +16,9 @@ export const getPermissions = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { data, meta } = await PermissionService.getPermissions(req.query as any)
+    const data = await PermissionService.getPermissions(req.query as any)
 
-    sendPaginated(res, MESSAGE_CODES.PERMISSIONS_FETCHED, data, meta)
+    sendSuccess(res, MESSAGE_CODES.PERMISSIONS_FETCHED, data)
   } catch (err) {
     next(err)
   }
