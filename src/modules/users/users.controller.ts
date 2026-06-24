@@ -74,6 +74,20 @@ export async function changePassword(
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+export async function getUsersDropdown(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const data = await userService.getUsersDropdown(
+      req.user!.pharmacyId!,
+      req.query.search as string | undefined
+    );
+    sendSuccess(res, 'USERS_FETCHED', data);
+  } catch (err) { next(err); }
+}
+
 export async function listUsers(
   req: Request<ParamsDictionary, any, any, ListUserQuery>,
   res: Response,

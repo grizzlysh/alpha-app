@@ -805,6 +805,198 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Laporan retur berhasil diambil',
   },
 
+  // ─── Storage ───────────────────────────────────────────────────────────────
+  STORAGE_CABINETS_FETCHED: {
+    en: 'Storage cabinets fetched successfully',
+    id: 'Data lemari penyimpanan berhasil diambil',
+  },
+  STORAGE_CABINET_FETCHED: {
+    en: 'Storage cabinet fetched successfully',
+    id: 'Data lemari penyimpanan berhasil diambil',
+  },
+  STORAGE_CABINET_CREATED: {
+    en: 'Storage cabinet created successfully',
+    id: 'Lemari penyimpanan berhasil dibuat',
+  },
+  STORAGE_CABINET_UPDATED: {
+    en: 'Storage cabinet updated successfully',
+    id: 'Lemari penyimpanan berhasil diperbarui',
+  },
+  STORAGE_CABINET_DELETED: {
+    en: 'Storage cabinet deleted successfully',
+    id: 'Lemari penyimpanan berhasil dihapus',
+  },
+  STORAGE_CABINET_NOT_FOUND: {
+    en: 'Storage cabinet not found',
+    id: 'Lemari penyimpanan tidak ditemukan',
+  },
+  STORAGE_CABINET_CODE_EXISTS: {
+    en: 'A cabinet with this code already exists',
+    id: 'Lemari dengan kode ini sudah ada',
+  },
+  STORAGE_CABINET_HAS_SHELVES: {
+    en: 'Cabinet cannot be deleted because it has shelves',
+    id: 'Lemari tidak dapat dihapus karena masih memiliki rak',
+  },
+
+  STORAGE_SHELVES_FETCHED: {
+    en: 'Storage shelves fetched successfully',
+    id: 'Data rak penyimpanan berhasil diambil',
+  },
+  STORAGE_SHELF_FETCHED: {
+    en: 'Storage shelf fetched successfully',
+    id: 'Data rak penyimpanan berhasil diambil',
+  },
+  STORAGE_SHELF_CREATED: {
+    en: 'Storage shelf created successfully',
+    id: 'Rak penyimpanan berhasil dibuat',
+  },
+  STORAGE_SHELF_UPDATED: {
+    en: 'Storage shelf updated successfully',
+    id: 'Rak penyimpanan berhasil diperbarui',
+  },
+  STORAGE_SHELF_DELETED: {
+    en: 'Storage shelf deleted successfully',
+    id: 'Rak penyimpanan berhasil dihapus',
+  },
+  STORAGE_SHELF_NOT_FOUND: {
+    en: 'Storage shelf not found',
+    id: 'Rak penyimpanan tidak ditemukan',
+  },
+  STORAGE_SHELF_CODE_EXISTS: {
+    en: 'A shelf with this code already exists in this cabinet',
+    id: 'Rak dengan kode ini sudah ada di lemari ini',
+  },
+  STORAGE_SHELF_HAS_BINS: {
+    en: 'Shelf cannot be deleted because it has bins',
+    id: 'Rak tidak dapat dihapus karena masih memiliki bin',
+  },
+
+  STORAGE_BINS_FETCHED: {
+    en: 'Storage bins fetched successfully',
+    id: 'Data bin penyimpanan berhasil diambil',
+  },
+  STORAGE_BIN_FETCHED: {
+    en: 'Storage bin fetched successfully',
+    id: 'Data bin penyimpanan berhasil diambil',
+  },
+  STORAGE_BIN_CREATED: {
+    en: 'Storage bin created successfully',
+    id: 'Bin penyimpanan berhasil dibuat',
+  },
+  STORAGE_BIN_UPDATED: {
+    en: 'Storage bin updated successfully',
+    id: 'Bin penyimpanan berhasil diperbarui',
+  },
+  STORAGE_BIN_DELETED: {
+    en: 'Storage bin deleted successfully',
+    id: 'Bin penyimpanan berhasil dihapus',
+  },
+  STORAGE_BIN_NOT_FOUND: {
+    en: 'Storage bin not found',
+    id: 'Bin penyimpanan tidak ditemukan',
+  },
+  STORAGE_BIN_CODE_EXISTS: {
+    en: 'A bin with this code already exists on this shelf',
+    id: 'Bin dengan kode ini sudah ada di rak ini',
+  },
+  STORAGE_BIN_IN_USE: {
+    en: 'Bin cannot be deleted because it is assigned to medicines or stock batches',
+    id: 'Bin tidak dapat dihapus karena masih digunakan oleh obat atau batch stok',
+  },
+
+  // ─── Doctors ───────────────────────────────────────────────────────────────
+  DOCTORS_FETCHED: {
+    en: 'Doctors fetched successfully',
+    id: 'Data dokter berhasil diambil',
+  },
+  DOCTOR_FETCHED: {
+    en: 'Doctor fetched successfully',
+    id: 'Data dokter berhasil diambil',
+  },
+  DOCTOR_CREATED: {
+    en: 'Doctor created successfully',
+    id: 'Dokter berhasil ditambahkan',
+  },
+  DOCTOR_UPDATED: {
+    en: 'Doctor updated successfully',
+    id: 'Dokter berhasil diperbarui',
+  },
+  DOCTOR_DELETED: {
+    en: 'Doctor deleted successfully',
+    id: 'Dokter berhasil dihapus',
+  },
+  DOCTOR_NOT_FOUND: {
+    en: 'Doctor not found',
+    id: 'Dokter tidak ditemukan',
+  },
+  DOCTOR_LICENSE_EXISTS: {
+    en: 'A doctor with this license number already exists',
+    id: 'Dokter dengan nomor SIP ini sudah terdaftar',
+  },
+  DOCTOR_USER_ALREADY_LINKED: {
+    en: 'This user account is already linked to a doctor profile',
+    id: 'Akun pengguna ini sudah terhubung ke profil dokter',
+  },
+  DOCTOR_HAS_PRESCRIPTIONS: {
+    en: 'Doctor cannot be deleted because they have prescriptions',
+    id: 'Dokter tidak dapat dihapus karena masih memiliki resep',
+  },
+
+  // ─── Prescriptions ─────────────────────────────────────────────────────────
+  PRESCRIPTIONS_FETCHED: {
+    en: 'Prescriptions fetched successfully',
+    id: 'Data resep berhasil diambil',
+  },
+  PRESCRIPTION_FETCHED: {
+    en: 'Prescription fetched successfully',
+    id: 'Data resep berhasil diambil',
+  },
+  PRESCRIPTION_CREATED: {
+    en: 'Prescription created successfully',
+    id: 'Resep berhasil ditambahkan',
+  },
+  PRESCRIPTION_UPDATED: {
+    en: 'Prescription updated successfully',
+    id: 'Resep berhasil diperbarui',
+  },
+  PRESCRIPTION_DELETED: {
+    en: 'Prescription deleted successfully',
+    id: 'Resep berhasil dihapus',
+  },
+  PRESCRIPTION_DISPENSED: {
+    en: 'Prescription dispensed successfully',
+    id: 'Resep berhasil dilayani',
+  },
+  PRESCRIPTION_CANCELLED: {
+    en: 'Prescription cancelled successfully',
+    id: 'Resep berhasil dibatalkan',
+  },
+  PRESCRIPTION_NOT_FOUND: {
+    en: 'Prescription not found',
+    id: 'Resep tidak ditemukan',
+  },
+  PRESCRIPTION_ALREADY_DISPENSED: {
+    en: 'Prescription has already been fully dispensed',
+    id: 'Resep sudah sepenuhnya dilayani',
+  },
+  PRESCRIPTION_ALREADY_CANCELLED: {
+    en: 'Prescription has already been cancelled',
+    id: 'Resep sudah dibatalkan',
+  },
+  PRESCRIPTION_CANNOT_EDIT: {
+    en: 'Only pending prescriptions can be edited',
+    id: 'Hanya resep dengan status menunggu yang dapat diedit',
+  },
+  PRESCRIPTION_CANNOT_DELETE: {
+    en: 'Only pending prescriptions can be deleted',
+    id: 'Hanya resep dengan status menunggu yang dapat dihapus',
+  },
+  PRESCRIPTION_NO_ITEMS_TO_DISPENSE: {
+    en: 'No pending items to dispense in this prescription',
+    id: 'Tidak ada item yang perlu dilayani pada resep ini',
+  },
+
   // ─── Dashboard ─────────────────────────────────────────────────────────────
   DASHBOARD_FETCHED: {
     en: 'Dashboard data fetched successfully',

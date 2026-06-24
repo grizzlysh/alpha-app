@@ -40,7 +40,7 @@ export interface CreateInvoiceDetailBody {
 export interface CreateInvoiceBody {
   distributorUuid: string
   purchaseOrderUuid?: string
-  signedByUuid?: string
+  signedByUuid: string
   invoiceNumber: string
   invoiceDate: string
   dueDate: string

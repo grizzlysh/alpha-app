@@ -473,6 +473,7 @@ export const getPurchaseOrderPrintData = async (
         select: {
           name: true,
           address: true,
+          location: true,
           status: true,
           businessLicenses: {
             where: { status: RecordStatus.ACTIVE, deletedAt: null },
@@ -514,6 +515,7 @@ export const getPurchaseOrderPrintData = async (
     pharmacy: {
       name: purchaseOrder.pharmacy.name,
       address: purchaseOrder.pharmacy.address,
+      location: purchaseOrder.pharmacy.location,
       businessLicenseNumber: purchaseOrder.pharmacy.businessLicenses[0]?.licenseNumber ?? null,
     },
     headPharmacist: headPharmacistPlacement

@@ -20,6 +20,7 @@ export const listUserSchema = z.object({
   search: z.string().optional(),
   status: z.enum(RecordStatus).optional(),
   platformRole: z.enum(['PLATFORM_ADMIN', 'PLATFORM_VIEWER', 'PLATFORM_SUPPORT']).optional(),
+  pharmacyUuid: z.string().uuid('Invalid pharmacy UUID').optional(),
 });
 
 export const createUserSchema = z.object({

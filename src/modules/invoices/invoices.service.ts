@@ -278,34 +278,31 @@ export const createInvoice = async (
     }
 
     // ── Resolve Signed By ─────────────────────────
-    let signedById: number | undefined
-    if (data.signedByUuid) {
-      const signer = await tx.user.findFirst({
-        where: { uuid: data.signedByUuid, deletedAt: null },
-        select: {
-          id: true,
-          placements: {
-            where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-            select: {
-              role: {
-                select: {
-                  rolePermissions: {
-                    where: { isEnabled: true },
-                    select: { permission: { select: { module: true, action: true } } },
-                  },
+    const signer = await tx.user.findFirst({
+      where: { uuid: data.signedByUuid, deletedAt: null },
+      select: {
+        id: true,
+        placements: {
+          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
+          select: {
+            role: {
+              select: {
+                rolePermissions: {
+                  where: { isEnabled: true },
+                  select: { permission: { select: { module: true, action: true } } },
                 },
               },
             },
           },
         },
-      })
-      if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-      const hasSignPermission = signer.placements[0].role.rolePermissions.some(
-        (rp) => rp.permission.module === 'sign'
-      )
-      if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign this document')
-      signedById = signer.id
-    }
+      },
+    })
+    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
+    const hasSignPermission = signer.placements[0].role.rolePermissions.some(
+      (rp) => rp.permission.module === 'sign'
+    )
+    if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign this document')
+    const signedById = signer.id
 
     // ── Resolve Purchase Order ────────────────────
     let purchaseOrderId: number | undefined

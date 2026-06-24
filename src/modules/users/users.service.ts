@@ -21,6 +21,7 @@ import {
   UpdateLicenseBody,
   UserListItem,
   UserDetailItem,
+  UserDropdownItem,
   MeItem,
   PlacementItem,
   LicenseItem,
@@ -206,6 +207,16 @@ export async function listUsers(
   const limit = Math.min(100, Math.max(1, parseInt(query.limit || '10')));
   const skip = (page - 1) * limit;
 
+  let filterPharmacyId: number | undefined;
+  if (query.pharmacyUuid) {
+    const pharmacy = await prisma.pharmacy.findFirst({
+      where: { uuid: query.pharmacyUuid, deletedAt: null },
+      select: { id: true },
+    });
+    if (!pharmacy) throw new NotFoundException('PHARMACY_NOT_FOUND');
+    filterPharmacyId = pharmacy.id;
+  }
+
   const where = {
     deletedAt: null,
     ...(query.status && { status: query.status }),
@@ -215,6 +226,9 @@ export async function listUsers(
         { name: { contains: query.search, mode: 'insensitive' as const } },
         { email: { contains: query.search, mode: 'insensitive' as const } },
       ],
+    }),
+    ...(filterPharmacyId !== undefined && {
+      placements: { some: { pharmacyId: filterPharmacyId, deletedAt: null } },
     }),
   };
 
@@ -254,6 +268,35 @@ export async function listUsers(
     })),
     total,
   };
+}
+
+// ─── Users Dropdown ───────────────────────────────────────────────────────────
+
+export async function getUsersDropdown(
+  pharmacyId: number,
+  search?: string
+): Promise<UserDropdownItem[]> {
+  return prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      status: RecordStatus.ACTIVE,
+      placements: {
+        some: {
+          pharmacyId,
+          deletedAt: null,
+          status: RecordStatus.ACTIVE,
+        },
+      },
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' as const } },
+          { email: { contains: search, mode: 'insensitive' as const } },
+        ],
+      }),
+    },
+    select: { uuid: true, name: true, email: true },
+    orderBy: { name: 'asc' },
+  });
 }
 
 // ─── Get User ─────────────────────────────────────────────────────────────────

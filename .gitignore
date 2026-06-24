@@ -17,7 +17,7 @@ uncaughtExceptions.log
 prisma/migrations/
 
 # Generated report files
-storage/
+/storage/
 
 # OS
 .DS_Store

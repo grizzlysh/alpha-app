@@ -112,7 +112,7 @@ export const updateBusinessParameter = async (
 ): Promise<BusinessParameterResponse> => {
   const existing = await prisma.businessParameter.findFirst({
     where: { uuid },
-    select: { id: true, pharmacyId: true },
+    select: { id: true, key: true, pharmacyId: true },
   })
 
   if (!existing) throw new NotFoundException('Business parameter not found')
@@ -130,6 +130,16 @@ export const updateBusinessParameter = async (
     data: { ...data, updatedById: userId },
     select: businessParameterSelect,
   })
+
+  if (existing.key === 'MARGIN_PERCENTAGE' && existing.pharmacyId !== null) {
+    const margin = parseFloat(param.value)
+    await prisma.$executeRaw`
+      UPDATE inv_stocks
+      SET calculated_price = base_price + (base_price * ${margin} / 100),
+          updated_at = NOW()
+      WHERE pharmacy_id = ${existing.pharmacyId}
+    `
+  }
 
   return formatResponse(param)
 }

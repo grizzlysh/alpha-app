@@ -31,6 +31,9 @@ import { meRouter, userRouter } from '@modules/users/users.routes'
 import stockMovementRoutes from '@modules/stock-movements/stock-movements.routes'
 import reportRoutes from '@modules/reports/reports.routes'
 import dashboardRoutes from '@modules/dashboard/dashboard.routes'
+import storageRoutes from '@modules/storage/storage.routes'
+import doctorRoutes from '@modules/doctors/doctors.routes'
+import prescriptionRoutes from '@modules/prescriptions/prescriptions.routes'
 
 
 
@@ -86,6 +89,9 @@ app.use('/api/sales', salesRoutes)
 app.use('/api/stock-movements', stockMovementRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/storage', storageRoutes)
+app.use('/api/doctors', doctorRoutes)
+app.use('/api/prescriptions', prescriptionRoutes)
 
 // ── Health Check ─────────────────────────────
 app.get('/', (req: Request, res: Response): void => {

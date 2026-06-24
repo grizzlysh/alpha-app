@@ -243,6 +243,7 @@ model Pharmacy {
   code        String           @unique
   category    PharmacyCategory @default(APOTEK)
   address     String
+  location    String
   phone       String
   email       String?
   status      RecordStatus     @default(ACTIVE)
@@ -277,6 +278,8 @@ model Pharmacy {
   medicineClasses     MedicineClass[]
   prescriptions       Prescription[]
   stockReservations   StockReservation[]
+  storageCabinets     StorageCabinet[]
+  doctors             Doctor[]
 
   @@map("mst_pharmacies")
 }
@@ -474,11 +477,31 @@ model User {
   salePaymentHistoriesCreated SalePaymentHistory[] @relation("SalePaymentHistoryCreatedBy")
   salePaymentHistoriesUpdated SalePaymentHistory[] @relation("SalePaymentHistoryUpdatedBy")
 
+  // ── Audit: StorageCabinet ─────────────────────────
+  storageCabinetsCreated StorageCabinet[] @relation("StorageCabinetCreatedBy")
+  storageCabinetsUpdated StorageCabinet[] @relation("StorageCabinetUpdatedBy")
+  storageCabinetsDeleted StorageCabinet[] @relation("StorageCabinetDeletedBy")
+
+  // ── Audit: StorageShelf ───────────────────────────
+  storageShelvesCreated StorageShelf[] @relation("StorageShelfCreatedBy")
+  storageShelvesUpdated StorageShelf[] @relation("StorageShelfUpdatedBy")
+  storageShelvesDeleted StorageShelf[] @relation("StorageShelfDeletedBy")
+
+  // ── Audit: StorageBin ─────────────────────────────
+  storageBinsCreated StorageBin[] @relation("StorageBinCreatedBy")
+  storageBinsUpdated StorageBin[] @relation("StorageBinUpdatedBy")
+  storageBinsDeleted StorageBin[] @relation("StorageBinDeletedBy")
+
   // ── Audit: StockReservation ───────────────────────
   stockReservationsCreated StockReservation[] @relation("StockReservationCreatedBy")
 
+  // ── Audit: Doctor ─────────────────────────────────
+  doctorProfile  Doctor?   @relation("DoctorUserProfile")
+  doctorsCreated Doctor[]  @relation("DoctorCreatedBy")
+  doctorsUpdated Doctor[]  @relation("DoctorUpdatedBy")
+  doctorsDeleted Doctor[]  @relation("DoctorDeletedBy")
+
   // ── Audit: Prescription ───────────────────────────
-  doctorPrescriptions  Prescription[] @relation("PrescriptionDoctor")
   createdPrescriptions Prescription[] @relation("PrescriptionCreatedBy")
   updatedPrescriptions Prescription[] @relation("PrescriptionUpdatedBy")
   deletedPrescriptions Prescription[] @relation("PrescriptionDeletedBy")
@@ -589,6 +612,85 @@ model BusinessLicense {
   @@map("mst_business_licenses")
 }
 
+// ── MST STORAGE ──────────────────────────────────────────
+
+model StorageCabinet {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  pharmacyId  Int          @map("pharmacy_id")
+  name        String       @db.VarChar(100)
+  code        String       @db.VarChar(20)
+  description String?      @db.Text
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
+
+  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
+  createdByUser User?          @relation("StorageCabinetCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?          @relation("StorageCabinetUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?          @relation("StorageCabinetDeletedBy", fields: [deletedById], references: [id])
+  shelves       StorageShelf[]
+
+  @@unique([pharmacyId, code])
+  @@map("mst_storage_cabinets")
+}
+
+model StorageShelf {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  cabinetId   Int          @map("cabinet_id")
+  name        String       @db.VarChar(100)
+  code        String       @db.VarChar(20)
+  level       Int?
+  description String?      @db.Text
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
+
+  cabinet       StorageCabinet @relation(fields: [cabinetId], references: [id])
+  createdByUser User?          @relation("StorageShelfCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?          @relation("StorageShelfUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?          @relation("StorageShelfDeletedBy", fields: [deletedById], references: [id])
+  bins          StorageBin[]
+
+  @@unique([cabinetId, code])
+  @@map("mst_storage_shelves")
+}
+
+model StorageBin {
+  id          Int          @id @default(autoincrement())
+  uuid        String       @unique @default(uuid())
+  shelfId     Int          @map("shelf_id")
+  name        String       @db.VarChar(100)
+  code        String       @db.VarChar(20)
+  description String?      @db.Text
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  createdById Int?         @map("created_by_id")
+  updatedById Int?         @map("updated_by_id")
+  deletedById Int?         @map("deleted_by_id")
+
+  shelf         StorageShelf   @relation(fields: [shelfId], references: [id])
+  createdByUser User?          @relation("StorageBinCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?          @relation("StorageBinUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?          @relation("StorageBinDeletedBy", fields: [deletedById], references: [id])
+  medicines     Medicine[]
+  stockDetails  StockDetail[]
+
+  @@unique([shelfId, code])
+  @@map("mst_storage_bins")
+}
+
 // ── MST MEDICINE ─────────────────────────────────────────
 
 model MedicineShape {
@@ -666,6 +768,7 @@ model Medicine {
   shapeId         Int          @map("shape_id")
   typeId          Int          @map("type_id")
   medicineClassId Int          @map("medicine_class_id")
+  defaultBinId    Int?         @map("default_bin_id")
   unit            String
   status          RecordStatus @default(ACTIVE)
   createdAt       DateTime     @default(now()) @map("created_at")
@@ -676,6 +779,7 @@ model Medicine {
   deletedById     Int?         @map("deleted_by_id")
 
   pharmacy             Pharmacy              @relation(fields: [pharmacyId], references: [id])
+  defaultBin           StorageBin?           @relation(fields: [defaultBinId], references: [id])
   shape                MedicineShape         @relation(fields: [shapeId], references: [id])
   type                 MedicineType          @relation(fields: [typeId], references: [id])
   medicineClass        MedicineClass         @relation(fields: [medicineClassId], references: [id])
@@ -978,6 +1082,7 @@ model StockDetail {
   stockId         Int      @map("stock_id")
   distributorId   Int      @map("distributor_id")
   invoiceDetailId Int      @unique @map("invoice_detail_id")
+  binId           Int?     @map("bin_id")
   batchNumber     String   @map("batch_number")
   barcode         String   @unique
   expiryDate      DateTime @map("expiry_date")
@@ -990,6 +1095,7 @@ model StockDetail {
   updatedById     Int?     @map("updated_by_id")
 
   stock                Stock                 @relation(fields: [stockId], references: [id])
+  bin                  StorageBin?           @relation(fields: [binId], references: [id])
   distributor          Distributor           @relation(fields: [distributorId], references: [id])
   invoiceDetail        InvoiceDetail         @relation(fields: [invoiceDetailId], references: [id])
   createdByUser        User?                 @relation("StockDetailCreatedBy", fields: [createdById], references: [id])
@@ -1285,6 +1391,37 @@ model SalePaymentHistory {
   @@map("trx_sale_payment_history")
 }
 
+// ── MST DOCTOR ───────────────────────────────────────────
+
+model Doctor {
+  id            Int          @id @default(autoincrement())
+  uuid          String       @unique @default(uuid())
+  pharmacyId    Int          @map("pharmacy_id")
+  userId        Int?         @unique @map("user_id")
+  name          String
+  licenseNumber String?      @map("license_number")
+  specialty     String?
+  clinicName    String?      @map("clinic_name")
+  phone         String?
+  status        RecordStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  deletedAt     DateTime?    @map("deleted_at")
+  createdById   Int?         @map("created_by_id")
+  updatedById   Int?         @map("updated_by_id")
+  deletedById   Int?         @map("deleted_by_id")
+
+  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
+  user          User?          @relation("DoctorUserProfile", fields: [userId], references: [id])
+  prescriptions Prescription[]
+  createdBy     User?          @relation("DoctorCreatedBy", fields: [createdById], references: [id])
+  updatedBy     User?          @relation("DoctorUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy     User?          @relation("DoctorDeletedBy", fields: [deletedById], references: [id])
+
+  @@unique([pharmacyId, licenseNumber])
+  @@map("mst_doctors")
+}
+
 // ── TRX PRESCRIPTION ─────────────────────────────────────
 
 model Prescription {
@@ -1292,12 +1429,9 @@ model Prescription {
   uuid               String             @unique @default(uuid())
   pharmacyId         Int                @map("pharmacy_id")
   customerId         Int                @map("customer_id")
-  saleId             Int?               @unique @map("sale_id") // filled when dispensed
-  doctorId           Int?               @map("doctor_id") // nullable, registered doctor
-  doctorName         String             @map("doctor_name") // required if doctorId null
-  doctorLicense      String?            @map("doctor_license") // SIP number
-  clinicName         String?            @map("clinic_name")
-  prescriptionNumber String?            @map("prescription_number") // number on paper
+  saleId             Int?               @unique @map("sale_id")
+  doctorId           Int?               @map("doctor_id")
+  prescriptionNumber String?            @map("prescription_number")
   prescribedAt       DateTime           @map("prescribed_at")
   notes              String?
   status             PrescriptionStatus @default(PENDING)
@@ -1312,7 +1446,7 @@ model Prescription {
   pharmacy   Pharmacy             @relation(fields: [pharmacyId], references: [id])
   customer   Customer             @relation(fields: [customerId], references: [id])
   sale       Sale?                @relation("PrescriptionDispensedSale", fields: [saleId], references: [id])
-  doctor     User?                @relation("PrescriptionDoctor", fields: [doctorId], references: [id])
+  doctor     Doctor?              @relation(fields: [doctorId], references: [id])
   createdBy  User?                @relation("PrescriptionCreatedBy", fields: [createdById], references: [id])
   updatedBy  User?                @relation("PrescriptionUpdatedBy", fields: [updatedById], references: [id])
   deletedBy  User?                @relation("PrescriptionDeletedBy", fields: [deletedById], references: [id])

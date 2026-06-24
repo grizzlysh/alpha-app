@@ -23,6 +23,7 @@ export const createPharmacySchema = z.object({
   category: z.enum(PharmacyCategory),
   phone: z.string().trim().min(1, { message: 'Phone is required' }),
   address: z.string().trim().min(1, { message: 'Address is required' }),
+  location: z.string().trim().min(1, { message: 'Location is required' }),
   email: z.string().trim().email({ message: 'Invalid email' }).optional(),
 })
 
@@ -39,6 +40,7 @@ export const updatePharmacySchema = z.object({
   category: z.enum(PharmacyCategory).optional(),
   phone: z.string().trim().optional(),
   address: z.string().trim().optional(),
+  location: z.string().trim().optional(),
   email: z.string().trim().email().optional(),
   status: z.enum(RecordStatus).optional(),
 })

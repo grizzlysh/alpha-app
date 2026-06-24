@@ -138,6 +138,7 @@ export interface PurchaseOrderPrintResponse {
   pharmacy: {
     name: string
     address: string
+    location: string
     businessLicenseNumber: string | null
   }
   headPharmacist: {

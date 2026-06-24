@@ -24,6 +24,7 @@ export interface CreatePharmacyBody {
   category: PharmacyCategory
   phone: string
   address: string
+  location: string
   email?: string
 }
 
@@ -33,6 +34,7 @@ export interface UpdatePharmacyBody {
   category?: PharmacyCategory
   phone?: string
   address?: string
+  location?: string
   email?: string
   status?: RecordStatus
 }
@@ -144,6 +146,7 @@ export interface PharmacyResponse {
   category: PharmacyCategory
   phone: string
   address: string
+  location: string
   email: string | null
   status: RecordStatus
   activeLicense: ActiveBusinessLicense | null

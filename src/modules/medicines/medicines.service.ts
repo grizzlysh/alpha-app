@@ -70,15 +70,20 @@ const formatResponse = (m: Prisma.MedicineGetPayload<{ select: typeof medicineSe
   updatedAt: m.updatedAt,
 })
 
+const pharmacyOr = (pharmacyId: number) => ({
+  OR: [{ pharmacyId: null }, { pharmacyId }],
+})
+
 const resolveMedicineRefs = async (
   medicineShapeUuid: string,
   medicineTypeUuid: string,
-  medicineClassUuid: string
+  medicineClassUuid: string,
+  pharmacyId: number
 ): Promise<{ shapeId: number; typeId: number; medicineClassId: number }> => {
   const [shape, type, medicineClass] = await Promise.all([
-    prisma.medicineShape.findFirst({ where: { uuid: medicineShapeUuid, deletedAt: null }, select: { id: true } }),
-    prisma.medicineType.findFirst({ where: { uuid: medicineTypeUuid, deletedAt: null }, select: { id: true } }),
-    prisma.medicineClass.findFirst({ where: { uuid: medicineClassUuid, deletedAt: null }, select: { id: true } }),
+    prisma.medicineShape.findFirst({ where: { uuid: medicineShapeUuid, deletedAt: null, ...pharmacyOr(pharmacyId) }, select: { id: true } }),
+    prisma.medicineType.findFirst({ where: { uuid: medicineTypeUuid, deletedAt: null, ...pharmacyOr(pharmacyId) }, select: { id: true } }),
+    prisma.medicineClass.findFirst({ where: { uuid: medicineClassUuid, deletedAt: null, ...pharmacyOr(pharmacyId) }, select: { id: true } }),
   ])
 
   if (!shape) throw new NotFoundException('Medicine shape not found')
@@ -177,7 +182,8 @@ export const createMedicine = async (
   const { shapeId, typeId, medicineClassId } = await resolveMedicineRefs(
     data.medicineShapeUuid,
     data.medicineTypeUuid,
-    data.medicineClassUuid
+    data.medicineClassUuid,
+    pharmacyId
   )
 
   const medicine = await prisma.medicine.create({
@@ -228,13 +234,13 @@ export const updateMedicine = async (
   if (data.medicineShapeUuid || data.medicineTypeUuid || data.medicineClassUuid) {
     const [shape, type, medicineClass] = await Promise.all([
       data.medicineShapeUuid
-        ? prisma.medicineShape.findFirst({ where: { uuid: data.medicineShapeUuid, deletedAt: null }, select: { id: true } })
+        ? prisma.medicineShape.findFirst({ where: { uuid: data.medicineShapeUuid, deletedAt: null, ...pharmacyOr(pharmacyId) }, select: { id: true } })
         : null,
       data.medicineTypeUuid
-        ? prisma.medicineType.findFirst({ where: { uuid: data.medicineTypeUuid, deletedAt: null }, select: { id: true } })
+        ? prisma.medicineType.findFirst({ where: { uuid: data.medicineTypeUuid, deletedAt: null, ...pharmacyOr(pharmacyId) }, select: { id: true } })
         : null,
       data.medicineClassUuid
-        ? prisma.medicineClass.findFirst({ where: { uuid: data.medicineClassUuid, deletedAt: null }, select: { id: true } })
+        ? prisma.medicineClass.findFirst({ where: { uuid: data.medicineClassUuid, deletedAt: null, ...pharmacyOr(pharmacyId) }, select: { id: true } })
         : null,
     ])
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '@middlewares/auth';
-import { requirePermission } from '@middlewares/roleGuard';
+import { requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard';
 import { validateBody, validateQuery } from '@middlewares/validate';
 import { PERMISSIONS } from '@constants/permissions';
 import * as userController from './users.controller';
@@ -27,6 +27,7 @@ meRouter.put('/password', validateBody(changePasswordSchema), userController.cha
 export const userRouter = Router();
 userRouter.use(authenticate);
 
+userRouter.get('/dropdown', requirePharmacyAccess, requirePermission(PERMISSIONS.USERS_READ), userController.getUsersDropdown);
 userRouter.get('/', requirePermission(PERMISSIONS.USERS_READ), validateQuery(listUserSchema), userController.listUsers);
 userRouter.get('/:user_uuid', requirePermission(PERMISSIONS.USERS_READ), userController.getUser);
 userRouter.post('/', requirePermission(PERMISSIONS.USERS_CREATE), validateBody(createUserSchema), userController.createUser);

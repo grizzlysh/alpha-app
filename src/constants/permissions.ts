@@ -117,6 +117,24 @@ export const PERMISSIONS = {
   SETTINGS_READ: 'settings.read',
   SETTINGS_UPDATE: 'settings.update',
 
+  // storage
+  STORAGE_READ: 'storage.read',
+  STORAGE_CREATE: 'storage.create',
+  STORAGE_UPDATE: 'storage.update',
+  STORAGE_DELETE: 'storage.delete',
+
+  // doctors
+  DOCTORS_READ: 'doctors.read',
+  DOCTORS_CREATE: 'doctors.create',
+  DOCTORS_UPDATE: 'doctors.update',
+  DOCTORS_DELETE: 'doctors.delete',
+
+  // prescriptions
+  PRESCRIPTIONS_READ: 'prescriptions.read',
+  PRESCRIPTIONS_CREATE: 'prescriptions.create',
+  PRESCRIPTIONS_UPDATE: 'prescriptions.update',
+  PRESCRIPTIONS_DELETE: 'prescriptions.delete',
+
   // dashboard
   DASHBOARD_READ: 'dashboard.read',
   DASHBOARD_ADVANCED: 'dashboard.advanced',

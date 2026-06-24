@@ -73,7 +73,7 @@ async function getDailyOps(pharmacyId: number) {
     soldAt: { gte: start, lte: end },
   })
 
-  const [todayAgg, yesterdayAgg, todayList] = await Promise.all([
+  const [todayAgg, yesterdayAgg, todayList, recentList] = await Promise.all([
     prisma.sale.aggregate({
       where: completedFilter(today.start, today.end),
       _sum: { grandTotal: true },
@@ -86,16 +86,20 @@ async function getDailyOps(pharmacyId: number) {
     }),
     prisma.sale.findMany({
       where: completedFilter(today.start, today.end),
+      select: { prescriptionId: true, grandTotal: true },
+    }),
+    prisma.sale.findMany({
+      where: { pharmacyId, status: SaleStatus.COMPLETED, deletedAt: null },
       select: {
         uuid: true,
         saleNumber: true,
         grandTotal: true,
         soldAt: true,
         prescriptionId: true,
-        customer: { select: { name: true, isWalkIn: true } },
+        customer: { select: { name: true } },
       },
       orderBy: { soldAt: 'desc' },
-      take: 10,
+      take: 5,
     }),
   ])
 
@@ -119,7 +123,7 @@ async function getDailyOps(pharmacyId: number) {
       otcRevenue: otcSales.reduce((sum, s) => sum + toNum(s.grandTotal), 0),
       rxRevenue: rxSales.reduce((sum, s) => sum + toNum(s.grandTotal), 0),
     },
-    recentTransactions: todayList.map((s) => ({
+    recentTransactions: recentList.map((s) => ({
       uuid: s.uuid,
       saleNumber: s.saleNumber,
       customerName: s.customer.name,

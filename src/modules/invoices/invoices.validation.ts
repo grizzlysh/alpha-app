@@ -15,7 +15,7 @@ export const createInvoiceDetailSchema = z.object({
 export const createInvoiceSchema = z.object({
   distributorUuid: z.string().trim().uuid({ message: 'Invalid distributor UUID' }),
   purchaseOrderUuid: z.string().trim().uuid().optional(),
-  signedByUuid: z.string().trim().uuid().optional(),
+  signedByUuid: z.string().trim().uuid({ message: 'Invalid signer UUID' }),
   invoiceNumber: z.string().trim().toLowerCase().min(1, { message: 'Invoice number is required' }),
   invoiceDate: z.string().trim().min(1, { message: 'Invoice date is required' }),
   dueDate: z.string().trim().min(1, { message: 'Due date is required' }),
@@ -26,7 +26,10 @@ export const createInvoiceSchema = z.object({
   details: z
     .array(createInvoiceDetailSchema)
     .min(1, { message: 'At least one detail is required' }),
-})
+}).refine(
+  (data) => new Date(data.receiveDate) >= new Date(data.invoiceDate),
+  { message: 'Receive date must be the same as or after invoice date', path: ['receiveDate'] }
+)
 
 export const invoiceQuerySchema = z.object({
   search: z.string().trim().optional(),

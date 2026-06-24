@@ -23,6 +23,7 @@ export interface ListUserQuery {
   search?: string;
   status?: RecordStatus;
   platformRole?: PlatformRole;
+  pharmacyUuid?: string;
 }
 
 export interface ListPlacementQuery {
@@ -148,6 +149,12 @@ export interface UserListItem {
 export interface UserDetailItem extends UserListItem {
   placements: PlacementItem[];
   updatedAt: Date;
+}
+
+export interface UserDropdownItem {
+  uuid: string;
+  name: string;
+  email: string;
 }
 
 export interface MeItem {
