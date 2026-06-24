@@ -115,12 +115,42 @@ const PERMISSIONS = [
   { module: 'sign',               action: 'full' },
 ]
 
-const OWNER_PERMISSIONS = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
+const all = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
 
-const PHARMACY_USER_EXCLUDED_MODULES = ['users', 'roles', 'permissions', 'pharmacies', 'system_parameters']
-const PHARMACY_USER_PERMISSIONS = PERMISSIONS
-  .filter((p) => !PHARMACY_USER_EXCLUDED_MODULES.includes(p.module))
-  .map((p) => `${p.module}.${p.action}`)
+const excluded = (...modules: string[]) =>
+  PERMISSIONS.filter((p) => !modules.includes(p.module)).map((p) => `${p.module}.${p.action}`)
+
+const only = (...keys: string[]) => keys
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  OWNER: all,
+
+  ADMIN: excluded('system_parameters', 'pharmacies'),
+
+  HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
+
+  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters'),
+
+  CASHIER: only(
+    'customers.read', 'customers.create', 'customers.update',
+    'medicines.read',
+    'stock.read',
+    'sales.read', 'sales.create', 'sales.update', 'sales.delete',
+    'prescriptions.read',
+    'doctors.read',
+    'storage.read',
+    'dashboard.read',
+    'sign.standard',
+  ),
+
+  DOCTOR: only(
+    'customers.read',
+    'medicines.read',
+    'doctors.read', 'doctors.create', 'doctors.update', 'doctors.delete',
+    'prescriptions.read', 'prescriptions.create', 'prescriptions.update', 'prescriptions.delete',
+    'dashboard.read',
+  ),
+}
 
 // ── Price helpers ─────────────────────────────────────────────────────────────
 
@@ -333,6 +363,62 @@ async function main() {
     },
   })
 
+  // ── 4a. Admin ─────────────────────────────────────────────────────────────
+  console.log('Creating admin user...')
+  const adminUserPassword = await bcrypt.hash('Admin@123', 10)
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@apotek.com' },
+    update: {},
+    create: {
+      name: 'Budi Hartono',
+      email: 'admin@apotek.com',
+      password: adminUserPassword,
+      status: RecordStatus.ACTIVE,
+    },
+  })
+
+  // ── 4b. Head Pharmacist ───────────────────────────────────────────────────
+  console.log('Creating head pharmacist user...')
+  const headPharmacistPassword = await bcrypt.hash('HeadPharma@123', 10)
+  const headPharmacist = await prisma.user.upsert({
+    where: { email: 'headpharmacist@apotek.com' },
+    update: {},
+    create: {
+      name: 'Dewi Lestari',
+      email: 'headpharmacist@apotek.com',
+      password: headPharmacistPassword,
+      status: RecordStatus.ACTIVE,
+    },
+  })
+
+  // ── 4c. Cashier ───────────────────────────────────────────────────────────
+  console.log('Creating cashier user...')
+  const cashierPassword = await bcrypt.hash('Cashier@123', 10)
+  const cashier = await prisma.user.upsert({
+    where: { email: 'cashier@apotek.com' },
+    update: {},
+    create: {
+      name: 'Rina Marlina',
+      email: 'cashier@apotek.com',
+      password: cashierPassword,
+      status: RecordStatus.ACTIVE,
+    },
+  })
+
+  // ── 4d. Doctor user ───────────────────────────────────────────────────────
+  console.log('Creating doctor user...')
+  const doctorUserPassword = await bcrypt.hash('Doctor@123', 10)
+  const doctorUser = await prisma.user.upsert({
+    where: { email: 'doctor@apotek.com' },
+    update: {},
+    create: {
+      name: 'Dr. Sanjaya Putra',
+      email: 'doctor@apotek.com',
+      password: doctorUserPassword,
+      status: RecordStatus.ACTIVE,
+    },
+  })
+
   // ── 5. Pharmacy ───────────────────────────────────────────────────────────
   console.log('Creating pharmacy...')
   const pharmacy = await prisma.pharmacy.upsert({
@@ -373,94 +459,85 @@ async function main() {
 
   // ── 6. Roles ──────────────────────────────────────────────────────────────
   console.log('Creating roles...')
-  const ownerRole =
-    (await prisma.role.findFirst({ where: { pharmacyId: null, name: 'Owner' } })) ??
-    (await prisma.role.create({
-      data: {
-        pharmacyId: null,
-        name: 'Owner',
-        type: AppRole.OWNER,
-        description: 'Pharmacy owner with full access',
-        requiresLicense: false,
-        status: RecordStatus.ACTIVE,
-      },
-    }))
-
-  const pharmacistRole =
-    (await prisma.role.findFirst({ where: { pharmacyId: null, name: 'Pharmacist' } })) ??
-    (await prisma.role.create({
-      data: {
-        pharmacyId: null,
-        name: 'Pharmacist',
-        type: AppRole.PHARMACIST,
-        description: 'Licensed pharmacist with dispensing access',
-        requiresLicense: true,
-        status: RecordStatus.ACTIVE,
-      },
-    }))
+  const roleDefs: { name: string; type: AppRole; description: string; requiresLicense: boolean }[] = [
+    { name: 'Owner',           type: AppRole.OWNER,           description: 'Pharmacy owner with full access',                                   requiresLicense: false },
+    { name: 'Admin',           type: AppRole.ADMIN,           description: 'Pharmacy administrator with full operational access',                requiresLicense: false },
+    { name: 'Head Pharmacist', type: AppRole.HEAD_PHARMACIST, description: 'Senior licensed pharmacist with staff and license management access', requiresLicense: true  },
+    { name: 'Pharmacist',      type: AppRole.PHARMACIST,      description: 'Licensed pharmacist with dispensing access',                         requiresLicense: true  },
+    { name: 'Cashier',         type: AppRole.CASHIER,         description: 'Cashier with sales and customer access',                             requiresLicense: false },
+    { name: 'Doctor',          type: AppRole.DOCTOR,          description: 'Doctor with prescription management access',                         requiresLicense: true  },
+  ]
+  const roles: Record<string, { id: number }> = {}
+  for (const def of roleDefs) {
+    const existing = await prisma.role.findFirst({ where: { pharmacyId: null, name: def.name } })
+    roles[def.type] = existing ?? await prisma.role.create({
+      data: { pharmacyId: null, name: def.name, type: def.type, description: def.description, requiresLicense: def.requiresLicense, status: RecordStatus.ACTIVE },
+    })
+  }
 
   // ── 7. Role permissions ───────────────────────────────────────────────────
   console.log('Assigning permissions to roles...')
-  for (const key of OWNER_PERMISSIONS) {
-    const permId = permMap.get(key)
-    if (!permId) continue
-    const exists = await prisma.rolePermission.findFirst({
-      where: { roleId: ownerRole.id, permissionId: permId, pharmacyId: null },
-    })
-    if (!exists) {
-      await prisma.rolePermission.create({
-        data: { roleId: ownerRole.id, permissionId: permId, pharmacyId: null, isEnabled: true },
+  for (const [roleType, permKeys] of Object.entries(ROLE_PERMISSIONS)) {
+    const role = roles[roleType]
+    if (!role) continue
+    for (const key of permKeys) {
+      const permId = permMap.get(key)
+      if (!permId) continue
+      const exists = await prisma.rolePermission.findFirst({
+        where: { roleId: role.id, permissionId: permId, pharmacyId: null },
       })
-    }
-  }
-  for (const key of PHARMACY_USER_PERMISSIONS) {
-    const permId = permMap.get(key)
-    if (!permId) continue
-    const exists = await prisma.rolePermission.findFirst({
-      where: { roleId: pharmacistRole.id, permissionId: permId, pharmacyId: null },
-    })
-    if (!exists) {
-      await prisma.rolePermission.create({
-        data: { roleId: pharmacistRole.id, permissionId: permId, pharmacyId: null, isEnabled: true },
-      })
+      if (!exists) {
+        await prisma.rolePermission.create({
+          data: { roleId: role.id, permissionId: permId, pharmacyId: null, isEnabled: true },
+        })
+      }
     }
   }
 
   // ── 8. Placement memberships ──────────────────────────────────────────────
   console.log('Assigning users to pharmacy...')
-  const ownerPlacement = await prisma.placement.findFirst({
-    where: { userId: owner.id, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
-  })
-  if (!ownerPlacement) {
-    await prisma.placement.create({
-      data: { userId: owner.id, pharmacyId: pharmacy.id, roleId: ownerRole.id, status: RecordStatus.ACTIVE },
+
+  async function ensurePlacement(userId: number, roleId: number): Promise<{ id: number }> {
+    const existing = await prisma.placement.findFirst({
+      where: { userId, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
+    })
+    return existing ?? prisma.placement.create({
+      data: { userId, pharmacyId: pharmacy.id, roleId, joinedAt: new Date('2024-01-01'), status: RecordStatus.ACTIVE },
     })
   }
-  let pharmacistPlacement = await prisma.placement.findFirst({
-    where: { userId: pharmacist.id, pharmacyId: pharmacy.id, status: RecordStatus.ACTIVE },
-  })
-  if (!pharmacistPlacement) {
-    pharmacistPlacement = await prisma.placement.create({
-      data: { userId: pharmacist.id, pharmacyId: pharmacy.id, roleId: pharmacistRole.id, status: RecordStatus.ACTIVE },
+
+  async function ensurePracticeLicense(placementId: number, licenseNumber: string): Promise<void> {
+    const existing = await prisma.practiceLicense.findFirst({
+      where: { placementId, status: RecordStatus.ACTIVE },
     })
+    if (!existing) {
+      await prisma.practiceLicense.create({
+        data: {
+          placementId,
+          licenseNumber,
+          validFrom: new Date('2024-01-01'),
+          validUntil: new Date('2027-12-31'),
+          status: RecordStatus.ACTIVE,
+          createdById: platformAdmin.id,
+          updatedById: platformAdmin.id,
+        },
+      })
+    }
   }
-  // PracticeLicense (SIPA) designates this pharmacist as the PIC of the pharmacy
-  const existingSipa = await prisma.practiceLicense.findFirst({
-    where: { placementId: pharmacistPlacement.id, status: RecordStatus.ACTIVE },
-  })
-  if (!existingSipa) {
-    await prisma.practiceLicense.create({
-      data: {
-        placementId: pharmacistPlacement.id,
-        licenseNumber: 'SIPA-JKT-2024-001',
-        validFrom: new Date('2024-01-01'),
-        validUntil: new Date('2027-12-31'),
-        status: RecordStatus.ACTIVE,
-        createdById: platformAdmin.id,
-        updatedById: platformAdmin.id,
-      },
-    })
-  }
+
+  await ensurePlacement(owner.id, roles[AppRole.OWNER].id)
+  await ensurePlacement(adminUser.id, roles[AppRole.ADMIN].id)
+
+  const headPharmacistPlacement = await ensurePlacement(headPharmacist.id, roles[AppRole.HEAD_PHARMACIST].id)
+  await ensurePracticeLicense(headPharmacistPlacement.id, 'SIPA-HPC-2024-001')
+
+  const pharmacistPlacement = await ensurePlacement(pharmacist.id, roles[AppRole.PHARMACIST].id)
+  await ensurePracticeLicense(pharmacistPlacement.id, 'SIPA-JKT-2024-001')
+
+  await ensurePlacement(cashier.id, roles[AppRole.CASHIER].id)
+
+  const doctorUserPlacement = await ensurePlacement(doctorUser.id, roles[AppRole.DOCTOR].id)
+  await ensurePracticeLicense(doctorUserPlacement.id, 'SIP-JKT-2024-003')
 
   // ── 9. System parameters ──────────────────────────────────────────────────
   console.log('Creating system parameters...')
@@ -578,6 +655,7 @@ async function main() {
     })
   }
 
+  // bin code → medicine name (for linking stock details to bins)
   const binDefs = [
     { shelf: 'SHF-A1', code: 'BIN-A1-01', name: 'Kotak A1-01' },
     { shelf: 'SHF-A1', code: 'BIN-A1-02', name: 'Kotak A1-02' },
@@ -587,23 +665,31 @@ async function main() {
     { shelf: 'SHF-B2', code: 'BIN-B2-01', name: 'Kotak B2-01' },
   ]
 
+  const bins: Record<string, { id: number }> = {}
   for (const def of binDefs) {
     const shelfId = shelves[def.shelf].id
     const existing = await prisma.storageBin.findFirst({
       where: { shelfId, code: def.code },
     })
-    if (!existing) {
-      await prisma.storageBin.create({
-        data: {
-          shelfId,
-          code: def.code,
-          name: def.name,
-          status: RecordStatus.ACTIVE,
-          createdById: owner.id,
-          updatedById: owner.id,
-        },
-      })
-    }
+    bins[def.code] = existing ?? await prisma.storageBin.create({
+      data: {
+        shelfId,
+        code: def.code,
+        name: def.name,
+        status: RecordStatus.ACTIVE,
+        createdById: owner.id,
+        updatedById: owner.id,
+      },
+    })
+  }
+
+  // medicine → bin mapping for inventory linking
+  const medicineBinCode: Record<string, string> = {
+    'Paracetamol 500mg': 'BIN-A1-01',
+    'Vitamin C 1000mg':  'BIN-A1-02',
+    'Ibuprofen 400mg':   'BIN-A2-01',
+    'Amoxicillin 500mg': 'BIN-B1-01',
+    'Amlodipin 10mg':    'BIN-B1-02',
   }
 
   // ── 12. Medicine master data ──────────────────────────────────────────────
@@ -894,6 +980,7 @@ async function main() {
         },
       })
 
+      const binCode = medicineBinCode[lineCalc.medicine]
       const stockDetail = await prisma.stockDetail.create({
         data: {
           stockId: stock.id,
@@ -905,6 +992,7 @@ async function main() {
           quantityPieces: detail.quantityPieces,
           quantityBox: detail.quantityBox,
           quantityPerBox: detail.quantityPerBox,
+          ...(binCode && { binId: bins[binCode].id }),
           createdById: owner.id,
         },
       })
@@ -1279,19 +1367,24 @@ async function main() {
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('\nSeed complete!')
   console.log('─────────────────────────────────────────────────────────────')
-  console.log('Platform Admin  →  admin@pharma.com        /  Admin@123      (all permissions, bypasses checks)')
-  console.log('Owner           →  owner@pharma.com        /  Owner@123      (all permissions)')
-  console.log('Pharmacist      →  pharmacist@pharma.com   /  Pharmacist@123 (all permissions except users/roles/permissions/pharmacies/system_parameters)')
-  console.log('Pharmacy        →  Apotek Sejahtera (APK1) — pharmacist is PIC (SIPA-JKT-2024-001)')
-  console.log('Medicines       →  5 (Paracetamol, Amoxicillin, Vitamin C, Ibuprofen, Amlodipin)')
-  console.log('Distributor     →  Kimia Farma, Enseval')
-  console.log('Storage         →  2 cabinets, 4 shelves, 6 bins')
-  console.log('Invoice         →  INV-APK1-20260101-001 (PAID, stock loaded)')
-  console.log('Sales           →  SL-APK1-20260115-001 + 30 daily (2026-05-20 → 2026-06-18)')
-  console.log('Doctors         →  Dr. Ahmad Fauzi (GP), Dr. Dewi Kusuma (Internist)')
-  console.log('Prescriptions   →  RX-APK1-20260110-001 (dispensed), RX-APK1-20260120-001 (partial)')
-  console.log('Stock Return    →  SR-APK1-20260210-001 (Amoxicillin 5 pcs, completed)')
-  console.log('Stock Disposal  →  SD-APK1-20260301-001 (Ibuprofen 3 pcs, damaged, completed)')
+  console.log('Platform Admin   →  admin@pharma.com             /  Admin@123        (bypasses all checks)')
+  console.log('Owner            →  owner@pharma.com             /  Owner@123        (all permissions)')
+  console.log('Admin            →  admin@apotek.com             /  Admin@123        (all except system_parameters/pharmacies)')
+  console.log('Head Pharmacist  →  headpharmacist@apotek.com    /  HeadPharma@123   (all except system_parameters/pharmacies, SIPA-HPC-2024-001)')
+  console.log('Pharmacist       →  pharmacist@pharma.com        /  Pharmacist@123   (no users/roles/permissions/pharmacies/system_parameters, SIPA-JKT-2024-001)')
+  console.log('Cashier          →  cashier@apotek.com           /  Cashier@123      (sales/customers/medicines/stock/prescriptions only)')
+  console.log('Doctor           →  doctor@apotek.com            /  Doctor@123       (doctors/prescriptions/customers/medicines, SIP-JKT-2024-003)')
+  console.log('Pharmacy         →  Apotek Sejahtera (APK1)')
+  console.log('Roles            →  6 global roles, all permissions assigned')
+  console.log('Medicines        →  5 (Paracetamol, Amoxicillin, Vitamin C, Ibuprofen, Amlodipin)')
+  console.log('Distributors     →  Kimia Farma, Enseval')
+  console.log('Storage          →  2 cabinets → 4 shelves → 6 bins (stock details linked to bins)')
+  console.log('Invoice          →  INV-APK1-20260101-001 (PAID, stock loaded)')
+  console.log('Sales            →  SL-APK1-20260115-001 + 30 daily (2026-05-20 → 2026-06-18)')
+  console.log('Doctors          →  Dr. Ahmad Fauzi (GP), Dr. Dewi Kusuma (Internist)')
+  console.log('Prescriptions    →  RX-APK1-20260110-001 (dispensed), RX-APK1-20260120-001 (partial)')
+  console.log('Stock Return     →  SR-APK1-20260210-001 (Amoxicillin 5 pcs, completed)')
+  console.log('Stock Disposal   →  SD-APK1-20260301-001 (Ibuprofen 3 pcs, damaged, completed)')
   console.log('─────────────────────────────────────────────────────────────')
 }
 
