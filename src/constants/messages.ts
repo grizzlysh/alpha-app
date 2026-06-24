@@ -542,6 +542,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Role not found',
     id: 'Peran tidak ditemukan',
   },
+  CANNOT_ASSIGN_OWNER_ROLE: {
+    en: 'Only platform admin can assign the owner role',
+    id: 'Hanya platform admin yang dapat menetapkan peran pemilik',
+  },
   ROLE_NAME_ALREADY_EXISTS: {
     en: 'Role name already exists',
     id: 'Nama peran sudah ada',
@@ -675,6 +679,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   PHARMACY_ALREADY_HAS_HEAD_PHARMACIST: {
     en: 'Pharmacy already has a pharmacist in charge',
     id: 'Apotek sudah memiliki apoteker penanggung jawab',
+  },
+  PHARMACY_NO_HEAD_PHARMACIST: {
+    en: 'This pharmacy does not have a pharmacist in charge yet. Please contact the pharmacy owner.',
+    id: 'Apotek ini belum memiliki apoteker penanggung jawab. Silakan hubungi pemilik apotek.',
   },
   PLACEMENT_DATE_OVERLAP: {
     en: 'Placement dates overlap with an existing tenure at this pharmacy',
@@ -1043,6 +1051,19 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   PHARMACY_PARAMETERS_UPDATED: {
     en: 'Pharmacy parameters updated successfully',
     id: 'Parameter apotek berhasil diperbarui',
+  },
+
+  INVENTORY_TREE_FETCHED: {
+    en: 'Inventory tree fetched successfully',
+    id: 'Struktur inventaris berhasil diambil',
+  },
+  INVENTORY_BIN_ITEMS_FETCHED: {
+    en: 'Bin items fetched successfully',
+    id: 'Isi bin berhasil diambil',
+  },
+  INVENTORY_CABINET_POSITION_UPDATED: {
+    en: 'Cabinet position updated successfully',
+    id: 'Posisi lemari berhasil diperbarui',
   },
 
 }

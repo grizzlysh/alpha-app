@@ -10,6 +10,7 @@ export const createInvoiceDetailSchema = z.object({
   quantityPieces: z.number().int().positive({ message: 'Quantity pieces must be positive' }),
   price: z.number().positive({ message: 'Price must be positive' }),
   discountPercentage: z.number().min(0).max(100).optional().default(0),
+  binUuid: z.string().trim().uuid({ message: 'Invalid bin UUID' }).optional(),
 })
 
 export const createInvoiceSchema = z.object({

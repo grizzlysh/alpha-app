@@ -349,6 +349,7 @@ export const createInvoice = async (
 
     // ── Calculate Details ─────────────────────────
     const stockPriceMap = new Map<number, { basePrice: Decimal; calculatedPrice: Decimal }>()
+    const stockBinMap = new Map<string, number | null>()
     const detailsData = await Promise.all(
       data.details.map(async (detail) => {
         const medicine = await tx.medicine.findFirst({
@@ -360,6 +361,17 @@ export const createInvoice = async (
             `Medicine not found: ${detail.medicineUuid}`
           )
         }
+
+        let binId: number | null = null
+        if (detail.binUuid) {
+          const bin = await tx.storageBin.findFirst({
+            where: { uuid: detail.binUuid, deletedAt: null, shelf: { cabinet: { pharmacyId } } },
+            select: { id: true },
+          })
+          if (!bin) throw new NotFoundException(`Storage bin not found: ${detail.binUuid}`)
+          binId = bin.id
+        }
+        stockBinMap.set(`${medicine.id}-${detail.batchNumber}`, binId)
 
         const { discountAmount, finalPrice, basePrice, calculatedPrice } = calculatePrices(
           detail.price,
@@ -493,11 +505,14 @@ export const createInvoice = async (
       })
 
       // create stock detail
+      const binId = stockBinMap.get(`${detail.medicineId}-${detail.batchNumber}`) ?? null
+
       const stockDetail = await tx.stockDetail.create({
         data: {
           stockId: stock.id,
           distributorId: distributor.id,
           invoiceDetailId: detail.id,
+          binId: binId ?? undefined,
           batchNumber: detail.batchNumber,
           barcode: generateBarcode(),
           expiryDate: detail.expiryDate,

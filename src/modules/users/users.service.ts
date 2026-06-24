@@ -343,6 +343,7 @@ export async function getUser(userUuid: string): Promise<UserDetailItem> {
 
 export async function createUser(
   createdById: number,
+  callerPlatformRole: string | null,
   body: CreateUserBody
 ): Promise<UserDetailItem> {
   const duplicate = await prisma.user.findFirst({
@@ -380,6 +381,10 @@ export async function createUser(
     where: { uuid: body.placement.roleUuid, deletedAt: null },
   });
   if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
+
+  if (role.type === AppRole.OWNER && callerPlatformRole !== 'PLATFORM_ADMIN') {
+    throw new ForbiddenException('CANNOT_ASSIGN_OWNER_ROLE');
+  }
 
   const licenseRequired = role.type === AppRole.PHARMACIST || role.type === AppRole.HEAD_PHARMACIST || role.type === AppRole.DOCTOR;
   if (licenseRequired && !body.placement.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
@@ -617,6 +622,7 @@ async function checkPlacementOverlap(
 
 export async function createPlacement(
   createdById: number,
+  callerPlatformRole: string | null,
   userUuid: string,
   body: CreatePlacementBody
 ): Promise<PlacementItem> {
@@ -632,6 +638,10 @@ export async function createPlacement(
     where: { uuid: body.roleUuid, deletedAt: null },
   });
   if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
+
+  if (role.type === AppRole.OWNER && callerPlatformRole !== 'PLATFORM_ADMIN') {
+    throw new ForbiddenException('CANNOT_ASSIGN_OWNER_ROLE');
+  }
 
   const activeCount = await prisma.placement.count({
     where: { userId: user.id, deletedAt: null, status: RecordStatus.ACTIVE, leftAt: null },
@@ -699,6 +709,7 @@ export async function createPlacement(
 
 export async function updatePlacement(
   updatedById: number,
+  callerPlatformRole: string | null,
   userUuid: string,
   placementUuid: string,
   body: UpdatePlacementBody
@@ -715,6 +726,10 @@ export async function updatePlacement(
   if (body.roleUuid) {
     const role = await prisma.role.findFirst({ where: { uuid: body.roleUuid, deletedAt: null } });
     if (!role) throw new NotFoundException('ROLE_NOT_FOUND');
+
+    if (role.type === AppRole.OWNER && callerPlatformRole !== 'PLATFORM_ADMIN') {
+      throw new ForbiddenException('CANNOT_ASSIGN_OWNER_ROLE');
+    }
 
     if (role.type === AppRole.HEAD_PHARMACIST) {
       const existingPic = await prisma.placement.findFirst({

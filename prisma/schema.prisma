@@ -621,6 +621,11 @@ model StorageCabinet {
   name        String       @db.VarChar(100)
   code        String       @db.VarChar(20)
   description String?      @db.Text
+  posX        Float?       @map("pos_x")
+  posY        Float?       @map("pos_y")
+  width       Float?       @map("width")
+  height      Float?       @map("height")
+  rotation    Int?         @default(0) @map("rotation")
   status      RecordStatus @default(ACTIVE)
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")

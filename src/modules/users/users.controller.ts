@@ -118,8 +118,8 @@ export async function createUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
-    const data = await userService.createUser(id, req.body);
+    const { id, platformRole } = req.user!;
+    const data = await userService.createUser(id, platformRole, req.body);
     sendCreated(res, 'USER_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -191,8 +191,8 @@ export async function createPlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
-    const data = await userService.createPlacement(id, parseUuid(req.params.user_uuid), req.body);
+    const { id, platformRole } = req.user!;
+    const data = await userService.createPlacement(id, platformRole, parseUuid(req.params.user_uuid), req.body);
     sendCreated(res, 'PLACEMENT_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -203,9 +203,9 @@ export async function updatePlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
+    const { id, platformRole } = req.user!;
     const { user_uuid, placement_uuid } = req.params;
-    const data = await userService.updatePlacement(id, user_uuid, placement_uuid, req.body);
+    const data = await userService.updatePlacement(id, platformRole, user_uuid, placement_uuid, req.body);
     sendSuccess(res, 'PLACEMENT_UPDATED', data);
   } catch (err) { next(err); }
 }

@@ -34,6 +34,7 @@ import dashboardRoutes from '@modules/dashboard/dashboard.routes'
 import storageRoutes from '@modules/storage/storage.routes'
 import doctorRoutes from '@modules/doctors/doctors.routes'
 import prescriptionRoutes from '@modules/prescriptions/prescriptions.routes'
+import inventoryRoutes from '@modules/inventory/inventory.routes'
 
 
 
@@ -92,6 +93,7 @@ app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/storage', storageRoutes)
 app.use('/api/doctors', doctorRoutes)
 app.use('/api/prescriptions', prescriptionRoutes)
+app.use('/api/inventory', inventoryRoutes)
 
 // ── Health Check ─────────────────────────────
 app.get('/', (req: Request, res: Response): void => {

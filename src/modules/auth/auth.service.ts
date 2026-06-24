@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
-import { PlatformRole } from '@prisma/client'
+import { AppRole, PlatformRole } from '@prisma/client'
 import { prisma } from '@config/db'
 import { env } from '@config/env'
 import { LoginInput, SelectPharmacyInput } from './auth.validation'
@@ -266,6 +266,27 @@ export const selectPharmacy = async (
 
   if (!hasAccess) {
     throw new ForbiddenException('You do not have access to this pharmacy')
+  }
+
+  const isOwnerOrAdmin =
+    platformRole === PlatformRole.PLATFORM_ADMIN ||
+    pharmacyRole?.type === AppRole.OWNER
+
+  if (!isOwnerOrAdmin) {
+    const hasHeadPharmacist = await prisma.placement.findFirst({
+      where: {
+        pharmacyId: pharmacy.id,
+        deletedAt: null,
+        leftAt: null,
+        status: 'ACTIVE',
+        role: { type: AppRole.HEAD_PHARMACIST },
+      },
+      select: { id: true },
+    })
+
+    if (!hasHeadPharmacist) {
+      throw new ForbiddenException('PHARMACY_NO_HEAD_PHARMACIST')
+    }
   }
 
   let permissions: string[] = []

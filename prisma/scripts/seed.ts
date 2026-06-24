@@ -3,13 +3,18 @@ import {
   PlatformRole,
   AppRole,
   PharmacyCategory,
-  RecordStatus, // ACTIVE | INACTIVE (DELETED removed)
+  RecordStatus,
   DataType,
   PurchaseOrderStatus,
   PaymentStatus,
   PaymentMethod,
   SaleStatus,
   SaleType,
+  StockReturnStatus,
+  StockDisposalStatus,
+  DisposalReason,
+  PrescriptionStatus,
+  PrescriptionDetailStatus,
 } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -19,86 +24,99 @@ const prisma = new PrismaClient()
 // ── Permission Definitions ────────────────────────────────────────────────────
 
 const PERMISSIONS = [
-  { module: 'medicine_shapes', action: 'read' },
-  { module: 'medicine_shapes', action: 'create' },
-  { module: 'medicine_shapes', action: 'update' },
-  { module: 'medicine_shapes', action: 'delete' },
-  { module: 'medicine_types', action: 'read' },
-  { module: 'medicine_types', action: 'create' },
-  { module: 'medicine_types', action: 'update' },
-  { module: 'medicine_types', action: 'delete' },
-  { module: 'medicine_classes', action: 'read' },
-  { module: 'medicine_classes', action: 'create' },
-  { module: 'medicine_classes', action: 'update' },
-  { module: 'medicine_classes', action: 'delete' },
-  { module: 'medicines', action: 'read' },
-  { module: 'medicines', action: 'create' },
-  { module: 'medicines', action: 'update' },
-  { module: 'medicines', action: 'delete' },
-  { module: 'distributors', action: 'read' },
-  { module: 'distributors', action: 'create' },
-  { module: 'distributors', action: 'update' },
-  { module: 'distributors', action: 'delete' },
-  { module: 'customers', action: 'read' },
-  { module: 'customers', action: 'create' },
-  { module: 'customers', action: 'update' },
-  { module: 'customers', action: 'delete' },
-  { module: 'stock', action: 'read' },
-  { module: 'stock', action: 'adjust' },
-  { module: 'purchase_orders', action: 'read' },
-  { module: 'purchase_orders', action: 'create' },
-  { module: 'purchase_orders', action: 'update' },
-  { module: 'purchase_orders', action: 'delete' },
-  { module: 'invoices', action: 'read' },
-  { module: 'invoices', action: 'create' },
-  { module: 'invoices', action: 'update' },
-  { module: 'invoices', action: 'delete' },
-  { module: 'invoices', action: 'verify' },
-  { module: 'sales', action: 'read' },
-  { module: 'sales', action: 'create' },
-  { module: 'sales', action: 'update' },
-  { module: 'sales', action: 'delete' },
-  { module: 'stock_return', action: 'read' },
-  { module: 'stock_return', action: 'create' },
-  { module: 'stock_return', action: 'update' },
-  { module: 'stock_return', action: 'delete' },
-  { module: 'stock_disposal', action: 'read' },
-  { module: 'stock_disposal', action: 'create' },
-  { module: 'stock_disposal', action: 'update' },
-  { module: 'reports', action: 'read' },
-  { module: 'reports', action: 'export' },
-  { module: 'users', action: 'read' },
-  { module: 'users', action: 'create' },
-  { module: 'users', action: 'update' },
-  { module: 'users', action: 'delete' },
-  { module: 'permissions', action: 'read' },
-  { module: 'roles', action: 'read' },
-  { module: 'roles', action: 'create' },
-  { module: 'roles', action: 'update' },
-  { module: 'roles', action: 'delete' },
-  { module: 'licenses', action: 'read' },
-  { module: 'licenses', action: 'create' },
-  { module: 'licenses', action: 'update' },
-  { module: 'licenses', action: 'delete' },
-  { module: 'pharmacies', action: 'read' },
-  { module: 'pharmacies', action: 'create' },
-  { module: 'pharmacies', action: 'update' },
-  { module: 'pharmacies', action: 'delete' },
-  { module: 'business_parameters', action: 'read' },
-  { module: 'business_parameters', action: 'update' },
-  { module: 'system_parameters', action: 'read' },
-  { module: 'system_parameters', action: 'update' },
-  { module: 'settings', action: 'read' },
-  { module: 'settings', action: 'update' },
-  { module: 'sign', action: 'standard' },
-  { module: 'sign', action: 'full' },
-  { module: 'dashboard', action: 'read' },
-  { module: 'dashboard', action: 'advanced' },
+  { module: 'medicine_shapes',    action: 'read' },
+  { module: 'medicine_shapes',    action: 'create' },
+  { module: 'medicine_shapes',    action: 'update' },
+  { module: 'medicine_shapes',    action: 'delete' },
+  { module: 'medicine_types',     action: 'read' },
+  { module: 'medicine_types',     action: 'create' },
+  { module: 'medicine_types',     action: 'update' },
+  { module: 'medicine_types',     action: 'delete' },
+  { module: 'medicine_classes',   action: 'read' },
+  { module: 'medicine_classes',   action: 'create' },
+  { module: 'medicine_classes',   action: 'update' },
+  { module: 'medicine_classes',   action: 'delete' },
+  { module: 'medicines',          action: 'read' },
+  { module: 'medicines',          action: 'create' },
+  { module: 'medicines',          action: 'update' },
+  { module: 'medicines',          action: 'delete' },
+  { module: 'distributors',       action: 'read' },
+  { module: 'distributors',       action: 'create' },
+  { module: 'distributors',       action: 'update' },
+  { module: 'distributors',       action: 'delete' },
+  { module: 'customers',          action: 'read' },
+  { module: 'customers',          action: 'create' },
+  { module: 'customers',          action: 'update' },
+  { module: 'customers',          action: 'delete' },
+  { module: 'stock',              action: 'read' },
+  { module: 'stock',              action: 'adjust' },
+  { module: 'stock_movements',    action: 'read' },
+  { module: 'purchase_orders',    action: 'read' },
+  { module: 'purchase_orders',    action: 'create' },
+  { module: 'purchase_orders',    action: 'update' },
+  { module: 'purchase_orders',    action: 'delete' },
+  { module: 'invoices',           action: 'read' },
+  { module: 'invoices',           action: 'create' },
+  { module: 'invoices',           action: 'update' },
+  { module: 'invoices',           action: 'delete' },
+  { module: 'invoices',           action: 'verify' },
+  { module: 'sales',              action: 'read' },
+  { module: 'sales',              action: 'create' },
+  { module: 'sales',              action: 'update' },
+  { module: 'sales',              action: 'delete' },
+  { module: 'stock_return',       action: 'read' },
+  { module: 'stock_return',       action: 'create' },
+  { module: 'stock_return',       action: 'update' },
+  { module: 'stock_return',       action: 'delete' },
+  { module: 'stock_disposal',     action: 'read' },
+  { module: 'stock_disposal',     action: 'create' },
+  { module: 'stock_disposal',     action: 'update' },
+  { module: 'stock_disposal',     action: 'delete' },
+  { module: 'storage',            action: 'read' },
+  { module: 'storage',            action: 'create' },
+  { module: 'storage',            action: 'update' },
+  { module: 'storage',            action: 'delete' },
+  { module: 'doctors',            action: 'read' },
+  { module: 'doctors',            action: 'create' },
+  { module: 'doctors',            action: 'update' },
+  { module: 'doctors',            action: 'delete' },
+  { module: 'prescriptions',      action: 'read' },
+  { module: 'prescriptions',      action: 'create' },
+  { module: 'prescriptions',      action: 'update' },
+  { module: 'prescriptions',      action: 'delete' },
+  { module: 'reports',            action: 'read' },
+  { module: 'reports',            action: 'export' },
+  { module: 'users',              action: 'read' },
+  { module: 'users',              action: 'create' },
+  { module: 'users',              action: 'update' },
+  { module: 'users',              action: 'delete' },
+  { module: 'permissions',        action: 'read' },
+  { module: 'roles',              action: 'read' },
+  { module: 'roles',              action: 'create' },
+  { module: 'roles',              action: 'update' },
+  { module: 'roles',              action: 'delete' },
+  { module: 'licenses',           action: 'read' },
+  { module: 'licenses',           action: 'create' },
+  { module: 'licenses',           action: 'update' },
+  { module: 'licenses',           action: 'delete' },
+  { module: 'pharmacies',         action: 'read' },
+  { module: 'pharmacies',         action: 'create' },
+  { module: 'pharmacies',         action: 'update' },
+  { module: 'pharmacies',         action: 'delete' },
+  { module: 'business_parameters',action: 'read' },
+  { module: 'business_parameters',action: 'update' },
+  { module: 'system_parameters',  action: 'read' },
+  { module: 'system_parameters',  action: 'update' },
+  { module: 'settings',           action: 'read' },
+  { module: 'settings',           action: 'update' },
+  { module: 'dashboard',          action: 'read' },
+  { module: 'dashboard',          action: 'advanced' },
+  { module: 'sign',               action: 'standard' },
+  { module: 'sign',               action: 'full' },
 ]
 
 const OWNER_PERMISSIONS = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
 
-// All permissions except user management, roles, permissions, pharmacy config, and system parameters
 const PHARMACY_USER_EXCLUDED_MODULES = ['users', 'roles', 'permissions', 'pharmacies', 'system_parameters']
 const PHARMACY_USER_PERMISSIONS = PERMISSIONS
   .filter((p) => !PHARMACY_USER_EXCLUDED_MODULES.includes(p.module))
@@ -325,6 +343,7 @@ async function main() {
       code: 'APK1',
       category: PharmacyCategory.APOTEK,
       address: 'Jl. Merdeka No. 1, Jakarta Pusat 10110',
+      location: 'Jakarta Pusat',
       phone: '021-12345678',
       email: 'apotek@pharma.com',
       status: RecordStatus.ACTIVE,
@@ -507,7 +526,87 @@ async function main() {
     }
   }
 
-  // ── 11. Medicine master data ──────────────────────────────────────────────
+  // ── 11. Storage ───────────────────────────────────────────────────────────
+  console.log('Creating storage cabinets, shelves, and bins...')
+
+  const cabinetDefs = [
+    { code: 'CAB-A', name: 'Lemari A', description: 'Obat bebas dan vitamin' },
+    { code: 'CAB-B', name: 'Lemari B', description: 'Obat keras dan antibiotik' },
+  ]
+
+  const cabinets: Record<string, { id: number }> = {}
+  for (const def of cabinetDefs) {
+    const existing = await prisma.storageCabinet.findFirst({
+      where: { pharmacyId: pharmacy.id, code: def.code },
+    })
+    cabinets[def.code] = existing ?? await prisma.storageCabinet.create({
+      data: {
+        pharmacyId: pharmacy.id,
+        code: def.code,
+        name: def.name,
+        description: def.description,
+        status: RecordStatus.ACTIVE,
+        createdById: owner.id,
+        updatedById: owner.id,
+      },
+    })
+  }
+
+  const shelfDefs = [
+    { cabinet: 'CAB-A', code: 'SHF-A1', name: 'Rak A1', level: 1 },
+    { cabinet: 'CAB-A', code: 'SHF-A2', name: 'Rak A2', level: 2 },
+    { cabinet: 'CAB-B', code: 'SHF-B1', name: 'Rak B1', level: 1 },
+    { cabinet: 'CAB-B', code: 'SHF-B2', name: 'Rak B2', level: 2 },
+  ]
+
+  const shelves: Record<string, { id: number }> = {}
+  for (const def of shelfDefs) {
+    const cabinetId = cabinets[def.cabinet].id
+    const existing = await prisma.storageShelf.findFirst({
+      where: { cabinetId, code: def.code },
+    })
+    shelves[def.code] = existing ?? await prisma.storageShelf.create({
+      data: {
+        cabinetId,
+        code: def.code,
+        name: def.name,
+        level: def.level,
+        status: RecordStatus.ACTIVE,
+        createdById: owner.id,
+        updatedById: owner.id,
+      },
+    })
+  }
+
+  const binDefs = [
+    { shelf: 'SHF-A1', code: 'BIN-A1-01', name: 'Kotak A1-01' },
+    { shelf: 'SHF-A1', code: 'BIN-A1-02', name: 'Kotak A1-02' },
+    { shelf: 'SHF-A2', code: 'BIN-A2-01', name: 'Kotak A2-01' },
+    { shelf: 'SHF-B1', code: 'BIN-B1-01', name: 'Kotak B1-01' },
+    { shelf: 'SHF-B1', code: 'BIN-B1-02', name: 'Kotak B1-02' },
+    { shelf: 'SHF-B2', code: 'BIN-B2-01', name: 'Kotak B2-01' },
+  ]
+
+  for (const def of binDefs) {
+    const shelfId = shelves[def.shelf].id
+    const existing = await prisma.storageBin.findFirst({
+      where: { shelfId, code: def.code },
+    })
+    if (!existing) {
+      await prisma.storageBin.create({
+        data: {
+          shelfId,
+          code: def.code,
+          name: def.name,
+          status: RecordStatus.ACTIVE,
+          createdById: owner.id,
+          updatedById: owner.id,
+        },
+      })
+    }
+  }
+
+  // ── 12. Medicine master data ──────────────────────────────────────────────
   console.log('Creating medicine master data...')
 
   const shapeNames = ['Tablet', 'Kapsul', 'Sirup', 'Salep', 'Injeksi']
@@ -907,6 +1006,276 @@ async function main() {
     })
   }
 
+  // ── 20. Doctors ───────────────────────────────────────────────────────────
+  console.log('Creating doctors...')
+
+  const doctorDefs = [
+    {
+      name: 'Dr. Ahmad Fauzi',
+      licenseNumber: 'SIP-JKT-2024-001',
+      specialty: 'Dokter Umum',
+      clinicName: 'Klinik Sehat Sentosa',
+      phone: '081200001111',
+    },
+    {
+      name: 'Dr. Dewi Kusuma',
+      licenseNumber: 'SIP-JKT-2024-002',
+      specialty: 'Dokter Spesialis Penyakit Dalam',
+      clinicName: 'RS Medika Utama',
+      phone: '081200002222',
+    },
+  ]
+
+  const doctors: Record<string, { id: number }> = {}
+  for (const def of doctorDefs) {
+    const existing = await prisma.doctor.findFirst({
+      where: { pharmacyId: pharmacy.id, licenseNumber: def.licenseNumber },
+    })
+    doctors[def.name] = existing ?? await prisma.doctor.create({
+      data: {
+        pharmacyId: pharmacy.id,
+        name: def.name,
+        licenseNumber: def.licenseNumber,
+        specialty: def.specialty,
+        clinicName: def.clinicName,
+        phone: def.phone,
+        status: RecordStatus.ACTIVE,
+        createdById: owner.id,
+        updatedById: owner.id,
+      },
+    })
+  }
+
+  // ── 21. Prescriptions ─────────────────────────────────────────────────────
+  console.log('Creating prescriptions...')
+
+  const rxNumber1 = 'RX-APK1-20260110-001'
+  const rxNumber2 = 'RX-APK1-20260120-001'
+
+  if (!(await prisma.prescription.findFirst({ where: { prescriptionNumber: rxNumber1 } }))) {
+    await prisma.prescription.create({
+      data: {
+        pharmacyId: pharmacy.id,
+        customerId: customers['Budi Santoso'].id,
+        doctorId: doctors['Dr. Ahmad Fauzi'].id,
+        prescriptionNumber: rxNumber1,
+        prescribedAt: new Date('2026-01-10'),
+        notes: 'Minum setelah makan',
+        status: PrescriptionStatus.DISPENSED,
+        createdById: pharmacist.id,
+        updatedById: pharmacist.id,
+        details: {
+          create: [
+            {
+              medicineId: medicines['Amoxicillin 500mg'].id,
+              medicineName: 'Amoxicillin 500mg',
+              frequency: '3x1',
+              duration: '7 hari',
+              qty: 21,
+              dispensedQty: 21,
+              status: PrescriptionDetailStatus.DISPENSED,
+              createdById: pharmacist.id,
+              updatedById: pharmacist.id,
+            },
+            {
+              medicineId: medicines['Paracetamol 500mg'].id,
+              medicineName: 'Paracetamol 500mg',
+              frequency: '3x1',
+              duration: '3 hari',
+              qty: 9,
+              dispensedQty: 9,
+              status: PrescriptionDetailStatus.DISPENSED,
+              createdById: pharmacist.id,
+              updatedById: pharmacist.id,
+            },
+          ],
+        },
+      },
+    })
+  }
+
+  if (!(await prisma.prescription.findFirst({ where: { prescriptionNumber: rxNumber2 } }))) {
+    await prisma.prescription.create({
+      data: {
+        pharmacyId: pharmacy.id,
+        customerId: customers['Siti Rahayu'].id,
+        doctorId: doctors['Dr. Dewi Kusuma'].id,
+        prescriptionNumber: rxNumber2,
+        prescribedAt: new Date('2026-01-20'),
+        notes: 'Kontrol 2 minggu',
+        status: PrescriptionStatus.PARTIAL,
+        createdById: pharmacist.id,
+        updatedById: pharmacist.id,
+        details: {
+          create: [
+            {
+              medicineId: medicines['Amlodipin 10mg'].id,
+              medicineName: 'Amlodipin 10mg',
+              frequency: '1x1',
+              duration: '30 hari',
+              qty: 30,
+              dispensedQty: 10,
+              status: PrescriptionDetailStatus.PARTIAL,
+              createdById: pharmacist.id,
+              updatedById: pharmacist.id,
+            },
+            {
+              medicineId: medicines['Ibuprofen 400mg'].id,
+              medicineName: 'Ibuprofen 400mg',
+              frequency: '2x1',
+              duration: '5 hari',
+              qty: 10,
+              dispensedQty: 0,
+              status: PrescriptionDetailStatus.PENDING,
+              createdById: pharmacist.id,
+              updatedById: pharmacist.id,
+            },
+          ],
+        },
+      },
+    })
+  }
+
+  // ── 22. Stock return ──────────────────────────────────────────────────────
+  console.log('Creating stock return...')
+
+  const returnNumber = 'SR-APK1-20260210-001'
+  if (!(await prisma.stockReturn.findFirst({ where: { returnNumber } }))) {
+    const amoxDetail = stockDetailMap['Amoxicillin 500mg']
+    if (amoxDetail) {
+      const returnQtyPieces = 5
+      const returnQtyBox = 0
+      const pricePerPiece = new Decimal('2850.00') // finalPrice after 5% disc
+      const totalAmount = new Decimal((returnQtyPieces * 2850).toFixed(2))
+      const quantityBefore = parseFloat(
+        (await prisma.stock.findUnique({ where: { id: amoxDetail.stockId }, select: { totalPieces: true } }))!
+          .totalPieces.toString()
+      )
+      const quantityAfter = quantityBefore - returnQtyPieces
+
+      const stockReturn = await prisma.stockReturn.create({
+        data: {
+          pharmacyId: pharmacy.id,
+          distributorId: distributors['PT. Kimia Farma Trading & Distribution'].id,
+          signedById: pharmacist.id,
+          returnNumber,
+          status: StockReturnStatus.COMPLETED,
+          reason: 'Kelebihan stok mendekati kadaluarsa',
+          totalAmount,
+          returnedAt: new Date('2026-02-10'),
+          createdById: owner.id,
+          updatedById: owner.id,
+          details: {
+            create: [{
+              medicineId: medicines['Amoxicillin 500mg'].id,
+              stockDetailId: amoxDetail.id,
+              quantityPieces: returnQtyPieces,
+              quantityBox: returnQtyBox,
+              price: pricePerPiece,
+              totalAmount,
+              reason: 'Mendekati kadaluarsa',
+              createdById: owner.id,
+              updatedById: owner.id,
+            }],
+          },
+        },
+        include: { details: { select: { id: true } } },
+      })
+
+      await prisma.stock.update({
+        where: { id: amoxDetail.stockId },
+        data: { totalPieces: { decrement: returnQtyPieces }, updatedById: owner.id },
+      })
+      await prisma.stockDetail.update({
+        where: { id: amoxDetail.id },
+        data: { quantityPieces: { decrement: returnQtyPieces } },
+      })
+      await prisma.stockMovement.create({
+        data: {
+          pharmacyId: pharmacy.id,
+          medicineId: medicines['Amoxicillin 500mg'].id,
+          stockId: amoxDetail.stockId,
+          stockDetailId: amoxDetail.id,
+          stockReturnDetailId: stockReturn.details[0].id,
+          type: 'OUT',
+          reason: 'RETURN',
+          quantity: returnQtyPieces,
+          quantityBefore,
+          quantityAfter,
+          description: `Stock return ${returnNumber}`,
+          createdById: owner.id,
+        },
+      })
+    }
+  }
+
+  // ── 23. Stock disposal ────────────────────────────────────────────────────
+  console.log('Creating stock disposal...')
+
+  const disposalNumber = 'SD-APK1-20260301-001'
+  if (!(await prisma.stockDisposal.findFirst({ where: { disposalNumber } }))) {
+    const ibuprofenDetail = stockDetailMap['Ibuprofen 400mg']
+    if (ibuprofenDetail) {
+      const disposeQtyPieces = 3
+      const disposeQtyBox = 0
+      const quantityBefore = parseFloat(
+        (await prisma.stock.findUnique({ where: { id: ibuprofenDetail.stockId }, select: { totalPieces: true } }))!
+          .totalPieces.toString()
+      )
+      const quantityAfter = quantityBefore - disposeQtyPieces
+
+      const stockDisposal = await prisma.stockDisposal.create({
+        data: {
+          pharmacyId: pharmacy.id,
+          signedById: pharmacist.id,
+          disposalNumber,
+          status: StockDisposalStatus.COMPLETED,
+          description: 'Pemusnahan obat rusak akibat kesalahan penyimpanan',
+          disposedAt: new Date('2026-03-01'),
+          createdById: owner.id,
+          updatedById: owner.id,
+          details: {
+            create: [{
+              medicineId: medicines['Ibuprofen 400mg'].id,
+              stockDetailId: ibuprofenDetail.id,
+              quantityPieces: disposeQtyPieces,
+              quantityBox: disposeQtyBox,
+              reason: DisposalReason.DAMAGED,
+              createdById: owner.id,
+              updatedById: owner.id,
+            }],
+          },
+        },
+        include: { details: { select: { id: true } } },
+      })
+
+      await prisma.stock.update({
+        where: { id: ibuprofenDetail.stockId },
+        data: { totalPieces: { decrement: disposeQtyPieces }, updatedById: owner.id },
+      })
+      await prisma.stockDetail.update({
+        where: { id: ibuprofenDetail.id },
+        data: { quantityPieces: { decrement: disposeQtyPieces } },
+      })
+      await prisma.stockMovement.create({
+        data: {
+          pharmacyId: pharmacy.id,
+          medicineId: medicines['Ibuprofen 400mg'].id,
+          stockId: ibuprofenDetail.stockId,
+          stockDetailId: ibuprofenDetail.id,
+          stockDisposalDetailId: stockDisposal.details[0].id,
+          type: 'OUT',
+          reason: 'DISPOSAL',
+          quantity: disposeQtyPieces,
+          quantityBefore,
+          quantityAfter,
+          description: `Stock disposal ${disposalNumber}`,
+          createdById: owner.id,
+        },
+      })
+    }
+  }
+
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('\nSeed complete!')
   console.log('─────────────────────────────────────────────────────────────')
@@ -916,8 +1285,13 @@ async function main() {
   console.log('Pharmacy        →  Apotek Sejahtera (APK1) — pharmacist is PIC (SIPA-JKT-2024-001)')
   console.log('Medicines       →  5 (Paracetamol, Amoxicillin, Vitamin C, Ibuprofen, Amlodipin)')
   console.log('Distributor     →  Kimia Farma, Enseval')
+  console.log('Storage         →  2 cabinets, 4 shelves, 6 bins')
   console.log('Invoice         →  INV-APK1-20260101-001 (PAID, stock loaded)')
   console.log('Sales           →  SL-APK1-20260115-001 + 30 daily (2026-05-20 → 2026-06-18)')
+  console.log('Doctors         →  Dr. Ahmad Fauzi (GP), Dr. Dewi Kusuma (Internist)')
+  console.log('Prescriptions   →  RX-APK1-20260110-001 (dispensed), RX-APK1-20260120-001 (partial)')
+  console.log('Stock Return    →  SR-APK1-20260210-001 (Amoxicillin 5 pcs, completed)')
+  console.log('Stock Disposal  →  SD-APK1-20260301-001 (Ibuprofen 3 pcs, damaged, completed)')
   console.log('─────────────────────────────────────────────────────────────')
 }
 

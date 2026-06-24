@@ -1,4 +1,4 @@
-import { PlatformRole, Prisma } from '@prisma/client'
+import { AppRole, PlatformRole, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   RoleQueryInput,
@@ -363,13 +363,18 @@ export const getRolesDdl = async (
   pharmacyId: number | null,
   platformRole: PlatformRole | null
 ): Promise<RoleDdlItem[]> => {
-  const pharmacyFilter =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? {}
-      : { OR: [{ pharmacyId: null }, { pharmacyId }] }
+  const isPlatformAdmin = platformRole === PlatformRole.PLATFORM_ADMIN
+
+  const pharmacyFilter = isPlatformAdmin
+    ? {}
+    : { OR: [{ pharmacyId: null }, { pharmacyId }] }
 
   const roles = await prisma.role.findMany({
-    where: { ...pharmacyFilter, status: 'ACTIVE' },
+    where: {
+      ...pharmacyFilter,
+      status: 'ACTIVE',
+      ...(!isPlatformAdmin && { NOT: { type: AppRole.OWNER } }),
+    },
     select: { uuid: true, name: true, type: true, pharmacyId: true, requiresLicense: true },
     orderBy: [{ pharmacyId: 'asc' }, { name: 'asc' }],
   })
