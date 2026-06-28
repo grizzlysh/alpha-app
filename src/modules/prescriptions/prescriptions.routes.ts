@@ -9,6 +9,7 @@ import {
   updatePrescriptionSchema,
   prescriptionQuerySchema,
   dispensePrescriptionSchema,
+  availablePrescriptionsQuerySchema,
 } from './prescriptions.validation'
 
 const router: Router = Router()
@@ -17,6 +18,7 @@ router.use(requirePharmacyAccess)
 
 router.get('/', requirePermission(PERMISSIONS.PRESCRIPTIONS_READ), validateQuery(prescriptionQuerySchema), PrescriptionController.getPrescriptions)
 router.get('/queue', requirePermission(PERMISSIONS.PRESCRIPTIONS_READ), PrescriptionController.getPrescriptionQueue)
+router.get('/available', requirePermission(PERMISSIONS.PRESCRIPTIONS_READ), validateQuery(availablePrescriptionsQuerySchema), PrescriptionController.getAvailablePrescriptions)
 router.get('/:prescription_uuid', requirePermission(PERMISSIONS.PRESCRIPTIONS_READ), PrescriptionController.getPrescription)
 router.post('/', requirePermission(PERMISSIONS.PRESCRIPTIONS_CREATE), validateBody(createPrescriptionSchema), PrescriptionController.createPrescription)
 router.put('/:prescription_uuid', requirePermission(PERMISSIONS.PRESCRIPTIONS_UPDATE), validateBody(updatePrescriptionSchema), PrescriptionController.updatePrescription)

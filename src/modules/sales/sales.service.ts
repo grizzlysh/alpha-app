@@ -1,4 +1,4 @@
-import { SaleStatus, SaleType, PaymentStatus, Prisma } from '@prisma/client'
+import { SaleStatus, SaleType, PaymentStatus, PrescriptionStatus, PrescriptionDetailStatus, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   CreateSaleInput,
@@ -7,6 +7,7 @@ import {
   AddPaymentInput,
   UpdatePaymentHistoryInput,
   SaleQueryInput,
+  InlinePrescriptionInput,
 } from './sales.validation'
 import { SalePaymentResponse, SaleResponse } from './sales.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
@@ -74,6 +75,14 @@ const saleSelect = {
       },
     },
   },
+  prescription: {
+    select: {
+      uuid: true,
+      prescriptionNumber: true,
+      prescribedAt: true,
+      doctor: { select: { uuid: true, name: true } },
+    },
+  },
 }
 
 type SaleDetailDraft = {
@@ -124,6 +133,7 @@ const formatSale = (sale: Prisma.SaleGetPayload<{ select: typeof saleSelect }>):
         })),
       }
     : null,
+  prescription: sale.prescription ?? null,
 })
 
 const salePaymentSelect = {
@@ -149,6 +159,104 @@ const formatSalePayment = (p: any): SalePaymentResponse => ({
   paidAmount: parseFloat(p.paidAmount.toString()),
   history: p.history.map((h: any) => ({ ...h, amount: parseFloat(h.amount.toString()) })),
 })
+
+// ── Prescription Helpers ──────────────────────────────
+
+const resolvePrescriptionId = async (
+  tx: Prisma.TransactionClient,
+  opts: {
+    prescriptionUuid?: string
+    prescription?: InlinePrescriptionInput
+    existingPrescriptionId?: number | null
+    isPrescription?: boolean
+    isPending?: boolean
+    medicineIds: number[]
+    pharmacyId: number
+    customerId: number
+    userId: number
+  }
+): Promise<number | undefined> => {
+  const { prescriptionUuid, prescription, existingPrescriptionId, isPrescription, isPending, medicineIds, pharmacyId, customerId, userId } = opts
+
+  // Only check required medicines when the sale is being finalised
+  const rxMedicines = isPending
+    ? []
+    : await tx.medicine.findMany({
+        where: { id: { in: medicineIds }, requiredPrescription: true },
+        select: { id: true, name: true },
+      })
+
+  const prescriptionRequired = !isPending && (rxMedicines.length > 0 || !!isPrescription)
+
+  if (prescriptionUuid) {
+    const rx = await tx.prescription.findFirst({
+      where: { uuid: prescriptionUuid, pharmacyId, deletedAt: null },
+      select: { id: true, status: true },
+    })
+    if (!rx) throw new NotFoundException('Prescription not found')
+    if (rx.status === PrescriptionStatus.DISPENSED || rx.status === PrescriptionStatus.CANCELLED || rx.status === PrescriptionStatus.EXPIRED) {
+      throw new BadRequestException('Prescription is not available for use')
+    }
+    return rx.id
+  }
+
+  if (prescription) {
+    let doctorId: number | undefined
+    if (prescription.doctorUuid) {
+      const doctor = await tx.doctor.findFirst({
+        where: { uuid: prescription.doctorUuid, pharmacyId, deletedAt: null, status: 'ACTIVE' },
+        select: { id: true },
+      })
+      if (!doctor) throw new NotFoundException('Doctor not found')
+      doctorId = doctor.id
+    }
+
+    const medUuids = prescription.items.filter((i) => i.medicineUuid).map((i) => i.medicineUuid!)
+    const medicines = medUuids.length
+      ? await tx.medicine.findMany({
+          where: { uuid: { in: medUuids }, pharmacyId, deletedAt: null },
+          select: { id: true, uuid: true },
+        })
+      : []
+    const uuidToId = new Map(medicines.map((m) => [m.uuid, m.id]))
+
+    const createdRx = await tx.prescription.create({
+      data: {
+        pharmacyId,
+        customerId,
+        doctorId,
+        prescriptionNumber: prescription.prescriptionNumber,
+        prescribedAt: prescription.prescribedAt,
+        notes: prescription.notes,
+        status: PrescriptionStatus.DISPENSED,
+        createdById: userId,
+        details: {
+          create: prescription.items.map((item) => ({
+            medicineName: item.medicineName,
+            medicineId: item.medicineUuid ? (uuidToId.get(item.medicineUuid) ?? null) : null,
+            frequency: item.frequency,
+            duration: item.duration,
+            qty: item.qty,
+            dispensedQty: item.qty,
+            status: PrescriptionDetailStatus.DISPENSED,
+            notes: item.notes,
+            createdById: userId,
+          })),
+        },
+      },
+      select: { id: true },
+    })
+    return createdRx.id
+  }
+
+  if (existingPrescriptionId) return existingPrescriptionId
+
+  if (prescriptionRequired) {
+    const names = rxMedicines.map((m) => m.name).join(', ')
+    throw new BadRequestException(names ? `Prescription required for: ${names}` : 'Prescription is required for this sale')
+  }
+  return undefined
+}
 
 // ── Services ──────────────────────────────────────────
 
@@ -372,6 +480,18 @@ export const createSale = async (
       })
     }
 
+    // ── Prescription Gate ─────────────────────────
+    const prescriptionId = await resolvePrescriptionId(tx, {
+      prescriptionUuid: data.prescriptionUuid,
+      prescription: data.prescription,
+      isPrescription: data.isPrescription,
+      isPending: data.isPending,
+      medicineIds: [...new Set(detailsData.map((d) => d.medicineId))],
+      pharmacyId,
+      customerId,
+      userId,
+    })
+
     // ── Header Amounts (all from input) ──────────
     const discountPercentage = data.discountPercentage ?? 0
     const discountAmount = data.discountAmount ?? 0
@@ -396,6 +516,7 @@ export const createSale = async (
         pharmacyId,
         customerId,
         saleNumber,
+        ...(prescriptionId && { prescriptionId }),
         saleType: data.saleType ?? SaleType.CASH,
         status: data.isPending ? SaleStatus.PENDING : SaleStatus.COMPLETED,
         totalAmount: new Decimal(totalAmount.toFixed(2)),
@@ -423,6 +544,14 @@ export const createSale = async (
       },
       select: { id: true, details: { select: { id: true } } },
     })
+
+    // Link inline prescription back to this sale
+    if (data.prescription && prescriptionId) {
+      await tx.prescription.update({
+        where: { id: prescriptionId },
+        data: { saleId: sale.id },
+      })
+    }
 
     if (data.isPending) {
       // ── Create Stock Reservations ─────────────────
@@ -559,7 +688,7 @@ export const completeSale = async (
   const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.sale.findFirst({
       where: { uuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true, customerId: true },
+      select: { id: true, status: true, customerId: true, prescriptionId: true },
     })
 
     if (!existing) throw new NotFoundException('Sale not found')
@@ -637,6 +766,19 @@ export const completeSale = async (
       })
     }
 
+    // ── Prescription Gate ─────────────────────────
+    const prescriptionId = await resolvePrescriptionId(tx, {
+      prescriptionUuid: data.prescriptionUuid,
+      prescription: data.prescription,
+      existingPrescriptionId: existing.prescriptionId,
+      isPrescription: data.isPrescription,
+      isPending: false,
+      medicineIds: [...new Set(detailsData.map((d) => d.medicineId))],
+      pharmacyId,
+      customerId,
+      userId,
+    })
+
     // ── Amounts ───────────────────────────────────
     const grandTotal = data.grandTotal
     const paidAmount = data.saleType === SaleType.CASH ? (data.paidAmount ?? grandTotal) : 0
@@ -652,6 +794,7 @@ export const completeSale = async (
       where: { id: existing.id },
       data: {
         customerId,
+        ...(prescriptionId !== undefined && { prescriptionId }),
         saleType: data.saleType ?? SaleType.CASH,
         status: SaleStatus.COMPLETED,
         totalAmount: new Decimal(data.totalAmount.toFixed(2)),
@@ -676,6 +819,14 @@ export const completeSale = async (
       },
       select: { id: true, details: { select: { id: true } } },
     })
+
+    // Link inline prescription back to this sale
+    if (data.prescription && prescriptionId) {
+      await tx.prescription.update({
+        where: { id: prescriptionId },
+        data: { saleId: existing.id },
+      })
+    }
 
     // ── Deduct stock + create movements ───────────
     const stockOffsets = new Map<number, number>()
@@ -942,7 +1093,7 @@ export const updateSale = async (
   const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.sale.findFirst({
       where: { uuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true },
+      select: { id: true, status: true, customerId: true, prescriptionId: true },
     })
 
     if (!existing) throw new NotFoundException('Sale not found')
@@ -1029,11 +1180,26 @@ export const updateSale = async (
       })
     }
 
+    // ── Prescription Gate ─────────────────────────
+    const resolvedCustomerId = customerId ?? existing.customerId
+    const prescriptionId = await resolvePrescriptionId(tx, {
+      prescriptionUuid: data.prescriptionUuid,
+      prescription: data.prescription,
+      existingPrescriptionId: existing.prescriptionId,
+      isPrescription: data.isPrescription,
+      isPending: true,
+      medicineIds: [...new Set(detailsCreate.map((d) => d.medicineId))],
+      pharmacyId,
+      customerId: resolvedCustomerId,
+      userId,
+    })
+
     // ── Replace details + update header ──────────
     await tx.sale.update({
       where: { id: existing.id },
       data: {
         ...(customerId && { customerId }),
+        ...(prescriptionId !== undefined && { prescriptionId }),
         saleType: data.saleType ?? SaleType.CASH,
         totalAmount: new Decimal(data.totalAmount.toFixed(2)),
         discountPercentage: new Decimal((data.discountPercentage ?? 0).toFixed(2)),
@@ -1050,6 +1216,14 @@ export const updateSale = async (
         },
       },
     })
+
+    // Link inline prescription back to this sale
+    if (data.prescription && prescriptionId) {
+      await tx.prescription.update({
+        where: { id: prescriptionId },
+        data: { saleId: existing.id },
+      })
+    }
 
     // ── Create new reservations ───────────────────
     for (const r of reservationDrafts) {

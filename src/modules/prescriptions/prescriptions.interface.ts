@@ -19,7 +19,21 @@ export interface PrescriptionQueryParams {
   limit?: string
 }
 
+export interface AvailablePrescriptionItem {
+  uuid: string
+  prescriptionNumber: string | null
+  prescribedAt: Date
+  status: PrescriptionStatus
+  customer: { uuid: string; name: string }
+  doctor: { uuid: string; name: string } | null
+}
+
+export interface AvailablePrescriptionsQueryParams {
+  customerUuid?: string
+}
+
 export type ListPrescriptionsRequest = Request<{}, {}, {}, PrescriptionQueryParams>
+export type AvailablePrescriptionsRequest = Request<{}, {}, {}, AvailablePrescriptionsQueryParams>
 export type GetPrescriptionRequest = Request<PrescriptionUuidParam, {}, {}, {}>
 export type CreatePrescriptionRequest = Request<{}, {}, any, {}>
 export type UpdatePrescriptionRequest = Request<PrescriptionUuidParam, {}, any, {}>

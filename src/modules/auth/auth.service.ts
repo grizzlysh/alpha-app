@@ -268,11 +268,7 @@ export const selectPharmacy = async (
     throw new ForbiddenException('You do not have access to this pharmacy')
   }
 
-  const isOwnerOrAdmin =
-    platformRole === PlatformRole.PLATFORM_ADMIN ||
-    pharmacyRole?.type === AppRole.OWNER
-
-  if (!isOwnerOrAdmin) {
+  if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
     const hasHeadPharmacist = await prisma.placement.findFirst({
       where: {
         pharmacyId: pharmacy.id,

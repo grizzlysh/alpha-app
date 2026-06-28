@@ -109,7 +109,7 @@ const only = (...keys: string[]) => keys
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   OWNER: all,
 
-  ADMIN: excluded('system_parameters', 'pharmacies'),
+  ADMIN: all,
 
   HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
 
@@ -200,17 +200,15 @@ async function main() {
   for (const [roleType, permKeys] of Object.entries(ROLE_PERMISSIONS)) {
     const role = roles[roleType]
     if (!role) continue
-    for (const key of permKeys) {
-      const permId = permMap.get(key)
-      if (!permId) continue
-      const exists = await prisma.rolePermission.findFirst({
-        where: { roleId: role.id, permissionId: permId, pharmacyId: null },
+
+    // Full sync: wipe global assignments then re-insert the authoritative set
+    await prisma.rolePermission.deleteMany({ where: { roleId: role.id, pharmacyId: null } })
+
+    const permIds = permKeys.map((key) => permMap.get(key)).filter(Boolean) as number[]
+    for (const permId of permIds) {
+      await prisma.rolePermission.create({
+        data: { roleId: role.id, permissionId: permId, pharmacyId: null, isEnabled: true },
       })
-      if (!exists) {
-        await prisma.rolePermission.create({
-          data: { roleId: role.id, permissionId: permId, pharmacyId: null, isEnabled: true },
-        })
-      }
     }
   }
 

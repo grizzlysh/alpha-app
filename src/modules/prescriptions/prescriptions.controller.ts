@@ -5,6 +5,7 @@ import {
   ListPrescriptionsRequest, GetPrescriptionRequest, CreatePrescriptionRequest,
   UpdatePrescriptionRequest, DeletePrescriptionRequest,
   DispensePrescriptionRequest, CancelPrescriptionRequest,
+  AvailablePrescriptionsRequest,
 } from './prescriptions.interface'
 import { sendSuccess, sendCreated, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
@@ -13,6 +14,13 @@ export const getPrescriptions = async (req: ListPrescriptionsRequest, res: Respo
   try {
     const { data, meta } = await PrescriptionService.getPrescriptions(req.user!.pharmacyId!, req.query as any)
     sendPaginated(res, MESSAGE_CODES.PRESCRIPTIONS_FETCHED, data, meta)
+  } catch (err) { next(err) }
+}
+
+export const getAvailablePrescriptions = async (req: AvailablePrescriptionsRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data = await PrescriptionService.getAvailablePrescriptions(req.user!.pharmacyId!, req.query as any)
+    sendSuccess(res, MESSAGE_CODES.PRESCRIPTIONS_FETCHED, data)
   } catch (err) { next(err) }
 }
 

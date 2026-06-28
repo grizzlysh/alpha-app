@@ -43,6 +43,10 @@ export const prescriptionQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+export const availablePrescriptionsQuerySchema = z.object({
+  customerUuid: z.string().uuid().optional(),
+})
+
 const dispenseItemSchema = z.object({
   detailUuid: z.string().uuid(),
   dispensedQty: z.number().int().min(1),
@@ -73,3 +77,4 @@ export type CreatePrescriptionInput = z.infer<typeof createPrescriptionSchema>
 export type UpdatePrescriptionInput = z.infer<typeof updatePrescriptionSchema>
 export type PrescriptionQueryInput = z.infer<typeof prescriptionQuerySchema>
 export type DispensePrescriptionInput = z.infer<typeof dispensePrescriptionSchema>
+export type AvailablePrescriptionsQueryInput = z.infer<typeof availablePrescriptionsQuerySchema>

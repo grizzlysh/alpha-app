@@ -80,7 +80,7 @@ enum PaymentMethod {
 }
 
 enum StockReturnStatus {
-  ON_PROCESS
+  IN_PROCESS
   COMPLETED
   CANCELLED
   REJECTED
@@ -1181,7 +1181,7 @@ model StockReturn {
   distributorId      Int               @map("distributor_id")
   signedById         Int?              @map("signed_by_id")
   returnNumber       String            @unique @map("return_number")
-  status             StockReturnStatus @default(ON_PROCESS)
+  status             StockReturnStatus @default(IN_PROCESS)
   reason             String?
   description        String?
   totalAmount        Decimal           @default(0) @map("total_amount") @db.Decimal(12, 0)

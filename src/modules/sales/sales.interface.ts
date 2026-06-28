@@ -42,6 +42,23 @@ export interface CreateSalePaymentBody {
   description?: string
 }
 
+export interface InlinePrescriptionItemBody {
+  medicineUuid?: string
+  medicineName: string
+  frequency?: string
+  duration?: string
+  qty: number
+  notes?: string
+}
+
+export interface InlinePrescriptionBody {
+  doctorUuid?: string
+  prescriptionNumber?: string
+  prescribedAt: string
+  notes?: string
+  items: InlinePrescriptionItemBody[]
+}
+
 export interface CreateSaleBody {
   customerUuid?: string
   saleType?: SaleType
@@ -54,8 +71,11 @@ export interface CreateSaleBody {
   paidAmount?: number
   description?: string
   isPending?: boolean
+  isPrescription?: boolean
   details: CreateSaleDetailBody[]
   payment?: CreateSalePaymentBody
+  prescriptionUuid?: string
+  prescription?: InlinePrescriptionBody
 }
 
 export interface CancelSaleBody {
@@ -107,7 +127,10 @@ export interface UpdateSaleBody {
   totalAmount: number
   grandTotal: number
   description?: string
+  isPrescription?: boolean
   details: CreateSaleDetailBody[]
+  prescriptionUuid?: string
+  prescription?: InlinePrescriptionBody
 }
 
 export type CompleteSaleRequest = Request<
@@ -194,6 +217,13 @@ export interface SalePaymentResponse {
   history: SalePaymentHistoryResponse[]
 }
 
+export interface SalePrescriptionResponse {
+  uuid: string
+  prescriptionNumber: string | null
+  prescribedAt: Date
+  doctor: { uuid: string; name: string } | null
+}
+
 export interface SaleResponse {
   uuid: string
   saleNumber: string
@@ -217,4 +247,5 @@ export interface SaleResponse {
   }
   details: SaleDetailResponse[]
   payment: SalePaymentResponse | null
+  prescription: SalePrescriptionResponse | null
 }

@@ -1,5 +1,6 @@
 import { prisma } from '@config/db'
 import { NotFoundException } from '@exceptions/NotFoundException'
+import { BadRequestException } from '@exceptions/BadRequestException'
 import { UpdateCabinetPositionInput } from './inventory.validation'
 import { BinItemResponse, CabinetNode, ExpiryStatus, Rotation } from './inventory.interface'
 
@@ -120,6 +121,24 @@ export const getBinItems = async (
   })
 }
 
+type CabinetBounds = { left: number; right: number; top: number; bottom: number }
+
+const getCabinetBounds = (
+  posX: number,
+  posY: number,
+  width: number,
+  height: number,
+  rotation: number
+): CabinetBounds => {
+  const isSwapped = rotation === 90 || rotation === 270
+  const effectiveW = isSwapped ? height : width
+  const effectiveH = isSwapped ? width : height
+  return { left: posX, right: posX + effectiveW, top: posY, bottom: posY + effectiveH }
+}
+
+const boundsOverlap = (a: CabinetBounds, b: CabinetBounds): boolean =>
+  a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+
 export const updateCabinetPosition = async (
   cabinetUuid: string,
   data: UpdateCabinetPositionInput,
@@ -128,9 +147,28 @@ export const updateCabinetPosition = async (
 ): Promise<void> => {
   const cabinet = await prisma.storageCabinet.findFirst({
     where: { uuid: cabinetUuid, pharmacyId, deletedAt: null },
-    select: { id: true },
+    select: { id: true, width: true, height: true, rotation: true },
   })
   if (!cabinet) throw new NotFoundException('Storage cabinet not found')
+
+  const effectiveWidth = data.width ?? cabinet.width ?? 1
+  const effectiveHeight = data.height ?? cabinet.height ?? 1
+  const effectiveRotation = data.rotation ?? cabinet.rotation ?? 0
+
+  const newBounds = getCabinetBounds(data.posX, data.posY, effectiveWidth, effectiveHeight, effectiveRotation)
+
+  const otherCabinets = await prisma.storageCabinet.findMany({
+    where: { pharmacyId, deletedAt: null, uuid: { not: cabinetUuid }, posX: { not: null } },
+    select: { uuid: true, name: true, posX: true, posY: true, width: true, height: true, rotation: true },
+  })
+
+  for (const other of otherCabinets) {
+    if (other.posX == null || other.posY == null || other.width == null || other.height == null) continue
+    const otherBounds = getCabinetBounds(other.posX, other.posY, other.width, other.height, other.rotation ?? 0)
+    if (boundsOverlap(newBounds, otherBounds)) {
+      throw new BadRequestException(`Cabinet position overlaps with cabinet "${other.name}"`)
+    }
+  }
 
   await prisma.storageCabinet.update({
     where: { id: cabinet.id },

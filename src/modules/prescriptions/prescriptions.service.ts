@@ -4,8 +4,9 @@ import { prisma } from '@config/db'
 import {
   CreatePrescriptionInput, UpdatePrescriptionInput,
   PrescriptionQueryInput, DispensePrescriptionInput,
+  AvailablePrescriptionsQueryInput,
 } from './prescriptions.validation'
-import { PrescriptionResponse, PrescriptionListItem } from './prescriptions.interface'
+import { PrescriptionResponse, PrescriptionListItem, AvailablePrescriptionItem } from './prescriptions.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
@@ -145,6 +146,40 @@ export const getPrescriptionQueue = async (
   })
 
   return data as unknown as PrescriptionListItem[]
+}
+
+export const getAvailablePrescriptions = async (
+  pharmacyId: number,
+  query: AvailablePrescriptionsQueryInput
+): Promise<AvailablePrescriptionItem[]> => {
+  let customerId: number | undefined
+  if (query.customerUuid) {
+    const customer = await prisma.customer.findFirst({
+      where: { uuid: query.customerUuid, pharmacyId },
+      select: { id: true },
+    })
+    customerId = customer?.id
+  }
+
+  const data = await prisma.prescription.findMany({
+    where: {
+      pharmacyId,
+      deletedAt: null,
+      status: { in: [PrescriptionStatus.PENDING, PrescriptionStatus.PARTIAL] },
+      ...(customerId && { customerId }),
+    },
+    select: {
+      uuid: true,
+      prescriptionNumber: true,
+      prescribedAt: true,
+      status: true,
+      customer: { select: { uuid: true, name: true } },
+      doctor: { select: { uuid: true, name: true } },
+    },
+    orderBy: { prescribedAt: 'desc' },
+  })
+
+  return data as AvailablePrescriptionItem[]
 }
 
 export const getPrescriptionByUuid = async (

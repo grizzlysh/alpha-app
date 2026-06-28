@@ -337,7 +337,7 @@ export const createStockReturn = async (
         distributorId: distributor.id,
         signedById,
         returnNumber,
-        status: StockReturnStatus.ON_PROCESS,
+        status: StockReturnStatus.IN_PROCESS,
         reason: data.reason,
         description: data.description,
         totalAmount: 0,
@@ -434,8 +434,8 @@ export const updateStockReturn = async (
 
     if (!existing) throw new NotFoundException('Stock return not found')
 
-    if (existing.status !== StockReturnStatus.ON_PROCESS) {
-      throw new BadRequestException('Stock return can only be edited in ON_PROCESS status')
+    if (existing.status !== StockReturnStatus.IN_PROCESS) {
+      throw new BadRequestException('Stock return can only be edited in IN_PROCESS status')
     }
 
     let distributorId: number | undefined
@@ -551,8 +551,8 @@ export const completeStockReturn = async (
 
   if (!existing) throw new NotFoundException('Stock return not found')
 
-  if (existing.status !== StockReturnStatus.ON_PROCESS) {
-    throw new BadRequestException('Stock return can only be completed from ON_PROCESS status')
+  if (existing.status !== StockReturnStatus.IN_PROCESS) {
+    throw new BadRequestException('Stock return can only be completed from IN_PROCESS status')
   }
 
   if (!existing.signedById) {
@@ -585,8 +585,8 @@ export const rejectStockReturn = async (
 
   if (!existing) throw new NotFoundException('Stock return not found')
 
-  if (existing.status !== StockReturnStatus.ON_PROCESS) {
-    throw new BadRequestException('Stock return can only be rejected while ON_PROCESS')
+  if (existing.status !== StockReturnStatus.IN_PROCESS) {
+    throw new BadRequestException('Stock return can only be rejected while IN_PROCESS')
   }
 
   await prisma.$transaction(async (tx) => {
@@ -618,8 +618,8 @@ export const cancelStockReturn = async (
 
   if (!existing) throw new NotFoundException('Stock return not found')
 
-  if (existing.status !== StockReturnStatus.ON_PROCESS) {
-    throw new BadRequestException('Stock return can only be cancelled while ON_PROCESS')
+  if (existing.status !== StockReturnStatus.IN_PROCESS) {
+    throw new BadRequestException('Stock return can only be cancelled while IN_PROCESS')
   }
 
   await prisma.$transaction(async (tx) => {
@@ -650,8 +650,8 @@ export const deleteStockReturn = async (
 
   if (!existing) throw new NotFoundException('Stock return not found')
 
-  if (existing.status !== StockReturnStatus.ON_PROCESS) {
-    throw new BadRequestException('Only ON_PROCESS stock returns can be deleted')
+  if (existing.status !== StockReturnStatus.IN_PROCESS) {
+    throw new BadRequestException('Only IN_PROCESS stock returns can be deleted')
   }
 
   await prisma.$transaction(async (tx) => {
