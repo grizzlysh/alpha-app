@@ -139,7 +139,7 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Distributor tidak ditemukan',
   },
 
-  // ─── Customers ─────────────────────────────────────────────────────────────
+  // ─── parties ──────────────────────────────────────────────────────────────
   CUSTOMERS_FETCHED: {
     en: 'Customers fetched successfully',
     id: 'Data pelanggan berhasil diambil',
@@ -1003,6 +1003,60 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   PRESCRIPTION_NO_ITEMS_TO_DISPENSE: {
     en: 'No pending items to dispense in this prescription',
     id: 'Tidak ada item yang perlu dilayani pada resep ini',
+  },
+
+  // ─── Medical Records ───────────────────────────────────────────────────────
+  MEDICAL_RECORD_FETCHED: {
+    en: 'Medical record fetched successfully',
+    id: 'Rekam medis berhasil diambil',
+  },
+  MEDICAL_RECORD_UPDATED: {
+    en: 'Medical record updated successfully',
+    id: 'Rekam medis berhasil diperbarui',
+  },
+  MEDICAL_RECORD_NOT_FOUND: {
+    en: 'Medical record not found',
+    id: 'Rekam medis tidak ditemukan',
+  },
+  MEDICAL_RECORD_PATIENT_ONLY: {
+    en: 'Medical records are only available for patients',
+    id: 'Rekam medis hanya tersedia untuk pasien',
+  },
+  MEDICAL_VISITS_FETCHED: {
+    en: 'Medical visits fetched successfully',
+    id: 'Data kunjungan berhasil diambil',
+  },
+  MEDICAL_VISIT_FETCHED: {
+    en: 'Medical visit fetched successfully',
+    id: 'Data kunjungan berhasil diambil',
+  },
+  MEDICAL_VISIT_CREATED: {
+    en: 'Medical visit created successfully',
+    id: 'Kunjungan berhasil ditambahkan',
+  },
+  MEDICAL_VISIT_UPDATED: {
+    en: 'Medical visit updated successfully',
+    id: 'Kunjungan berhasil diperbarui',
+  },
+  MEDICAL_VISIT_DELETED: {
+    en: 'Medical visit deleted successfully',
+    id: 'Kunjungan berhasil dihapus',
+  },
+  MEDICAL_VISIT_NOT_FOUND: {
+    en: 'Medical visit not found',
+    id: 'Kunjungan tidak ditemukan',
+  },
+  MEDICAL_ALLERGY_CREATED: {
+    en: 'Allergy record added successfully',
+    id: 'Data alergi berhasil ditambahkan',
+  },
+  MEDICAL_ALLERGY_DELETED: {
+    en: 'Allergy record removed successfully',
+    id: 'Data alergi berhasil dihapus',
+  },
+  MEDICAL_ALLERGY_NOT_FOUND: {
+    en: 'Allergy record not found',
+    id: 'Data alergi tidak ditemukan',
   },
 
   // ─── Dashboard ─────────────────────────────────────────────────────────────

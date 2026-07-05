@@ -126,6 +126,24 @@ enum PrescriptionDetailStatus {
   CANCELLED // removed from prescription
 }
 
+enum CustomerType {
+  PATIENT
+  PROFESSIONAL
+}
+
+enum AllergyType {
+  MEDICINE
+  FOOD
+  ENVIRONMENT
+  OTHER
+}
+
+enum AllergySeverity {
+  MILD
+  MODERATE
+  SEVERE
+}
+
 // ── MST SYSTEM ───────────────────────────────────────────
 
 model SystemParameter {
@@ -262,7 +280,7 @@ model Pharmacy {
   placements          Placement[]
   medicines           Medicine[]
   distributors        Distributor[]
-  customers           Customer[]
+  customers          Customer[]
   purchaseOrders      PurchaseOrder[]
   invoices            Invoice[]
   stocks              Stock[]
@@ -280,6 +298,8 @@ model Pharmacy {
   stockReservations   StockReservation[]
   storageCabinets     StorageCabinet[]
   doctors             Doctor[]
+  medicalRecords      MedicalRecord[]
+  medicalVisits       MedicalVisit[]
 
   @@map("mst_pharmacies")
 }
@@ -398,7 +418,7 @@ model User {
   distributorsUpdated Distributor[] @relation("DistributorUpdatedBy")
   distributorsDeleted Distributor[] @relation("DistributorDeletedBy")
 
-  // ── Audit: Customer ───────────────────────────────
+  // ── Audit: Customer ──────────────────────────────
   customersCreated Customer[] @relation("CustomerCreatedBy")
   customersUpdated Customer[] @relation("CustomerUpdatedBy")
   customersDeleted Customer[] @relation("CustomerDeletedBy")
@@ -510,6 +530,19 @@ model User {
   createdPrescriptionDetails PrescriptionDetail[] @relation("PrescriptionDetailCreatedBy")
   updatedPrescriptionDetails PrescriptionDetail[] @relation("PrescriptionDetailUpdatedBy")
   deletedPrescriptionDetails PrescriptionDetail[] @relation("PrescriptionDetailDeletedBy")
+
+  // ── Audit: MedicalRecord ──────────────────────────────
+  medicalRecordsCreated MedicalRecord[] @relation("MedicalRecordCreatedBy")
+  medicalRecordsUpdated MedicalRecord[] @relation("MedicalRecordUpdatedBy")
+
+  // ── Audit: MedicalRecordAllergy ───────────────────────
+  allergiesCreated MedicalRecordAllergy[] @relation("AllergyCreatedBy")
+  allergiesUpdated MedicalRecordAllergy[] @relation("AllergyUpdatedBy")
+
+  // ── Audit: MedicalVisit ───────────────────────────────
+  medicalVisitsCreated MedicalVisit[] @relation("MedicalVisitCreatedBy")
+  medicalVisitsUpdated MedicalVisit[] @relation("MedicalVisitUpdatedBy")
+  medicalVisitsDeleted MedicalVisit[] @relation("MedicalVisitDeletedBy")
 
   // ── Signing ───────────────────────────────────────────
   purchaseOrdersSigned PurchaseOrder[] @relation("PurchaseOrderSignedBy")
@@ -822,7 +855,7 @@ model MedicineIngredient {
   @@map("mst_medicine_ingredients")
 }
 
-// ── MST DISTRIBUTOR & CUSTOMER ───────────────────────────
+// ── MST DISTRIBUTOR & PATIENT ────────────────────────────
 
 model Distributor {
   id            Int          @id @default(autoincrement())
@@ -856,31 +889,59 @@ model Distributor {
 }
 
 model Customer {
-  id          Int          @id @default(autoincrement())
-  uuid        String       @unique @default(uuid())
-  pharmacyId  Int          @map("pharmacy_id")
-  name        String
-  phone       String?
-  address     String?
-  description String?
-  isWalkIn    Boolean      @default(false) @map("is_walk_in")
-  status      RecordStatus @default(ACTIVE)
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  deletedAt   DateTime?    @map("deleted_at")
-  createdById Int?         @map("created_by_id")
-  updatedById Int?         @map("updated_by_id")
-  deletedById Int?         @map("deleted_by_id")
+  id           Int          @id @default(autoincrement())
+  uuid         String       @unique @default(uuid())
+  pharmacyId   Int          @map("pharmacy_id")
+  customerType CustomerType @map("customer_type")
+  name         String
+  phone        String?
+  address      String?
+  description  String?
+  isWalkIn     Boolean      @default(false) @map("is_walk_in")
+  status       RecordStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  deletedAt    DateTime?    @map("deleted_at")
+  createdById  Int?         @map("created_by_id")
+  updatedById  Int?         @map("updated_by_id")
+  deletedById  Int?         @map("deleted_by_id")
 
-  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
-  createdByUser User?          @relation("CustomerCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?          @relation("CustomerUpdatedBy", fields: [updatedById], references: [id])
-  deletedByUser User?          @relation("CustomerDeletedBy", fields: [deletedById], references: [id])
-  sales         Sale[]
-  prescriptions Prescription[]
+  pharmacy           Pharmacy            @relation(fields: [pharmacyId], references: [id])
+  createdByUser      User?               @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  updatedByUser      User?               @relation("CustomerUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser      User?               @relation("CustomerDeletedBy", fields: [deletedById], references: [id])
+  sales              Sale[]
+  prescriptions      Prescription[]
+  patientDetail      PatientDetail?
+  professionalDetail ProfessionalDetail?
+  medicalRecord      MedicalRecord?
 
-  // @@unique([pharmacyId, phone])
   @@map("mst_customers")
+}
+
+model PatientDetail {
+  id          Int       @id @default(autoincrement())
+  customerId  Int       @unique @map("customer_id")
+  nik         String?
+  gender      String?
+  dateOfBirth DateTime? @map("date_of_birth")
+  bpjsNumber  String?   @map("bpjs_number")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("mst_customer_patient_details")
+}
+
+model ProfessionalDetail {
+  id         Int     @id @default(autoincrement())
+  customerId Int     @unique @map("customer_id")
+  strNumber  String? @map("str_number")
+  sipNumber  String? @map("sip_number")
+  profession String?
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("mst_customer_professional_details")
 }
 
 // ── TRX PURCHASE ORDER ───────────────────────────────────
@@ -1314,7 +1375,7 @@ model Sale {
   deletedById        Int?       @map("deleted_by_id")
 
   pharmacy              Pharmacy      @relation(fields: [pharmacyId], references: [id])
-  customer              Customer      @relation(fields: [customerId], references: [id])
+  customer             Customer      @relation(fields: [customerId], references: [id])
   prescription          Prescription? @relation("SaleSourcePrescription", fields: [prescriptionId], references: [id])
   dispensedPrescription Prescription? @relation("PrescriptionDispensedSale")
   createdByUser         User?         @relation("SaleCreatedBy", fields: [createdById], references: [id])
@@ -1335,7 +1396,8 @@ model SaleDetail {
   stockDetailId      Int      @map("stock_detail_id")
   quantityPieces     Int      @map("quantity_pieces")
   quantityBox        Int      @map("quantity_box")
-  isFefoOverride     Boolean  @default(false) @map("is_fefo_override")
+  isFefoOverride        Boolean  @default(false) @map("is_fefo_override")
+  requiresPrescription  Boolean  @default(false) @map("requires_prescription")
   sellingPrice       Decimal  @map("selling_price") @db.Decimal(12, 2)
   originalPrice      Decimal  @default(0) @map("original_price") @db.Decimal(12, 2)
   discountPercentage Decimal  @default(0) @map("discount_percentage") @db.Decimal(5, 2)
@@ -1416,12 +1478,13 @@ model Doctor {
   updatedById   Int?         @map("updated_by_id")
   deletedById   Int?         @map("deleted_by_id")
 
-  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
-  user          User?          @relation("DoctorUserProfile", fields: [userId], references: [id])
-  prescriptions Prescription[]
-  createdBy     User?          @relation("DoctorCreatedBy", fields: [createdById], references: [id])
-  updatedBy     User?          @relation("DoctorUpdatedBy", fields: [updatedById], references: [id])
-  deletedBy     User?          @relation("DoctorDeletedBy", fields: [deletedById], references: [id])
+  pharmacy       Pharmacy       @relation(fields: [pharmacyId], references: [id])
+  user           User?          @relation("DoctorUserProfile", fields: [userId], references: [id])
+  prescriptions  Prescription[]
+  medicalVisits  MedicalVisit[]
+  createdBy      User?          @relation("DoctorCreatedBy", fields: [createdById], references: [id])
+  updatedBy      User?          @relation("DoctorUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy      User?          @relation("DoctorDeletedBy", fields: [deletedById], references: [id])
 
   @@unique([pharmacyId, licenseNumber])
   @@map("mst_doctors")
@@ -1448,15 +1511,16 @@ model Prescription {
   updatedById Int?      @map("updated_by_id")
   deletedById Int?      @map("deleted_by_id")
 
-  pharmacy   Pharmacy             @relation(fields: [pharmacyId], references: [id])
-  customer   Customer             @relation(fields: [customerId], references: [id])
-  sale       Sale?                @relation("PrescriptionDispensedSale", fields: [saleId], references: [id])
-  doctor     Doctor?              @relation(fields: [doctorId], references: [id])
-  createdBy  User?                @relation("PrescriptionCreatedBy", fields: [createdById], references: [id])
-  updatedBy  User?                @relation("PrescriptionUpdatedBy", fields: [updatedById], references: [id])
-  deletedBy  User?                @relation("PrescriptionDeletedBy", fields: [deletedById], references: [id])
-  details    PrescriptionDetail[]
-  sourceSale Sale?                @relation("SaleSourcePrescription")
+  pharmacy      Pharmacy             @relation(fields: [pharmacyId], references: [id])
+  customer      Customer             @relation(fields: [customerId], references: [id])
+  sale          Sale?                @relation("PrescriptionDispensedSale", fields: [saleId], references: [id])
+  doctor        Doctor?              @relation(fields: [doctorId], references: [id])
+  createdBy     User?                @relation("PrescriptionCreatedBy", fields: [createdById], references: [id])
+  updatedBy     User?                @relation("PrescriptionUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy     User?                @relation("PrescriptionDeletedBy", fields: [deletedById], references: [id])
+  details       PrescriptionDetail[]
+  sourceSale    Sale?                @relation("SaleSourcePrescription")
+  medicalVisit  MedicalVisit?
 
   @@map("trx_prescriptions")
 }
@@ -1488,6 +1552,87 @@ model PrescriptionDetail {
   deletedBy    User?        @relation("PrescriptionDetailDeletedBy", fields: [deletedById], references: [id])
 
   @@map("trx_prescription_details")
+}
+
+// ── MEDICAL RECORDS ──────────────────────────────────────
+
+model MedicalRecord {
+  id                    Int      @id @default(autoincrement())
+  uuid                  String   @unique @default(uuid())
+  customerId            Int      @unique @map("customer_id")
+  pharmacyId            Int      @map("pharmacy_id")
+  number                String   @unique @map("number")
+  bloodType             String?  @map("blood_type")
+  emergencyContactName  String?  @map("emergency_contact_name")
+  emergencyContactPhone String?  @map("emergency_contact_phone")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  createdById           Int?     @map("created_by_id")
+  updatedById           Int?     @map("updated_by_id")
+
+  customer      Customer               @relation(fields: [customerId], references: [id])
+  pharmacy      Pharmacy               @relation(fields: [pharmacyId], references: [id])
+  createdByUser User?                  @relation("MedicalRecordCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?                  @relation("MedicalRecordUpdatedBy", fields: [updatedById], references: [id])
+  allergies     MedicalRecordAllergy[]
+  visits        MedicalVisit[]
+
+  @@map("trx_medical_records")
+}
+
+model MedicalRecordAllergy {
+  id              Int             @id @default(autoincrement())
+  uuid            String          @unique @default(uuid())
+  medicalRecordId Int             @map("medical_record_id")
+  allergenName    String          @map("allergen_name")
+  allergenType    AllergyType     @map("allergen_type")
+  reaction        String?
+  severity        AllergySeverity
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  createdById     Int?            @map("created_by_id")
+  updatedById     Int?            @map("updated_by_id")
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  createdByUser User?         @relation("AllergyCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?         @relation("AllergyUpdatedBy", fields: [updatedById], references: [id])
+
+  @@map("trx_medical_record_allergies")
+}
+
+model MedicalVisit {
+  id                 Int       @id @default(autoincrement())
+  uuid               String    @unique @default(uuid())
+  medicalRecordId    Int       @map("medical_record_id")
+  pharmacyId         Int       @map("pharmacy_id")
+  visitDate          DateTime  @map("visit_date")
+  chiefComplaint     String?   @map("chief_complaint")
+  diagnosis          String?
+  notes              String?
+  weightKg           Decimal?  @map("weight_kg") @db.Decimal(5, 2)
+  heightCm           Decimal?  @map("height_cm") @db.Decimal(5, 2)
+  bloodPressure      String?   @map("blood_pressure")
+  temperatureCelsius Decimal?  @map("temperature_celsius") @db.Decimal(4, 1)
+  pulsePerMinute     Int?      @map("pulse_per_minute")
+  prescriptionId     Int?      @unique @map("prescription_id")
+  doctorId           Int?      @map("doctor_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+  createdById        Int?      @map("created_by_id")
+  updatedById        Int?      @map("updated_by_id")
+  deletedById        Int?      @map("deleted_by_id")
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+  pharmacy      Pharmacy      @relation(fields: [pharmacyId], references: [id])
+  prescription  Prescription? @relation(fields: [prescriptionId], references: [id])
+  doctor        Doctor?       @relation(fields: [doctorId], references: [id])
+  createdByUser User?         @relation("MedicalVisitCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?         @relation("MedicalVisitUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?         @relation("MedicalVisitDeletedBy", fields: [deletedById], references: [id])
+
+  @@map("trx_medical_visits")
 }
 
 // ── SYS IDEMPOTENCY KEYS ─────────────────────────────────

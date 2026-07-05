@@ -1,88 +1,57 @@
 import { Request } from 'express'
-import { ParamsDictionary } from 'express-serve-static-core'
-import { RecordStatus } from '@prisma/client'
+import { CreateCustomerInput, UpdateCustomerInput } from './customers.validation'
 
-// ── Query/Param/Body Types ────────────────────────────
-
-export interface CustomerQueryParams {
-  search?: string
-  status?: RecordStatus
-  isWalkIn?: string
-  sortBy?: 'name' | 'createdAt'
-  sortOrder?: 'asc' | 'desc'
-  page?: string
-  limit?: string
-}
-
-export interface CustomerUuidParam extends ParamsDictionary {
-  customer_uuid: string
-}
-
-export interface CreateCustomerBody {
-  name: string
-  phone?: string
-  address?: string
-  description?: string
-}
-
-export interface UpdateCustomerBody {
-  name?: string
-  phone?: string
-  address?: string
-  description?: string
-  status?: RecordStatus
-}
-
-// ── Typed Request Aliases ─────────────────────────────
-
-export type GetCustomersRequest = Request<
-  {},
-  {},
-  {},
-  CustomerQueryParams
->
-
-export type GetCustomerRequest = Request<
-  CustomerUuidParam,
-  {}, {}, {}
->
-
-export type CreateCustomerRequest = Request<
-  {},
-  {},
-  CreateCustomerBody,
-  {}
->
-
-export type UpdateCustomerRequest = Request<
-  CustomerUuidParam,
-  {},
-  UpdateCustomerBody,
-  {}
->
-
-export type DeleteCustomerRequest = Request<
-  CustomerUuidParam,
-  {}, {}, {}
->
-
-// ── Response Types ────────────────────────────────────
-
-export interface CustomerResponse {
+export interface CustomerDetailResponse {
   uuid: string
+  customerType: string
   name: string
   phone: string | null
   address: string | null
   description: string | null
   isWalkIn: boolean
-  status: RecordStatus
+  status: string
   createdAt: Date
   updatedAt: Date
+  medicalRecord: {
+    uuid: string
+    number: string
+  } | null
+  patientDetail: {
+    nik: string | null
+    gender: string | null
+    dateOfBirth: Date | null
+    bpjsNumber: string | null
+  } | null
+  professionalDetail: {
+    strNumber: string | null
+    sipNumber: string | null
+    profession: string | null
+  } | null
 }
 
 export interface CustomerDropdownItem {
   uuid: string
   name: string
   phone: string | null
+  customerType: string
   isWalkIn: boolean
+}
+
+export type GetCustomersRequest = Request<{}, {}, {}, any>
+
+export interface GetCustomerRequest extends Request {
+  params: { customer_uuid: string }
+}
+
+export interface CreateCustomerRequest extends Request {
+  body: CreateCustomerInput
+}
+
+export interface UpdateCustomerRequest extends Request {
+  params: { customer_uuid: string }
+  body: UpdateCustomerInput
+}
+
+export interface DeleteCustomerRequest extends Request {
+  params: { customer_uuid: string }
 }

@@ -35,6 +35,7 @@ export interface CreateSaleDetailBody {
   discountPercentage?: number
   discountAmount?: number
   isFefoOverride?: boolean
+  requiresPrescription?: boolean
 }
 
 export interface CreateSalePaymentBody {
@@ -189,6 +190,7 @@ export interface SaleDetailResponse {
   discountAmount: number
   totalAmount: number
   isFefoOverride: boolean
+  requiresPrescription: boolean
   medicine: {
     uuid: string
     name: string
@@ -243,6 +245,7 @@ export interface SaleResponse {
   customer: {
     uuid: string
     name: string
+    customerType: string
     isWalkIn: boolean
   }
   details: SaleDetailResponse[]

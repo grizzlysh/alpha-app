@@ -36,7 +36,7 @@ const saleSelect = {
   soldAt: true,
   createdAt: true,
   customer: {
-    select: { uuid: true, name: true, isWalkIn: true },
+    select: { uuid: true, name: true, customerType: true, isWalkIn: true },
   },
   details: {
     select: {
@@ -49,6 +49,7 @@ const saleSelect = {
       discountAmount: true,
       totalAmount: true,
       isFefoOverride: true,
+      requiresPrescription: true,
       medicine: {
         select: { uuid: true, name: true, unit: true },
       },
@@ -96,6 +97,7 @@ type SaleDetailDraft = {
   discountAmount: Decimal
   totalAmount: Decimal
   isFefoOverride: boolean
+  requiresPrescription: boolean
   createdById: number
   _stockDetailId: number
   _stockId: number
@@ -182,7 +184,7 @@ const resolvePrescriptionId = async (
   const rxMedicines = isPending
     ? []
     : await tx.medicine.findMany({
-        where: { id: { in: medicineIds }, requiredPrescription: true },
+        where: { id: { in: medicineIds }, type: { requiredPrescription: true } },
         select: { id: true, name: true },
       })
 
@@ -282,11 +284,11 @@ export const getSales = async (
 
   let customerId: number | undefined
   if (customerUuid) {
-    const customer = await prisma.customer.findFirst({
+    const party = await prisma.customer.findFirst({
       where: { uuid: customerUuid, pharmacyId },
       select: { id: true },
     })
-    customerId = customer?.id
+    customerId = party?.id
   }
 
   const where = {
@@ -304,7 +306,7 @@ export const getSales = async (
       OR: [
         { saleNumber: { contains: search, mode: 'insensitive' as const } },
         {
-          customer: {
+          party: {
             name: { contains: search, mode: 'insensitive' as const },
           },
         },
@@ -373,22 +375,23 @@ export const createSale = async (
 
   const createdSale = await withDocNumberRetry('SL', () => prisma.$transaction(async (tx) => {
 
-    // ── Resolve Customer ──────────────────────────
+    // ── Resolve Party ────────────────────────────
     let customerId: number
 
     if (data.customerUuid) {
-      const customer = await tx.customer.findFirst({
+      const party = await tx.customer.findFirst({
         where: { uuid: data.customerUuid, pharmacyId, status: 'ACTIVE' },
-        select: { id: true },
+        select: { id: true, isWalkIn: true },
       })
-      if (!customer) throw new NotFoundException('Customer not found')
-      customerId = customer.id
+      if (!party) throw new NotFoundException('Party not found')
+      if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
+      customerId = party.id
     } else {
       const walkIn = await tx.customer.findFirst({
         where: { pharmacyId, isWalkIn: true },
         select: { id: true },
       })
-      if (!walkIn) throw new NotFoundException('Walk-in customer not found')
+      if (!walkIn) throw new NotFoundException('Walk-in party not found')
       customerId = walkIn.id
     }
 
@@ -470,6 +473,7 @@ export const createSale = async (
         discountAmount: new Decimal(discountAmount.toFixed(2)),
         totalAmount: new Decimal(itemTotal.toFixed(2)),
         isFefoOverride: detail.isFefoOverride ?? false,
+        requiresPrescription: detail.requiresPrescription ?? false,
         createdById: userId,
         _stockDetailId: stockDetail.id,
         _stockId: stockDetail.stockId,
@@ -696,15 +700,16 @@ export const completeSale = async (
       throw new BadRequestException('Only pending sales can be completed')
     }
 
-    // ── Resolve customer ──────────────────────────
+    // ── Resolve party ────────────────────────────
     let customerId = existing.customerId
     if (data.customerUuid) {
-      const customer = await tx.customer.findFirst({
+      const party = await tx.customer.findFirst({
         where: { uuid: data.customerUuid, pharmacyId, status: 'ACTIVE' },
-        select: { id: true },
+        select: { id: true, isWalkIn: true },
       })
-      if (!customer) throw new NotFoundException('Customer not found')
-      customerId = customer.id
+      if (!party) throw new NotFoundException('Party not found')
+      if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
+      customerId = party.id
     }
 
     // ── Release old reservations ──────────────────
@@ -756,6 +761,7 @@ export const completeSale = async (
         discountAmount: new Decimal((detail.discountAmount ?? 0).toFixed(2)),
         totalAmount: new Decimal((detail.sellingPrice * detail.quantityPieces).toFixed(2)),
         isFefoOverride: detail.isFefoOverride ?? false,
+        requiresPrescription: detail.requiresPrescription ?? false,
         createdById: userId,
         _stockDetailId: stockDetail.id,
         _stockId: stockDetail.stockId,
@@ -1104,15 +1110,16 @@ export const updateSale = async (
     // ── Release old reservations first ────────────
     await tx.stockReservation.deleteMany({ where: { saleId: existing.id } })
 
-    // ── Resolve Customer ──────────────────────────
+    // ── Resolve Party ────────────────────────────
     let customerId: number | undefined
     if (data.customerUuid) {
-      const customer = await tx.customer.findFirst({
+      const party = await tx.customer.findFirst({
         where: { uuid: data.customerUuid, pharmacyId, status: 'ACTIVE' },
-        select: { id: true },
+        select: { id: true, isWalkIn: true },
       })
-      if (!customer) throw new NotFoundException('Customer not found')
-      customerId = customer.id
+      if (!party) throw new NotFoundException('Party not found')
+      if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
+      customerId = party.id
     }
 
     // ── Validate + build new details + reservation drafts ──
@@ -1169,6 +1176,7 @@ export const updateSale = async (
         discountAmount: new Decimal((detail.discountAmount ?? 0).toFixed(2)),
         totalAmount: new Decimal((detail.sellingPrice * detail.quantityPieces).toFixed(2)),
         isFefoOverride: detail.isFefoOverride ?? false,
+        requiresPrescription: detail.requiresPrescription ?? false,
         createdById: userId,
       })
 
@@ -1181,7 +1189,7 @@ export const updateSale = async (
     }
 
     // ── Prescription Gate ─────────────────────────
-    const resolvedCustomerId = customerId ?? existing.customerId
+    const resolvedPartyId = customerId ?? existing.customerId
     const prescriptionId = await resolvePrescriptionId(tx, {
       prescriptionUuid: data.prescriptionUuid,
       prescription: data.prescription,
@@ -1190,7 +1198,7 @@ export const updateSale = async (
       isPending: true,
       medicineIds: [...new Set(detailsCreate.map((d) => d.medicineId))],
       pharmacyId,
-      customerId: resolvedCustomerId,
+      customerId: resolvedPartyId,
       userId,
     })
 

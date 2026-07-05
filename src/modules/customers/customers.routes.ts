@@ -4,14 +4,9 @@ import { authenticate } from '@middlewares/auth'
 import { requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard'
 import { validateBody, validateQuery } from '@middlewares/validate'
 import { PERMISSIONS } from '@constants/permissions'
-import {
-  createCustomerSchema,
-  updateCustomerSchema,
-  customerQuerySchema,
-} from './customers.validation'
+import { createCustomerSchema, updateCustomerSchema, customerQuerySchema } from './customers.validation'
 
 const router: Router = Router()
-
 router.use(authenticate)
 router.use(requirePharmacyAccess)
 

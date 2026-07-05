@@ -68,7 +68,7 @@ async function saveBuffer(pharmacyId: number, filename: string, buffer: Buffer):
 const salesColumns: ExportColumn<SalesExportRow>[] = [
   { header: 'Sale Number',    key: 'saleNumber',     width: 22 },
   { header: 'Date',           key: 'soldAt',         width: 20 },
-  { header: 'Customer',       key: 'customerName',   width: 25 },
+  { header: 'Buyer',          key: 'patientName',    width: 25 },
   { header: 'Type',           key: 'saleType',       width: 12 },
   { header: 'Status',         key: 'status',         width: 14 },
   { header: 'Subtotal',         key: 'totalAmount',        width: 16 },

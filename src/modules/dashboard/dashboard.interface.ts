@@ -21,7 +21,7 @@ export interface KpiDelta {
 export interface RecentTransaction {
   uuid: string
   saleNumber: string
-  customerName: string
+  patientName: string
   totalAmount: number
   soldAt: Date
   isRx: boolean
@@ -238,7 +238,7 @@ export interface PaymentScheduleResponse {
 export interface CreditSaleItem {
   saleUuid: string
   saleNumber: string
-  customerName: string
+  patientName: string
   soldAt: Date
   grandTotal: number
   paidAmount: number

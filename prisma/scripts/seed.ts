@@ -44,10 +44,10 @@ const PERMISSIONS = [
   { module: 'distributors',       action: 'create' },
   { module: 'distributors',       action: 'update' },
   { module: 'distributors',       action: 'delete' },
-  { module: 'customers',          action: 'read' },
-  { module: 'customers',          action: 'create' },
-  { module: 'customers',          action: 'update' },
-  { module: 'customers',          action: 'delete' },
+  { module: 'patients',          action: 'read' },
+  { module: 'patients',          action: 'create' },
+  { module: 'patients',          action: 'update' },
+  { module: 'patients',          action: 'delete' },
   { module: 'stock',              action: 'read' },
   { module: 'stock',              action: 'adjust' },
   { module: 'stock_movements',    action: 'read' },
@@ -132,7 +132,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters'),
 
   CASHIER: only(
-    'customers.read', 'customers.create', 'customers.update',
+    'patients.read', 'patients.create', 'patients.update',
     'medicines.read',
     'stock.read',
     'sales.read', 'sales.create', 'sales.update', 'sales.delete',
@@ -144,7 +144,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ),
 
   DOCTOR: only(
-    'customers.read',
+    'patients.read',
     'medicines.read',
     'doctors.read', 'doctors.create', 'doctors.update', 'doctors.delete',
     'prescriptions.read', 'prescriptions.create', 'prescriptions.update', 'prescriptions.delete',
@@ -464,7 +464,7 @@ async function main() {
     { name: 'Admin',           type: AppRole.ADMIN,           description: 'Pharmacy administrator with full operational access',                requiresLicense: false },
     { name: 'Head Pharmacist', type: AppRole.HEAD_PHARMACIST, description: 'Senior licensed pharmacist with staff and license management access', requiresLicense: true  },
     { name: 'Pharmacist',      type: AppRole.PHARMACIST,      description: 'Licensed pharmacist with dispensing access',                         requiresLicense: true  },
-    { name: 'Cashier',         type: AppRole.CASHIER,         description: 'Cashier with sales and customer access',                             requiresLicense: false },
+    { name: 'Cashier',         type: AppRole.CASHIER,         description: 'Cashier with sales and patient access',                             requiresLicense: false },
     { name: 'Doctor',          type: AppRole.DOCTOR,          description: 'Doctor with prescription management access',                         requiresLicense: true  },
   ]
   const roles: Record<string, { id: number }> = {}
@@ -573,7 +573,7 @@ async function main() {
   const businessParams = [
     // Pricing
     { key: 'MARGIN_PERCENTAGE',         value: '20',                    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
-    { key: 'PPN_PERCENTAGE_SELL',       value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to customers on sales (output VAT)' },
+    { key: 'PPN_PERCENTAGE_SELL',       value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
     { key: 'PPN_PERCENTAGE_BUY',        value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
     { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',                    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
     // Stock management
@@ -584,8 +584,8 @@ async function main() {
     { key: 'CREDIT_PAYMENT_DAYS',       value: '30',                    dataType: DataType.NUMBER,  description: 'Default credit term in days for non-cash sales' },
     { key: 'RETURN_POLICY_DAYS',        value: '7',                     dataType: DataType.NUMBER,  description: 'Number of days after sale within which a return is accepted' },
     // Receipt
-    { key: 'RECEIPT_HEADER',            value: 'Apotek Sejahtera',       dataType: DataType.STRING,  description: 'Header text printed on customer receipts' },
-    { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on customer receipts' },
+    { key: 'RECEIPT_HEADER',            value: 'Apotek Sejahtera',       dataType: DataType.STRING,  description: 'Header text printed on patient receipts' },
+    { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
   ]
   for (const bp of businessParams) {
     const existing = await prisma.businessParameter.findUnique({
@@ -804,12 +804,15 @@ async function main() {
     distributors[def.name] = dist
   }
 
-  // ── 14. Customers ─────────────────────────────────────────────────────────
+  // ── 14. Customers ────────────────────────────────────────���───────────────
   console.log('Creating customers...')
   const customerDefs = [
-    { name: 'Walk-in Customer', phone: null, address: null, isWalkIn: true },
-    { name: 'Budi Santoso', phone: '081234567890', address: 'Jl. Kenanga No. 5, Jakarta', isWalkIn: false },
-    { name: 'Siti Rahayu', phone: '081298765432', address: 'Jl. Melati No. 12, Depok', isWalkIn: false },
+    { name: 'Walk-in Patient',  phone: null,           address: null,                         isWalkIn: true,  customerType: 'PATIENT' as const },
+    { name: 'Budi Santoso',     phone: '081234567890', address: 'Jl. Kenanga No. 5, Jakarta', isWalkIn: false, customerType: 'PATIENT' as const },
+    { name: 'Siti Rahayu',      phone: '081298765432', address: 'Jl. Melati No. 12, Depok',   isWalkIn: false, customerType: 'PATIENT' as const },
+    { name: 'Agus Setiawan',    phone: '081311223344', address: 'Jl. Anggrek No. 8, Bekasi',  isWalkIn: false, customerType: 'PATIENT' as const },
+    { name: 'Dewi Permatasari', phone: '081355667788', address: 'Jl. Mawar No. 3, Tangerang', isWalkIn: false, customerType: 'PATIENT' as const },
+    { name: 'Rudi Hermawan',    phone: '081399887766', address: 'Jl. Dahlia No. 17, Bogor',   isWalkIn: false, customerType: 'PATIENT' as const },
   ]
   const customers: Record<string, { id: number }> = {}
   for (const def of customerDefs) {
@@ -819,6 +822,7 @@ async function main() {
     const customer = existing ?? await prisma.customer.create({
       data: {
         pharmacyId: pharmacy.id,
+        customerType: def.customerType,
         name: def.name,
         phone: def.phone,
         address: def.address,
@@ -1057,11 +1061,11 @@ async function main() {
   // Total usage: Paracetamol 96, Vitamin C 42, Ibuprofen 30, Amoxicillin 12, Amlodipin 6
   // All fit within the stock loaded by the invoice
   const SALE_PATTERNS = [
-    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 5 }, { medicine: 'Vitamin C 1000mg',   pieces: 3 }], customer: 'Walk-in Customer' },
-    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 3 }, { medicine: 'Ibuprofen 400mg',     pieces: 2 }], customer: 'Budi Santoso'     },
-    { lines: [{ medicine: 'Amoxicillin 500mg', pieces: 2 }, { medicine: 'Paracetamol 500mg',   pieces: 4 }], customer: 'Siti Rahayu'      },
-    { lines: [{ medicine: 'Vitamin C 1000mg',  pieces: 4 }, { medicine: 'Amlodipin 10mg',      pieces: 1 }], customer: 'Walk-in Customer' },
-    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 4 }, { medicine: 'Ibuprofen 400mg',     pieces: 3 }], customer: 'Budi Santoso'     },
+    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 5 }, { medicine: 'Vitamin C 1000mg',   pieces: 3 }], patient: 'Walk-in Patient' },
+    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 3 }, { medicine: 'Ibuprofen 400mg',     pieces: 2 }], patient: 'Budi Santoso'     },
+    { lines: [{ medicine: 'Amoxicillin 500mg', pieces: 2 }, { medicine: 'Paracetamol 500mg',   pieces: 4 }], patient: 'Siti Rahayu'      },
+    { lines: [{ medicine: 'Vitamin C 1000mg',  pieces: 4 }, { medicine: 'Amlodipin 10mg',      pieces: 1 }], patient: 'Walk-in Patient' },
+    { lines: [{ medicine: 'Paracetamol 500mg', pieces: 4 }, { medicine: 'Ibuprofen 400mg',     pieces: 3 }], patient: 'Budi Santoso'     },
   ]
 
   const existingSaleNumbers = new Set(
@@ -1083,7 +1087,7 @@ async function main() {
 
     await createSale({
       pharmacyId: pharmacy.id,
-      customerId: customers[pattern.customer].id,
+      customerId: customers[pattern.patient].id,
       saleNumber: saleNum,
       saleDate,
       saleType: SaleType.CASH,
@@ -1372,14 +1376,15 @@ async function main() {
   console.log('Admin            →  admin@apotek.com             /  Admin@123        (all except system_parameters/pharmacies)')
   console.log('Head Pharmacist  →  headpharmacist@apotek.com    /  HeadPharma@123   (all except system_parameters/pharmacies, SIPA-HPC-2024-001)')
   console.log('Pharmacist       →  pharmacist@pharma.com        /  Pharmacist@123   (no users/roles/permissions/pharmacies/system_parameters, SIPA-JKT-2024-001)')
-  console.log('Cashier          →  cashier@apotek.com           /  Cashier@123      (sales/customers/medicines/stock/prescriptions only)')
-  console.log('Doctor           →  doctor@apotek.com            /  Doctor@123       (doctors/prescriptions/customers/medicines, SIP-JKT-2024-003)')
+  console.log('Cashier          →  cashier@apotek.com           /  Cashier@123      (sales/patients/medicines/stock/prescriptions only)')
+  console.log('Doctor           →  doctor@apotek.com            /  Doctor@123       (doctors/prescriptions/patients/medicines, SIP-JKT-2024-003)')
   console.log('Pharmacy         →  Apotek Sejahtera (APK1)')
   console.log('Roles            →  6 global roles, all permissions assigned')
   console.log('Medicines        →  5 (Paracetamol, Amoxicillin, Vitamin C, Ibuprofen, Amlodipin)')
   console.log('Distributors     →  Kimia Farma, Enseval')
   console.log('Storage          →  2 cabinets → 4 shelves → 6 bins (stock details linked to bins)')
   console.log('Invoice          →  INV-APK1-20260101-001 (PAID, stock loaded)')
+  console.log('Patients         →  Walk-in + 5 named (Budi, Siti, Agus, Dewi, Rudi)')
   console.log('Sales            →  SL-APK1-20260115-001 + 30 daily (2026-05-20 → 2026-06-18)')
   console.log('Doctors          →  Dr. Ahmad Fauzi (GP), Dr. Dewi Kusuma (Internist)')
   console.log('Prescriptions    →  RX-APK1-20260110-001 (dispensed), RX-APK1-20260120-001 (partial)')

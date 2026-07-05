@@ -126,7 +126,7 @@ async function getDailyOps(pharmacyId: number) {
     recentTransactions: recentList.map((s) => ({
       uuid: s.uuid,
       saleNumber: s.saleNumber,
-      customerName: s.customer.name,
+      patientName: s.customer.name,
       totalAmount: toNum(s.grandTotal),
       soldAt: s.soldAt,
       isRx: s.prescriptionId !== null,
@@ -776,7 +776,7 @@ async function getCreditSalesOutstanding(pharmacyId: number) {
     return {
       saleUuid: s.uuid,
       saleNumber: s.saleNumber,
-      customerName: s.customer.name,
+      patientName: s.customer.name,
       soldAt: s.soldAt,
       grandTotal: toNum(s.grandTotal),
       paidAmount,

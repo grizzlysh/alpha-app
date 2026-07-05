@@ -135,6 +135,10 @@ export const PERMISSIONS = {
   PRESCRIPTIONS_UPDATE: 'prescriptions.update',
   PRESCRIPTIONS_DELETE: 'prescriptions.delete',
 
+  // medical records
+  MEDICAL_RECORDS_READ: 'medical_records.read',
+  MEDICAL_RECORDS_WRITE: 'medical_records.write',
+
   // dashboard
   DASHBOARD_READ: 'dashboard.read',
   DASHBOARD_ADVANCED: 'dashboard.advanced',

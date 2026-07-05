@@ -2,7 +2,7 @@ import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
-export type DocType = 'PO' | 'INV' | 'SL' | 'SR' | 'SD'
+export type DocType = 'PO' | 'INV' | 'SL' | 'SR' | 'SD' | 'MR'
 
 // Maps DocType to the DB column name holding the unique document number.
 const DOC_NUMBER_FIELD: Record<DocType, string> = {
@@ -11,6 +11,7 @@ const DOC_NUMBER_FIELD: Record<DocType, string> = {
   SL: 'sale_number',
   SR: 'return_number',
   SD: 'disposal_number',
+  MR: 'number',
 }
 
 /**
@@ -95,6 +96,11 @@ export const generateDocNumber = async (
       break
     case 'SD':
       count = await prisma.stockDisposal.count({
+        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
+      })
+      break
+    case 'MR':
+      count = await prisma.medicalRecord.count({
         where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
       })
       break

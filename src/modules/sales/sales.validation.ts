@@ -26,6 +26,7 @@ export const createSaleDetailSchema = z.object({
   discountPercentage: z.number().min(0).max(100).optional().default(0),
   discountAmount: z.number().min(0).optional().default(0),
   isFefoOverride: z.boolean().optional().default(false),
+  requiresPrescription: z.boolean().optional().default(false),
 })
 
 export const createSalePaymentSchema = z.object({

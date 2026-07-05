@@ -215,7 +215,7 @@ export const getSalesList = async (
     data: sales.map((s) => ({
       saleNumber: s.saleNumber,
       soldAt: DateTime.fromJSDate(s.soldAt).toFormat('yyyy-MM-dd HH:mm'),
-      customerName: s.customer.name,
+      patientName: s.customer.name,
       saleType: s.saleType,
       status: s.status,
       totalAmount: toNum(s.totalAmount),
@@ -260,7 +260,7 @@ export const getSalesExport = async (
   return sales.map((s) => ({
     saleNumber: s.saleNumber,
     soldAt: DateTime.fromJSDate(s.soldAt).toFormat('yyyy-MM-dd HH:mm'),
-    customerName: s.customer.name,
+    patientName: s.customer.name,
     saleType: s.saleType,
     status: s.status,
     totalAmount: toNum(s.totalAmount),

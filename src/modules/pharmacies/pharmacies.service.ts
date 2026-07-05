@@ -1,4 +1,4 @@
-import { DataType, PlatformRole, Prisma } from '@prisma/client'
+import { CustomerType, DataType, PlatformRole, Prisma } from '@prisma/client'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { prisma } from '@config/db'
 import {
@@ -19,7 +19,7 @@ import { PaginationMeta } from '@interfaces/common.interface'
 
 const DEFAULT_BUSINESS_PARAMS: Array<{ key: string; value: string; dataType: DataType; description: string }> = [
   { key: 'MARGIN_PERCENTAGE',         value: '20',    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
-  { key: 'PPN_PERCENTAGE_SELL',       value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to customers on sales (output VAT)' },
+  { key: 'PPN_PERCENTAGE_SELL',       value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
   { key: 'PPN_PERCENTAGE_BUY',        value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
   { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
   { key: 'REORDER_LEVEL_DEFAULT',     value: '10',    dataType: DataType.NUMBER,     description: 'Default low-stock alert threshold in pieces' },
@@ -27,8 +27,8 @@ const DEFAULT_BUSINESS_PARAMS: Array<{ key: string; value: string; dataType: Dat
   { key: 'ALLOW_FEFO_OVERRIDE',       value: 'true',  dataType: DataType.BOOLEAN,    description: 'Allow staff to select non-FEFO batches during sale' },
   { key: 'CREDIT_PAYMENT_DAYS',       value: '30',    dataType: DataType.NUMBER,     description: 'Default credit term in days for non-cash sales' },
   { key: 'RETURN_POLICY_DAYS',        value: '7',     dataType: DataType.NUMBER,     description: 'Number of days after sale within which a return is accepted' },
-  { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on customer receipts' },
-  { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on customer receipts' },
+  { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
+  { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
 ]
 
 // ── Helpers ───────────────────────────────────────────
@@ -202,6 +202,16 @@ export const createPharmacy = async (
           createdById: userId,
           updatedById: userId,
         })),
+      })
+
+      await tx.customer.create({
+        data: {
+          pharmacyId: created.id,
+          customerType: CustomerType.PATIENT,
+          name: 'Walk-in Patient',
+          isWalkIn: true,
+          createdById: userId,
+        },
       })
 
       return tx.pharmacy.findFirst({ where: { id: created.id }, select: pharmacySelect })

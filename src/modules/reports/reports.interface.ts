@@ -62,7 +62,7 @@ export interface SalesSummary {
 export interface SalesExportRow {
   saleNumber: string
   soldAt: string
-  customerName: string
+  patientName: string
   saleType: string
   status: string
   totalAmount: number
