@@ -1274,7 +1274,7 @@ model StockReturn {
   status             StockReturnStatus @default(IN_PROCESS)
   reason             String?
   description        String?
-  totalAmount        Decimal           @default(0) @map("total_amount") @db.Decimal(12, 0)
+  totalAmount        Decimal           @default(0) @map("total_amount") @db.Decimal(12, 2)
   cancellationReason String?           @map("cancellation_reason")
   rejectionReason    String?           @map("rejection_reason")
   returnedAt         DateTime?         @map("returned_at")
