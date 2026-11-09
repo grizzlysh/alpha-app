@@ -1,9 +1,10 @@
 import { prisma } from '@config/db'
 import { CustomerType } from '@prisma/client'
-import { UpdateMedicalRecordInput, CreateAllergyInput, CreateVisitInput, UpdateVisitInput, VisitQueryInput } from './medical-records.validation'
+import { UpdateMedicalRecordInput, CreateAllergyInput, UpdateAllergyInput, CreateVisitInput, UpdateVisitInput, VisitQueryInput } from './medical-records.validation'
 import { MedicalRecordResponse, AllergyResponse, MedicalVisitResponse } from './medical-records.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
+import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
 
 // ── Selects ───────────────────────────────────────────
@@ -33,6 +34,16 @@ const recordSelect = {
   },
 }
 
+const allergySelect = {
+  uuid: true,
+  allergenName: true,
+  allergenType: true,
+  reaction: true,
+  severity: true,
+  notes: true,
+  createdAt: true,
+}
+
 const visitSelect = {
   uuid: true,
   visitDate: true,
@@ -47,7 +58,7 @@ const visitSelect = {
   createdAt: true,
   updatedAt: true,
   prescription: {
-    select: { uuid: true, prescriptionNumber: true },
+    select: { uuid: true, prescriptionNumber: true, status: true },
   },
   doctor: {
     select: { uuid: true, name: true },
@@ -67,6 +78,44 @@ const resolveRecord = async (customerUuid: string, pharmacyId: number) => {
   const record = await prisma.medicalRecord.findUnique({ where: { customerId: customer.id } })
   if (!record) throw new NotFoundException('Medical record not found')
   return record
+}
+
+/**
+ * A visit may only link a prescription written for the same patient, and a
+ * prescription can back at most one visit. `undefined` = leave as is,
+ * `null` = unlink.
+ */
+const resolveVisitPrescriptionId = async (
+  prescriptionUuid: string | null | undefined,
+  record: { id: number; customerId: number },
+  pharmacyId: number,
+  currentVisitId?: number
+): Promise<number | null | undefined> => {
+  if (prescriptionUuid === undefined) return undefined
+  if (prescriptionUuid === null) return null
+
+  const prescription = await prisma.prescription.findFirst({
+    where: { uuid: prescriptionUuid, pharmacyId, deletedAt: null },
+    select: { id: true, customerId: true, medicalVisit: { select: { id: true } } },
+  })
+  if (!prescription) throw new NotFoundException('Prescription not found')
+  if (prescription.customerId !== record.customerId) {
+    throw new BadRequestException('The prescription belongs to a different patient')
+  }
+  if (prescription.medicalVisit && prescription.medicalVisit.id !== currentVisitId) {
+    throw new ConflictException('The prescription is already linked to another visit')
+  }
+  return prescription.id
+}
+
+const resolveVisitDoctorId = async (doctorUuid: string | undefined, pharmacyId: number): Promise<number | undefined> => {
+  if (!doctorUuid) return undefined
+  const doctor = await prisma.doctor.findFirst({
+    where: { uuid: doctorUuid, pharmacyId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!doctor) throw new NotFoundException('Doctor not found')
+  return doctor.id
 }
 
 // ── Services ──────────────────────────────────────────
@@ -126,17 +175,40 @@ export const addAllergy = async (
       notes: data.notes,
       createdById: userId,
     },
-    select: {
-      uuid: true,
-      allergenName: true,
-      allergenType: true,
-      reaction: true,
-      severity: true,
-      notes: true,
-      createdAt: true,
-    },
+    select: allergySelect,
   })
   return allergy as unknown as AllergyResponse
+}
+
+export const updateAllergy = async (
+  customerUuid: string,
+  allergyUuid: string,
+  data: UpdateAllergyInput,
+  pharmacyId: number,
+  userId: number
+): Promise<AllergyResponse> => {
+  const existing = await resolveRecord(customerUuid, pharmacyId)
+
+  const allergy = await prisma.medicalRecordAllergy.findFirst({
+    where: { uuid: allergyUuid, medicalRecordId: existing.id },
+    select: { id: true },
+  })
+  if (!allergy) throw new NotFoundException('Allergy record not found')
+
+  const updated = await prisma.medicalRecordAllergy.update({
+    where: { id: allergy.id },
+    data: {
+      ...(data.allergenName !== undefined && { allergenName: data.allergenName }),
+      ...(data.allergenType !== undefined && { allergenType: data.allergenType }),
+      ...(data.severity !== undefined && { severity: data.severity }),
+      // empty string clears the optional text fields
+      ...(data.reaction !== undefined && { reaction: data.reaction || null }),
+      ...(data.notes !== undefined && { notes: data.notes || null }),
+      updatedById: userId,
+    },
+    select: allergySelect,
+  })
+  return updated as unknown as AllergyResponse
 }
 
 export const removeAllergy = async (
@@ -202,25 +274,8 @@ export const createVisit = async (
 ): Promise<MedicalVisitResponse> => {
   const existing = await resolveRecord(customerUuid, pharmacyId)
 
-  let prescriptionId: number | undefined
-  if (data.prescriptionUuid) {
-    const prescription = await prisma.prescription.findFirst({
-      where: { uuid: data.prescriptionUuid, pharmacyId, deletedAt: null },
-      select: { id: true },
-    })
-    if (!prescription) throw new NotFoundException('Prescription not found')
-    prescriptionId = prescription.id
-  }
-
-  let doctorId: number | undefined
-  if (data.doctorUuid) {
-    const doctor = await prisma.doctor.findFirst({
-      where: { uuid: data.doctorUuid, pharmacyId, deletedAt: null },
-      select: { id: true },
-    })
-    if (!doctor) throw new NotFoundException('Doctor not found')
-    doctorId = doctor.id
-  }
+  const prescriptionId = await resolveVisitPrescriptionId(data.prescriptionUuid, existing, pharmacyId)
+  const doctorId = await resolveVisitDoctorId(data.doctorUuid, pharmacyId)
 
   const { prescriptionUuid, doctorUuid, ...visitData } = data
 
@@ -261,25 +316,8 @@ export const updateVisit = async (
   })
   if (!existingVisit) throw new NotFoundException('Medical visit not found')
 
-  let prescriptionId: number | undefined
-  if (data.prescriptionUuid) {
-    const prescription = await prisma.prescription.findFirst({
-      where: { uuid: data.prescriptionUuid, pharmacyId, deletedAt: null },
-      select: { id: true },
-    })
-    if (!prescription) throw new NotFoundException('Prescription not found')
-    prescriptionId = prescription.id
-  }
-
-  let doctorId: number | undefined
-  if (data.doctorUuid) {
-    const doctor = await prisma.doctor.findFirst({
-      where: { uuid: data.doctorUuid, pharmacyId, deletedAt: null },
-      select: { id: true },
-    })
-    if (!doctor) throw new NotFoundException('Doctor not found')
-    doctorId = doctor.id
-  }
+  const prescriptionId = await resolveVisitPrescriptionId(data.prescriptionUuid, existing, pharmacyId, existingVisit.id)
+  const doctorId = await resolveVisitDoctorId(data.doctorUuid, pharmacyId)
 
   const { prescriptionUuid, doctorUuid, visitDate, ...rest } = data
 

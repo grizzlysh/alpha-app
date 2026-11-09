@@ -1054,6 +1054,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Allergy record removed successfully',
     id: 'Data alergi berhasil dihapus',
   },
+  MEDICAL_ALLERGY_UPDATED: {
+    en: 'Allergy record updated successfully',
+    id: 'Data alergi berhasil diperbarui',
+  },
   MEDICAL_ALLERGY_NOT_FOUND: {
     en: 'Allergy record not found',
     id: 'Data alergi tidak ditemukan',

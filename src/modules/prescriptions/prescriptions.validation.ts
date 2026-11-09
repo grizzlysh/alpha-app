@@ -12,6 +12,8 @@ const prescriptionDetailSchema = z.object({
 export const createPrescriptionSchema = z.object({
   customerUuid: z.string().uuid(),
   doctorUuid: z.string().uuid().optional(),
+  // The examination this prescription came out of, if any.
+  medicalVisitUuid: z.string().uuid().optional(),
   prescriptionNumber: z.string().max(100).optional(),
   prescribedAt: z.coerce.date(),
   notes: z.string().optional(),

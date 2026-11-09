@@ -9,6 +9,7 @@ import {
 import { PrescriptionResponse, PrescriptionListItem, AvailablePrescriptionItem } from './prescriptions.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
+import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 
@@ -47,6 +48,7 @@ const fullSelect = {
   customer: { select: { uuid: true, name: true } },
   doctor: { select: { uuid: true, name: true, licenseNumber: true, clinicName: true } },
   sale: { select: { uuid: true, saleNumber: true } },
+  medicalVisit: { select: { uuid: true, visitDate: true, diagnosis: true } },
   details: { where: { deletedAt: null }, select: detailSelect, orderBy: { id: 'asc' as const } },
 }
 
@@ -207,6 +209,20 @@ export const createPrescription = async (
   const rx = await prisma.$transaction(async (tx) => {
     const customerId = await resolveCustomerId(data.customerUuid, pharmacyId, tx)
 
+    let visit: { id: number; doctorId: number | null } | null = null
+    if (data.medicalVisitUuid) {
+      const found = await tx.medicalVisit.findFirst({
+        where: { uuid: data.medicalVisitUuid, pharmacyId, deletedAt: null },
+        select: { id: true, doctorId: true, prescriptionId: true, medicalRecord: { select: { customerId: true } } },
+      })
+      if (!found) throw new NotFoundException('Medical visit not found')
+      if (found.medicalRecord.customerId !== customerId) {
+        throw new BadRequestException('The visit belongs to a different patient')
+      }
+      if (found.prescriptionId) throw new ConflictException('This visit already has a prescription')
+      visit = found
+    }
+
     const medicineIds = await Promise.all(
       data.items
         .filter((i) => i.medicineUuid)
@@ -220,11 +236,12 @@ export const createPrescription = async (
     )
     const medicineMap = new Map(medicineIds.map((m) => [m.uuid, m.id]))
 
-    return tx.prescription.create({
+    const created = await tx.prescription.create({
       data: {
         pharmacyId,
         customerId,
-        doctorId,
+        // A prescription written during a visit defaults to that visit's doctor.
+        doctorId: doctorId ?? visit?.doctorId ?? undefined,
         prescriptionNumber: data.prescriptionNumber,
         prescribedAt: data.prescribedAt,
         notes: data.notes,
@@ -241,8 +258,13 @@ export const createPrescription = async (
           })),
         },
       },
-      select: fullSelect,
+      select: { id: true },
     })
+
+    if (visit) {
+      await tx.medicalVisit.update({ where: { id: visit.id }, data: { prescriptionId: created.id, updatedById: userId } })
+    }
+    return tx.prescription.findUniqueOrThrow({ where: { id: created.id }, select: fullSelect })
   })
 
   return rx as unknown as PrescriptionResponse

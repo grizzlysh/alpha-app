@@ -5,6 +5,7 @@ import {
   getMedicalRecord,
   updateMedicalRecord,
   addAllergy,
+  updateAllergy,
   removeAllergy,
   getVisits,
   getVisitByUuid,
@@ -15,6 +16,7 @@ import {
 import {
   updateMedicalRecordSchema,
   createAllergySchema,
+  updateAllergySchema,
   createVisitSchema,
   updateVisitSchema,
   visitQuerySchema,
@@ -23,6 +25,7 @@ import {
   GetMedicalRecordRequest,
   UpdateMedicalRecordRequest,
   CreateAllergyRequest,
+  UpdateAllergyRequest,
   DeleteAllergyRequest,
   GetVisitsRequest,
   GetVisitRequest,
@@ -46,6 +49,12 @@ export const addAllergyController = async (req: CreateAllergyRequest, res: Respo
   const data = createAllergySchema.parse(req.body)
   const allergy = await addAllergy(req.params.customer_uuid, data, req.user!.pharmacyId!, req.user!.id)
   sendCreated(res, MESSAGE_CODES.MEDICAL_ALLERGY_CREATED, allergy)
+}
+
+export const updateAllergyController = async (req: UpdateAllergyRequest, res: Response) => {
+  const data = updateAllergySchema.parse(req.body)
+  const allergy = await updateAllergy(req.params.customer_uuid, req.params.allergy_uuid, data, req.user!.pharmacyId!, req.user!.id)
+  sendSuccess(res, MESSAGE_CODES.MEDICAL_ALLERGY_UPDATED, allergy)
 }
 
 export const removeAllergyController = async (req: DeleteAllergyRequest, res: Response) => {

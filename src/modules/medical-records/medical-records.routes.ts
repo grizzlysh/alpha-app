@@ -6,6 +6,7 @@ import {
   getMedicalRecordController,
   updateMedicalRecordController,
   addAllergyController,
+  updateAllergyController,
   removeAllergyController,
   getVisitsController,
   getVisitController,
@@ -24,6 +25,7 @@ router.put('/:customer_uuid', requirePermission(PERMISSIONS.MEDICAL_RECORDS_WRIT
 
 // Allergies
 router.post('/:customer_uuid/allergies', requirePermission(PERMISSIONS.MEDICAL_RECORDS_WRITE), addAllergyController)
+router.put('/:customer_uuid/allergies/:allergy_uuid', requirePermission(PERMISSIONS.MEDICAL_RECORDS_WRITE), updateAllergyController)
 router.delete('/:customer_uuid/allergies/:allergy_uuid', requirePermission(PERMISSIONS.MEDICAL_RECORDS_WRITE), removeAllergyController)
 
 // Visits
