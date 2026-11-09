@@ -26,16 +26,9 @@ import {
   sendCreated,
   sendPaginated,
 } from '@utils/responseHelper'
-import { PERMISSIONS } from '@constants/permissions'
-import { PlatformRole } from '@prisma/client'
 import { MESSAGE_CODES } from '@constants/messageCodes'
+import { saleActorOf } from '@utils/saleActor'
 
-const saleActorOf = (req: { user?: Express.Request["user"] }): SaleService.SaleActor => ({
-  userId: req.user!.id,
-  canOverridePrice:
-    req.user!.platformRole === PlatformRole.PLATFORM_ADMIN ||
-    req.user!.permissions.includes(PERMISSIONS.SALES_OVERRIDE_PRICE),
-})
 
 export const getSales = async (
   req: GetSalesRequest,

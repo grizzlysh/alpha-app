@@ -1386,7 +1386,7 @@ model Sale {
   uuid               String     @unique @default(uuid())
   pharmacyId         Int        @map("pharmacy_id")
   customerId         Int        @map("customer_id")
-  prescriptionId     Int?       @unique @map("prescription_id")
+  prescriptionId     Int?       @map("prescription_id")
   saleNumber         String     @unique @map("sale_number")
   saleType           SaleType   @default(CASH) @map("sale_type")
   status             SaleStatus @default(COMPLETED)
@@ -1421,6 +1421,7 @@ model Sale {
   @@index([pharmacyId, soldAt])
   @@index([pharmacyId, status])
   @@index([customerId])
+  @@index([prescriptionId])
   @@map("trx_sales")
 }
 
@@ -1559,7 +1560,7 @@ model Prescription {
   updatedBy    User?                @relation("PrescriptionUpdatedBy", fields: [updatedById], references: [id])
   deletedBy    User?                @relation("PrescriptionDeletedBy", fields: [deletedById], references: [id])
   details      PrescriptionDetail[]
-  sourceSale   Sale?                @relation("SaleSourcePrescription")
+  sales        Sale[]               @relation("SaleSourcePrescription")
   medicalVisit MedicalVisit?
 
   @@index([pharmacyId, prescribedAt])

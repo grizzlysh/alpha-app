@@ -173,9 +173,12 @@ const resolvePrescriptionId = async (
   if (prescriptionUuid) {
     const rx = await tx.prescription.findFirst({
       where: { uuid: prescriptionUuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true },
+      select: { id: true, status: true, customerId: true },
     })
     if (!rx) throw new NotFoundException('Prescription not found')
+    if (rx.customerId !== customerId) {
+      throw new BadRequestException('The prescription belongs to a different patient')
+    }
     if (rx.status === PrescriptionStatus.DISPENSED || rx.status === PrescriptionStatus.CANCELLED || rx.status === PrescriptionStatus.EXPIRED) {
       throw new BadRequestException('Prescription is not available for use')
     }
@@ -238,6 +241,98 @@ const resolvePrescriptionId = async (
     throw new BadRequestException(names ? `Prescription required for: ${names}` : 'Prescription is required for this sale')
   }
   return undefined
+}
+
+// ── Prescription dispensing sync ──────────────────────
+//
+// A completed sale that references a prescription is what dispenses it: each
+// sold medicine is matched to the prescription line for that medicine and
+// dispensedQty / statuses are recomputed. A refund or cancellation of that
+// sale reverses it. Lines written as free text (no medicineId) are left alone.
+
+const syncPrescriptionDispensing = async (
+  tx: Prisma.TransactionClient,
+  prescriptionId: number,
+  saleId: number,
+  soldLines: { medicineId: number; quantityPieces: number }[],
+  direction: 1 | -1,
+  userId: number
+): Promise<void> => {
+  const rx = await tx.prescription.findUnique({
+    where: { id: prescriptionId },
+    select: {
+      id: true,
+      status: true,
+      saleId: true,
+      details: {
+        where: { deletedAt: null },
+        select: { id: true, medicineId: true, medicineName: true, qty: true, dispensedQty: true, status: true },
+        orderBy: { id: 'asc' },
+      },
+    },
+  })
+  if (!rx || rx.status === PrescriptionStatus.CANCELLED) return
+
+  const soldByMedicine = new Map<number, number>()
+  for (const l of soldLines) soldByMedicine.set(l.medicineId, (soldByMedicine.get(l.medicineId) ?? 0) + l.quantityPieces)
+
+  // Older lines written as free text: match them to the sold medicine by name.
+  const soldMedicines = await tx.medicine.findMany({
+    where: { id: { in: [...soldByMedicine.keys()] } },
+    select: { id: true, name: true },
+  })
+  const idByName = new Map(soldMedicines.map((m) => [m.name.trim().toLowerCase(), m.id]))
+
+  const updated = rx.details.map((d) => ({ ...d, medicineId: d.medicineId ?? idByName.get(d.medicineName.trim().toLowerCase()) ?? null }))
+  for (const d of updated) {
+    if (d.medicineId == null || d.status === PrescriptionDetailStatus.CANCELLED) continue
+    let remaining = soldByMedicine.get(d.medicineId) ?? 0
+    if (remaining <= 0) continue
+    if (direction === 1) {
+      const take = Math.min(remaining, Math.max(d.qty - d.dispensedQty, 0))
+      d.dispensedQty += take
+      remaining -= take
+    } else {
+      const give = Math.min(remaining, d.dispensedQty)
+      d.dispensedQty -= give
+      remaining -= give
+    }
+    soldByMedicine.set(d.medicineId, remaining)
+  }
+
+  for (const d of updated) {
+    const before = rx.details.find((x) => x.id === d.id)!
+    if (before.dispensedQty === d.dispensedQty || d.status === PrescriptionDetailStatus.CANCELLED) continue
+    await tx.prescriptionDetail.update({
+      where: { id: d.id },
+      data: {
+        dispensedQty: d.dispensedQty,
+        status:
+          d.dispensedQty >= d.qty
+            ? PrescriptionDetailStatus.DISPENSED
+            : d.dispensedQty > 0
+              ? PrescriptionDetailStatus.PARTIAL
+              : PrescriptionDetailStatus.PENDING,
+        updatedById: userId,
+      },
+    })
+  }
+
+  const active = updated.filter((d) => d.status !== PrescriptionDetailStatus.CANCELLED)
+  const allDone = active.length > 0 && active.every((d) => d.dispensedQty >= d.qty)
+  const anyDone = active.some((d) => d.dispensedQty > 0)
+  const status = allDone ? PrescriptionStatus.DISPENSED : anyDone ? PrescriptionStatus.PARTIAL : PrescriptionStatus.PENDING
+
+  await tx.prescription.update({
+    where: { id: rx.id },
+    data: {
+      status,
+      // saleId records the first sale that dispensed it (one-to-one column).
+      ...(direction === 1 && rx.saleId == null && { saleId }),
+      ...(direction === -1 && rx.saleId === saleId && { saleId: null }),
+      updatedById: userId,
+    },
+  })
 }
 
 // ── Sale Pricing & Stock Helpers ──────────────────────
@@ -768,6 +863,9 @@ export const createSale = async (
     } else {
       await deductStockForSale(tx, lines, sale.details.map((d) => d.id), pharmacyId, userId)
       await createSalePaymentRecord(tx, sale.id, saleType, totals.grandTotal, data.payment, soldAt, userId)
+      if (prescriptionId && !data.prescription) {
+        await syncPrescriptionDispensing(tx, prescriptionId, sale.id, lines, 1, userId)
+      }
     }
 
     return sale
@@ -857,6 +955,9 @@ export const completeSale = async (
 
     await deductStockForSale(tx, lines, updated.details.map((d) => d.id), pharmacyId, userId)
     await createSalePaymentRecord(tx, existing.id, saleType, totals.grandTotal, data.payment, soldAt, userId)
+    if (prescriptionId && !data.prescription) {
+      await syncPrescriptionDispensing(tx, prescriptionId, existing.id, lines, 1, userId)
+    }
 
     return existing.id
   }, { timeout: 15000, maxWait: 5000 })
@@ -885,6 +986,7 @@ export const cancelOrRefundSale = async (
         status: true,
         totalAmount: true,
         soldAt: true,
+        prescriptionId: true,
         details: {
           select: {
             id: true,
@@ -947,27 +1049,26 @@ export const cancelOrRefundSale = async (
       await tx.stockReservation.deleteMany({ where: { saleId: sale.id } })
     } else {
       // ── Restore stock + create IN RETURN movements ────────
+      // Increment (not set) and read back, so concurrent sales and several
+      // lines on the same batch all log correct before/after quantities.
       for (const detail of sale.details) {
         const stockDetail = detail.stockDetail
-        const quantityBefore = stockDetail.stock.totalPieces
-        const quantityAfter = quantityBefore + detail.quantityPieces
-        const newDetailQuantity = stockDetail.quantityPieces + detail.quantityPieces
+        const qty = detail.quantityPieces
 
+        const detailAfter = await tx.stockDetail.update({
+          where: { id: stockDetail.id },
+          data: { quantityPieces: { increment: qty }, updatedById: userId },
+          select: { quantityPieces: true, quantityPerBox: true },
+        })
         await tx.stockDetail.update({
           where: { id: stockDetail.id },
-          data: {
-            quantityPieces: newDetailQuantity,
-            quantityBox: Math.floor(newDetailQuantity / stockDetail.quantityPerBox),
-            updatedById: userId,
-          },
+          data: { quantityBox: Math.floor(detailAfter.quantityPieces / Math.max(detailAfter.quantityPerBox, 1)) },
         })
 
-        await tx.stock.update({
+        const stockAfter = await tx.stock.update({
           where: { id: stockDetail.stockId },
-          data: {
-            totalPieces: { increment: detail.quantityPieces },
-            updatedById: userId,
-          },
+          data: { totalPieces: { increment: qty }, updatedById: userId },
+          select: { totalPieces: true },
         })
 
         await tx.stockMovement.create({
@@ -979,13 +1080,17 @@ export const cancelOrRefundSale = async (
             saleDetailId: detail.id,
             type: 'IN',
             reason: 'RETURN',
-            quantity: detail.quantityPieces,
-            quantityBefore,
-            quantityAfter,
+            quantity: qty,
+            quantityBefore: stockAfter.totalPieces - qty,
+            quantityAfter: stockAfter.totalPieces,
             description: data.description,
             createdById: userId,
           },
         })
+      }
+
+      if (sale.prescriptionId) {
+        await syncPrescriptionDispensing(tx, sale.prescriptionId, sale.id, sale.details, -1, userId)
       }
     }
 
