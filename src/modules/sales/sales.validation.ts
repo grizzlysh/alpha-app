@@ -21,12 +21,15 @@ export const inlinePrescriptionSchema = z.object({
 export const createSaleDetailSchema = z.object({
   stockDetailUuid: z.string().trim().uuid({ message: 'Invalid stock detail UUID' }),
   quantityPieces: z.number().int().positive({ message: 'Quantity must be positive' }),
-  sellingPrice: z.number().positive({ message: 'Selling price must be positive' }),
-  originalPrice: z.number().positive({ message: 'Original price must be positive' }),
+  // Optional: omitted = the stock's list price. A different value needs sales.override_price.
+  sellingPrice: z.number().positive({ message: 'Selling price must be positive' }).optional(),
+  // Ignored — the server records the list price as the original price.
+  originalPrice: z.number().positive().optional(),
   discountPercentage: z.number().min(0).max(100).optional().default(0),
   discountAmount: z.number().min(0).optional().default(0),
   isFefoOverride: z.boolean().optional().default(false),
-  requiresPrescription: z.boolean().optional().default(false),
+  // Ignored — derived from the medicine type on the server.
+  requiresPrescription: z.boolean().optional(),
 })
 
 export const createSalePaymentSchema = z.object({
@@ -42,8 +45,10 @@ export const createSaleSchema = z
     discountAmount: z.number().min(0).optional().default(0),
     ppnPercentage: z.number().min(0).max(100).optional().default(0),
     ppnAmount: z.number().min(0).optional().default(0),
-    totalAmount: z.number().positive({ message: 'Total amount is required' }),
-    grandTotal: z.number().positive({ message: 'Grand total is required' }),
+    // Totals and PPN are computed by the server; these fields are accepted for
+    // backward compatibility and ignored.
+    totalAmount: z.number().optional(),
+    grandTotal: z.number().optional(),
     paidAmount: z.number().min(0).optional().default(0),
     description: z.string().trim().optional(),
     isPending: z.boolean().optional().default(false),
@@ -72,8 +77,9 @@ export const updateSaleSchema = z.object({
   discountAmount: z.number().min(0).optional().default(0),
   ppnPercentage: z.number().min(0).max(100).optional().default(0),
   ppnAmount: z.number().min(0).optional().default(0),
-  totalAmount: z.number().positive({ message: 'Total amount is required' }),
-  grandTotal: z.number().positive({ message: 'Grand total is required' }),
+  // Computed by the server; accepted for backward compatibility and ignored.
+  totalAmount: z.number().optional(),
+  grandTotal: z.number().optional(),
   description: z.string().trim().optional(),
   isPrescription: z.boolean().optional().default(false),
   details: z

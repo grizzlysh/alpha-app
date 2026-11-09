@@ -61,6 +61,8 @@ export const PERMISSIONS = {
   SALES_CREATE: 'sales.create',
   SALES_UPDATE: 'sales.update',
   SALES_DELETE: 'sales.delete',
+  // Change unit price / discount above MAX_DISCOUNT_PERCENTAGE at the POS
+  SALES_OVERRIDE_PRICE: 'sales.override_price',
 
   // stock return
   STOCK_RETURN_READ: 'stock_return.read',

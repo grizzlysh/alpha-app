@@ -26,7 +26,16 @@ import {
   sendCreated,
   sendPaginated,
 } from '@utils/responseHelper'
+import { PERMISSIONS } from '@constants/permissions'
+import { PlatformRole } from '@prisma/client'
 import { MESSAGE_CODES } from '@constants/messageCodes'
+
+const saleActorOf = (req: { user?: Express.Request["user"] }): SaleService.SaleActor => ({
+  userId: req.user!.id,
+  canOverridePrice:
+    req.user!.platformRole === PlatformRole.PLATFORM_ADMIN ||
+    req.user!.permissions.includes(PERMISSIONS.SALES_OVERRIDE_PRICE),
+})
 
 export const getSales = async (
   req: GetSalesRequest,
@@ -71,7 +80,7 @@ export const createSale = async (
     const sale = await SaleService.createSale(
       req.body as any,
       req.user!.pharmacyId!,
-      req.user!.id
+      saleActorOf(req)
     )
 
     sendCreated(res, MESSAGE_CODES.SALE_CREATED, sale)
@@ -90,7 +99,7 @@ export const updateSale = async (
       parseUuid(req.params.sale_uuid),
       req.body as any,
       req.user!.pharmacyId!,
-      req.user!.id
+      saleActorOf(req)
     )
 
     sendSuccess(res, MESSAGE_CODES.SALE_UPDATED, sale)
@@ -109,7 +118,7 @@ export const completeSale = async (
       parseUuid(req.params.sale_uuid),
       req.body as any,
       req.user!.pharmacyId!,
-      req.user!.id
+      saleActorOf(req)
     )
 
     sendSuccess(res, MESSAGE_CODES.SALE_COMPLETED, sale)

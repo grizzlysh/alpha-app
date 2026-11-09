@@ -1192,4 +1192,16 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Cannot connect to the database. Please try again shortly.',
     id: 'Tidak dapat terhubung ke database. Silakan coba beberapa saat lagi.',
   },
+  PRICE_OVERRIDE_NOT_ALLOWED: {
+    en: "You don't have permission to change the price. Ask a pharmacist or the owner.",
+    id: "Anda tidak memiliki izin mengubah harga. Minta bantuan apoteker atau pemilik.",
+  },
+  GRAND_TOTAL_MUST_BE_POSITIVE: {
+    en: "The total must be greater than 0",
+    id: "Total harus lebih dari 0",
+  },
+  REQUEST_IN_PROGRESS: {
+    en: "This request is still being processed. Please wait a moment.",
+    id: "Permintaan ini masih diproses. Mohon tunggu sebentar.",
+  },
 }

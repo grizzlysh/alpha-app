@@ -66,6 +66,7 @@ const PERMISSIONS = [
   { module: 'sales',              action: 'create' },
   { module: 'sales',              action: 'update' },
   { module: 'sales',              action: 'delete' },
+  { module: 'sales',              action: 'override_price' },
   { module: 'stock_return',       action: 'read' },
   { module: 'stock_return',       action: 'create' },
   { module: 'stock_return',       action: 'update' },

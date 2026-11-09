@@ -84,6 +84,7 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   // ── Stock & sales rules ───────────────────────────
   'Adjustment would result in negative total stock': 'Penyesuaian akan membuat total stok menjadi minus',
   'Quantity cannot be negative': 'Jumlah tidak boleh minus',
+  'Selling price must be positive': 'Harga jual harus lebih dari 0',
   'FEFO override is not allowed. Items must be sold in expiry order.': 'Penjualan harus mengikuti urutan kedaluwarsa (FEFO). Pilih batch dengan tanggal kedaluwarsa paling dekat.',
   'Can only add installment to CREDIT sales': 'Cicilan hanya dapat ditambahkan ke penjualan kredit',
   'Cannot add payment to non-completed sale': 'Pembayaran hanya dapat ditambahkan ke penjualan yang sudah selesai',
@@ -143,6 +144,21 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
  * originals embed internal UUIDs that mean nothing to a cashier.
  */
 export const PATTERN_TRANSLATIONS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) => string; id: (m: RegExpMatchArray) => string }> = [
+  {
+    pattern: /^Insufficient stock for (.+): stock changed, please refresh$/,
+    en: (m) => `Stock for ${m[1]} just changed. Refresh and try again.`,
+    id: (m) => `Stok ${m[1]} baru saja berubah. Muat ulang lalu coba lagi.`,
+  },
+  {
+    pattern: /^Insufficient stock for (.+): (\d+) available$/,
+    en: (m) => `Not enough stock for ${m[1]} — only ${m[2]} available`,
+    id: (m) => `Stok ${m[1]} tidak cukup — hanya tersedia ${m[2]}`,
+  },
+  {
+    pattern: /^Discount exceeds the (.+)% limit for your role$/,
+    en: (m) => `Discount exceeds the ${m[1]}% limit for your role. Ask a pharmacist or the owner.`,
+    id: (m) => `Diskon melebihi batas ${m[1]}% untuk peran Anda. Minta bantuan apoteker atau pemilik.`,
+  },
   {
     pattern: /^Insufficient stock for (.+)$/,
     en: (m) => (isUuid(m[1]) ? 'Insufficient stock for one of the items' : `Insufficient stock for ${m[1]}`),
