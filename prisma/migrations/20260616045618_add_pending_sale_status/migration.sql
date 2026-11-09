@@ -1,0 +1,2 @@
+-- Add PENDING to SaleStatus enum
+ALTER TYPE "SaleStatus" ADD VALUE IF NOT EXISTS 'PENDING';
