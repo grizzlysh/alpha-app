@@ -1120,4 +1120,44 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Posisi lemari berhasil diperbarui',
   },
 
+  PLACEMENT_REQUIRED: {
+    en: 'A placement in your pharmacy is required to create a user',
+    id: 'Penempatan di apotek Anda wajib diisi untuk membuat pengguna',
+  },
+  PLACEMENT_OUTSIDE_PHARMACY: {
+    en: 'You can only manage placements in your own pharmacy',
+    id: 'Anda hanya dapat mengelola penempatan di apotek Anda sendiri',
+  },
+  ROLE_NOT_IN_PHARMACY: {
+    en: 'This role does not belong to the selected pharmacy',
+    id: 'Peran ini bukan milik apotek yang dipilih',
+  },
+  CANNOT_MANAGE_PLATFORM_USER: {
+    en: 'Only a platform admin can modify platform accounts',
+    id: 'Hanya platform admin yang dapat mengubah akun platform',
+  },
+  CANNOT_MANAGE_OWNER: {
+    en: "Only the pharmacy owner can modify the owner's account",
+    id: 'Hanya pemilik apotek yang dapat mengubah akun pemilik',
+  },
+  CANNOT_MODIFY_OWN_PLACEMENT: {
+    en: 'You cannot change your own role, status, or placement',
+    id: 'Anda tidak dapat mengubah peran, status, atau penempatan Anda sendiri',
+  },
+  CANNOT_CHANGE_OWN_STATUS: {
+    en: 'You cannot change your own account status',
+    id: 'Anda tidak dapat mengubah status akun Anda sendiri',
+  },
+  USER_HAS_OTHER_PHARMACIES: {
+    en: 'This user also works at other pharmacies. End their placement here instead.',
+    id: 'Pengguna ini juga bekerja di apotek lain. Akhiri penempatannya di apotek ini saja.',
+  },
+  CANNOT_RESET_OWN_PASSWORD: {
+    en: 'Use "Change password" in your profile to change your own password',
+    id: 'Gunakan "Ubah kata sandi" di profil untuk mengganti kata sandi Anda sendiri',
+  },
+  CANNOT_GRANT_UNHELD_PERMISSION: {
+    en: 'You cannot grant permissions that you do not have yourself',
+    id: 'Anda tidak dapat memberikan izin yang tidak Anda miliki sendiri',
+  },
 }

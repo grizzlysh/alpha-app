@@ -304,7 +304,8 @@ export const setRolePermissions = async (
   data: SetRolePermissionsInput,
   pharmacyId: number | null,
   platformRole: PlatformRole | null,
-  userId: number
+  userId: number,
+  actorPermissions: string[] = []
 ): Promise<RoleDetailResponse> => {
   const existing = await prisma.role.findFirst({
     where: { uuid, deletedAt: null },
@@ -327,11 +328,26 @@ export const setRolePermissions = async (
     where: {
       uuid: { in: data.permissionUuids },
     },
-    select: { id: true, uuid: true },
+    select: { id: true, uuid: true, module: true, action: true },
   })
 
   if (permissions.length !== data.permissionUuids.length) {
     throw new BadRequestException('One or more permissions not found')
+  }
+
+  // No privilege escalation: below platform admin, a caller may only ADD permissions
+  // they hold themselves. Permissions already on the role may stay or be removed.
+  if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
+    const held = new Set(actorPermissions)
+    const current = await prisma.rolePermission.findMany({
+      where: { roleId: existing.id },
+      select: { permissionId: true },
+    })
+    const currentIds = new Set(current.map((c) => c.permissionId))
+    const added = permissions.filter((p) => !currentIds.has(p.id))
+    if (added.some((p) => !held.has(`${p.module}.${p.action}`))) {
+      throw new ForbiddenException('CANNOT_GRANT_UNHELD_PERMISSION')
+    }
   }
 
   // replace all — delete existing, insert new

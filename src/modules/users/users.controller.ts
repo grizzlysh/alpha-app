@@ -34,6 +34,12 @@ import {
   updateLicenseSchema,
 } from './users.validation';
 
+const actorOf = (req: Request<any, any, any, any>): userService.UserActor => ({
+  id: req.user!.id,
+  platformRole: req.user!.platformRole,
+  pharmacyId: req.user!.pharmacyId,
+});
+
 // ─── Me ───────────────────────────────────────────────────────────────────────
 
 export async function getMe(
@@ -94,7 +100,7 @@ export async function listUsers(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { data, total } = await userService.listUsers(req.query as any);
+    const { data, total } = await userService.listUsers(actorOf(req), req.query as any);
     const page = (req.query as any).page ?? 1;
     const limit = (req.query as any).limit ?? 10;
     sendPaginated(res, 'USERS_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
@@ -107,7 +113,7 @@ export async function getUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const data = await userService.getUser(parseUuid(req.params.user_uuid));
+    const data = await userService.getUser(actorOf(req), parseUuid(req.params.user_uuid));
     sendSuccess(res, 'USER_FETCHED', data);
   } catch (err) { next(err); }
 }
@@ -118,8 +124,7 @@ export async function createUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id, platformRole } = req.user!;
-    const data = await userService.createUser(id, platformRole, req.body);
+    const data = await userService.createUser(actorOf(req), req.body);
     sendCreated(res, 'USER_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -130,8 +135,7 @@ export async function updateUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
-    const data = await userService.updateUser(id, parseUuid(req.params.user_uuid), req.body);
+    const data = await userService.updateUser(actorOf(req), parseUuid(req.params.user_uuid), req.body);
     sendSuccess(res, 'USER_UPDATED', data);
   } catch (err) { next(err); }
 }
@@ -142,8 +146,7 @@ export async function deleteUser(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
-    await userService.deleteUser(id, parseUuid(req.params.user_uuid));
+    await userService.deleteUser(actorOf(req), parseUuid(req.params.user_uuid));
     sendNoContent(res, 'USER_DELETED');
   } catch (err) { next(err); }
 }
@@ -154,9 +157,8 @@ export async function resetPassword(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
-    await userService.resetPassword(id, parseUuid(req.params.user_uuid));
-    sendNoContent(res, 'PASSWORD_RESET');
+    const data = await userService.resetPassword(actorOf(req), parseUuid(req.params.user_uuid));
+    sendSuccess(res, 'PASSWORD_RESET', data);
   } catch (err) { next(err); }
 }
 
@@ -168,7 +170,7 @@ export async function listPlacements(
   next: NextFunction
 ): Promise<void> {
   try {
-    const data = await userService.listPlacements(parseUuid(req.params.user_uuid), req.query as any);
+    const data = await userService.listPlacements(actorOf(req), parseUuid(req.params.user_uuid), req.query as any);
     sendSuccess(res, 'PLACEMENTS_FETCHED', data);
   } catch (err) { next(err); }
 }
@@ -180,7 +182,7 @@ export async function getPlacement(
 ): Promise<void> {
   try {
     const { user_uuid, placement_uuid } = req.params;
-    const data = await userService.getPlacement(user_uuid, placement_uuid);
+    const data = await userService.getPlacement(actorOf(req), user_uuid, placement_uuid);
     sendSuccess(res, 'PLACEMENT_FETCHED', data);
   } catch (err) { next(err); }
 }
@@ -191,8 +193,7 @@ export async function createPlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id, platformRole } = req.user!;
-    const data = await userService.createPlacement(id, platformRole, parseUuid(req.params.user_uuid), req.body);
+    const data = await userService.createPlacement(actorOf(req), parseUuid(req.params.user_uuid), req.body);
     sendCreated(res, 'PLACEMENT_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -203,9 +204,8 @@ export async function updatePlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id, platformRole } = req.user!;
     const { user_uuid, placement_uuid } = req.params;
-    const data = await userService.updatePlacement(id, platformRole, user_uuid, placement_uuid, req.body);
+    const data = await userService.updatePlacement(actorOf(req), user_uuid, placement_uuid, req.body);
     sendSuccess(res, 'PLACEMENT_UPDATED', data);
   } catch (err) { next(err); }
 }
@@ -216,9 +216,8 @@ export async function deletePlacement(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
     const { user_uuid, placement_uuid } = req.params;
-    await userService.deletePlacement(id, user_uuid, placement_uuid);
+    await userService.deletePlacement(actorOf(req), user_uuid, placement_uuid);
     sendNoContent(res, 'PLACEMENT_DELETED');
   } catch (err) { next(err); }
 }
@@ -232,7 +231,7 @@ export async function listLicenses(
 ): Promise<void> {
   try {
     const { user_uuid, placement_uuid } = req.params;
-    const { data, total } = await userService.listLicenses(user_uuid, placement_uuid, req.query as any);
+    const { data, total } = await userService.listLicenses(actorOf(req), user_uuid, placement_uuid, req.query as any);
     const page = (req.query as any).page ?? 1;
     const limit = (req.query as any).limit ?? 10;
     sendPaginated(res, 'LICENSES_FETCHED', data, { page, limit, total, totalPages: Math.ceil(total / limit) });
@@ -246,7 +245,7 @@ export async function getLicense(
 ): Promise<void> {
   try {
     const { user_uuid, placement_uuid, license_uuid } = req.params;
-    const data = await userService.getLicense(user_uuid, placement_uuid, license_uuid);
+    const data = await userService.getLicense(actorOf(req), user_uuid, placement_uuid, license_uuid);
     sendSuccess(res, 'LICENSE_FETCHED', data);
   } catch (err) { next(err); }
 }
@@ -257,9 +256,8 @@ export async function addLicense(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
     const { user_uuid, placement_uuid } = req.params;
-    const data = await userService.addLicense(id, user_uuid, placement_uuid, req.body);
+    const data = await userService.addLicense(actorOf(req), user_uuid, placement_uuid, req.body);
     sendCreated(res, 'LICENSE_CREATED', data);
   } catch (err) { next(err); }
 }
@@ -270,9 +268,8 @@ export async function updateLicense(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
     const { user_uuid, placement_uuid, license_uuid } = req.params;
-    const data = await userService.updateLicense(id, user_uuid, placement_uuid, license_uuid, req.body);
+    const data = await userService.updateLicense(actorOf(req), user_uuid, placement_uuid, license_uuid, req.body);
     sendSuccess(res, 'LICENSE_UPDATED', data);
   } catch (err) { next(err); }
 }
@@ -283,9 +280,8 @@ export async function deleteLicense(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { id } = req.user!;
     const { user_uuid, placement_uuid, license_uuid } = req.params;
-    await userService.deleteLicense(id, user_uuid, placement_uuid, license_uuid);
+    await userService.deleteLicense(actorOf(req), user_uuid, placement_uuid, license_uuid);
     sendNoContent(res, 'LICENSE_DELETED');
   } catch (err) { next(err); }
 }
