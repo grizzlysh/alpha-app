@@ -106,7 +106,11 @@ app.get('/', (req: Request, res: Response): void => {
 app.use(errorHandler)
 
 // ── Server ──────────────────────
-app.listen(PORT, (): void => {
+app.listen(PORT, (error?: Error): void => {
+  if (error) {
+    console.error(`Failed to start server on port ${PORT}:`, error.message)
+    process.exit(1)
+  }
   console.log(`Server running on port ${PORT}`)
 })
 

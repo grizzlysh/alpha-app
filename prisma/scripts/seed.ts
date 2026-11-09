@@ -15,6 +15,8 @@ import {
   DisposalReason,
   PrescriptionStatus,
   PrescriptionDetailStatus,
+  AllergyType,
+  AllergySeverity,
 } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -874,7 +876,7 @@ async function main() {
   // Pre-compute all line prices (calculatedPrice lives on Stock, not InvoiceDetail)
   const invoiceLines = [
     { medicine: 'Paracetamol 500mg', batch: 'BTH-PCT-2024-001', expiry: '2026-12-31', boxes: 20, perBox: 10, pricePerPiece: 500, discPct: 0 },
-    { medicine: 'Amoxicillin 500mg', batch: 'BTH-AMX-2024-001', expiry: '2026-06-30', boxes: 10, perBox: 10, pricePerPiece: 3000, discPct: 5 },
+    { medicine: 'Amoxicillin 500mg', batch: 'BTH-AMX-2024-001', expiry: '2027-06-30', boxes: 10, perBox: 10, pricePerPiece: 3000, discPct: 5 },
     { medicine: 'Vitamin C 1000mg', batch: 'BTH-VTC-2024-001', expiry: '2027-03-31', boxes: 15, perBox: 10, pricePerPiece: 2000, discPct: 0 },
     { medicine: 'Ibuprofen 400mg', batch: 'BTH-IBU-2024-001', expiry: '2026-09-30', boxes: 12, perBox: 10, pricePerPiece: 1500, discPct: 0 },
     { medicine: 'Amlodipin 10mg', batch: 'BTH-AML-2024-001', expiry: '2027-01-31', boxes: 6, perBox: 10, pricePerPiece: 5000, discPct: 0 },
@@ -1021,15 +1023,26 @@ async function main() {
       stockDetailMap[lineCalc.medicine] = { id: stockDetail.id, stockId: stock.id }
     }
   } else {
-    // Invoice already exists — populate stockDetailMap for sale seeding
+    // Invoice already exists — populate stockDetailMap for sale seeding.
+    // Look up medicine name from DB by medicineId and match case-insensitively
+    // so stale data with different casing doesn't break the mapping.
     const existingDetails = await prisma.invoiceDetail.findMany({
       where: { invoiceId: existingInvoice.id },
-      include: { stockDetail: { select: { id: true, stockId: true } } },
+      select: { id: true, medicineId: true },
     })
     for (const d of existingDetails) {
-      const medicineName = invoiceLines.find((l) => medicines[l.medicine].id === d.medicineId)?.medicine
-      if (medicineName && d.stockDetail) {
-        stockDetailMap[medicineName] = { id: d.stockDetail.id, stockId: d.stockDetail.stockId }
+      const med = await prisma.medicine.findUnique({ where: { id: d.medicineId }, select: { name: true } })
+      if (!med) continue
+      const lineName = invoiceLines.find(
+        (l) => l.medicine.toLowerCase() === med.name.toLowerCase()
+      )?.medicine
+      if (!lineName) continue
+      const sd = await prisma.stockDetail.findFirst({
+        where: { invoiceDetailId: d.id },
+        select: { id: true, stockId: true },
+      })
+      if (sd) {
+        stockDetailMap[lineName] = { id: sd.id, stockId: sd.stockId }
       }
     }
   }
@@ -1368,6 +1381,325 @@ async function main() {
     }
   }
 
+  // ── 24. Patient details ───────────────────────────────────────────────────
+  console.log('Creating patient details...')
+
+  const patientDetailDefs = [
+    { name: 'Budi Santoso',     gender: 'L', dateOfBirth: new Date('1990-05-15'), nik: '3174010515900001', bpjsNumber: '0001234567890' },
+    { name: 'Siti Rahayu',      gender: 'P', dateOfBirth: new Date('1985-11-20'), nik: '3276202011850002', bpjsNumber: '0001234567891' },
+    { name: 'Agus Setiawan',    gender: 'L', dateOfBirth: new Date('1978-03-08'), nik: '3275040803780003', bpjsNumber: null },
+    { name: 'Dewi Permatasari', gender: 'P', dateOfBirth: new Date('1995-07-22'), nik: '3603222207950004', bpjsNumber: null },
+    { name: 'Rudi Hermawan',    gender: 'L', dateOfBirth: new Date('1982-12-30'), nik: '3201303012820005', bpjsNumber: '0001234567892' },
+  ]
+
+  for (const def of patientDetailDefs) {
+    const customer = customers[def.name]
+    if (!customer) continue
+    const existing = await prisma.patientDetail.findUnique({ where: { customerId: customer.id } })
+    if (!existing) {
+      await prisma.patientDetail.create({
+        data: {
+          customerId: customer.id,
+          gender: def.gender,
+          dateOfBirth: def.dateOfBirth,
+          nik: def.nik,
+          bpjsNumber: def.bpjsNumber,
+        },
+      })
+    }
+  }
+
+  // ── 25. Medical records ───────────────────────────────────────────────────
+  console.log('Creating medical records...')
+
+  const rx1 = await prisma.prescription.findFirst({
+    where: { prescriptionNumber: rxNumber1 },
+    select: { id: true },
+  })
+  const rx2 = await prisma.prescription.findFirst({
+    where: { prescriptionNumber: rxNumber2 },
+    select: { id: true },
+  })
+
+  type AllergyDef = {
+    allergenName: string
+    allergenType: AllergyType
+    severity: AllergySeverity
+    reaction: string | null
+    notes: string | null
+  }
+
+  type VisitDef = {
+    visitDate: Date
+    chiefComplaint: string | null
+    diagnosis: string | null
+    notes: string | null
+    weightKg: number | null
+    heightCm: number | null
+    bloodPressure: string | null
+    temperatureCelsius: number | null
+    pulsePerMinute: number | null
+    doctorName: string | null
+    prescriptionId: number | null
+  }
+
+  const medicalRecordDefs: {
+    customerName: string
+    number: string
+    bloodType: string | null
+    emergencyContactName: string | null
+    emergencyContactPhone: string | null
+    allergies: AllergyDef[]
+    visits: VisitDef[]
+  }[] = [
+    {
+      customerName: 'Budi Santoso',
+      number: 'MR-APK1-0001',
+      bloodType: 'A',
+      emergencyContactName: 'Siti Santoso',
+      emergencyContactPhone: '081200001111',
+      allergies: [
+        {
+          allergenName: 'Penisilin',
+          allergenType: AllergyType.MEDICINE,
+          severity: AllergySeverity.SEVERE,
+          reaction: 'Anafilaksis',
+          notes: 'Gunakan antibiotik non-penisilin sebagai alternatif',
+        },
+        {
+          allergenName: 'Seafood',
+          allergenType: AllergyType.FOOD,
+          severity: AllergySeverity.MILD,
+          reaction: 'Gatal-gatal dan kemerahan',
+          notes: null,
+        },
+      ],
+      visits: [
+        {
+          visitDate: new Date('2026-01-10'),
+          chiefComplaint: 'Demam dan batuk selama 3 hari',
+          diagnosis: 'ISPA (Infeksi Saluran Pernapasan Atas)',
+          notes: 'Diberikan antibiotik Amoksisilin dan Parasetamol untuk demam',
+          weightKg: 72.5,
+          heightCm: 170.0,
+          bloodPressure: '120/80',
+          temperatureCelsius: 38.5,
+          pulsePerMinute: 88,
+          doctorName: 'Dr. Ahmad Fauzi',
+          prescriptionId: rx1?.id ?? null,
+        },
+        {
+          visitDate: new Date('2026-02-15'),
+          chiefComplaint: 'Kontrol setelah pengobatan ISPA',
+          diagnosis: 'Kondisi membaik, tidak ada komplikasi',
+          notes: 'Pasien dinyatakan sembuh, tidak perlu resep lanjutan',
+          weightKg: 72.0,
+          heightCm: 170.0,
+          bloodPressure: '118/78',
+          temperatureCelsius: 36.8,
+          pulsePerMinute: 76,
+          doctorName: 'Dr. Ahmad Fauzi',
+          prescriptionId: null,
+        },
+      ],
+    },
+    {
+      customerName: 'Siti Rahayu',
+      number: 'MR-APK1-0002',
+      bloodType: 'B',
+      emergencyContactName: 'Budi Rahayu',
+      emergencyContactPhone: '081200002222',
+      allergies: [
+        {
+          allergenName: 'Aspirin',
+          allergenType: AllergyType.MEDICINE,
+          severity: AllergySeverity.MODERATE,
+          reaction: 'Biduran dan sesak napas ringan',
+          notes: 'Gunakan parasetamol atau ibuprofen sebagai pengganti',
+        },
+      ],
+      visits: [
+        {
+          visitDate: new Date('2026-01-20'),
+          chiefComplaint: 'Sakit kepala dan pusing berputar',
+          diagnosis: 'Hipertensi Grade 1',
+          notes: 'Mulai terapi Amlodipin 10mg. Anjuran diet rendah garam dan olahraga rutin',
+          weightKg: 58.0,
+          heightCm: 158.0,
+          bloodPressure: '150/95',
+          temperatureCelsius: 36.9,
+          pulsePerMinute: 82,
+          doctorName: 'Dr. Dewi Kusuma',
+          prescriptionId: rx2?.id ?? null,
+        },
+        {
+          visitDate: new Date('2026-03-20'),
+          chiefComplaint: 'Kontrol tekanan darah rutin',
+          diagnosis: 'Hipertensi terkontrol',
+          notes: 'Tekanan darah membaik dengan pengobatan. Lanjutkan terapi Amlodipin',
+          weightKg: 57.5,
+          heightCm: 158.0,
+          bloodPressure: '130/85',
+          temperatureCelsius: 36.7,
+          pulsePerMinute: 78,
+          doctorName: 'Dr. Dewi Kusuma',
+          prescriptionId: null,
+        },
+      ],
+    },
+    {
+      customerName: 'Agus Setiawan',
+      number: 'MR-APK1-0003',
+      bloodType: 'O',
+      emergencyContactName: 'Rina Setiawan',
+      emergencyContactPhone: '081300001111',
+      allergies: [],
+      visits: [
+        {
+          visitDate: new Date('2026-03-05'),
+          chiefComplaint: 'Sakit kepala dan nyeri punggung bawah',
+          diagnosis: 'Tension headache, Myalgia',
+          notes: 'Diberikan Ibuprofen 400mg dan saran istirahat cukup',
+          weightKg: 80.0,
+          heightCm: 175.0,
+          bloodPressure: '125/82',
+          temperatureCelsius: 36.6,
+          pulsePerMinute: 80,
+          doctorName: 'Dr. Ahmad Fauzi',
+          prescriptionId: null,
+        },
+      ],
+    },
+    {
+      customerName: 'Dewi Permatasari',
+      number: 'MR-APK1-0004',
+      bloodType: 'AB',
+      emergencyContactName: 'Hendra Permatasari',
+      emergencyContactPhone: '081400001111',
+      allergies: [
+        {
+          allergenName: 'Kacang Tanah',
+          allergenType: AllergyType.FOOD,
+          severity: AllergySeverity.SEVERE,
+          reaction: 'Bengkak pada wajah dan tenggorokan',
+          notes: 'Bawa epinefrin auto-injector, hindari semua produk kacang',
+        },
+        {
+          allergenName: 'Debu',
+          allergenType: AllergyType.ENVIRONMENT,
+          severity: AllergySeverity.MILD,
+          reaction: 'Bersin-bersin dan mata berair',
+          notes: null,
+        },
+      ],
+      visits: [
+        {
+          visitDate: new Date('2026-04-10'),
+          chiefComplaint: 'Flu ringan dan hidung tersumbat',
+          diagnosis: 'Rhinitis alergi',
+          notes: 'Hindari paparan debu. Diberikan antihistamin',
+          weightKg: 52.0,
+          heightCm: 162.0,
+          bloodPressure: '110/70',
+          temperatureCelsius: 36.8,
+          pulsePerMinute: 72,
+          doctorName: 'Dr. Ahmad Fauzi',
+          prescriptionId: null,
+        },
+      ],
+    },
+    {
+      customerName: 'Rudi Hermawan',
+      number: 'MR-APK1-0005',
+      bloodType: 'O',
+      emergencyContactName: 'Ani Hermawan',
+      emergencyContactPhone: '081500001111',
+      allergies: [],
+      visits: [
+        {
+          visitDate: new Date('2026-05-12'),
+          chiefComplaint: 'Batuk kering dan demam ringan',
+          diagnosis: 'Faringitis',
+          notes: 'Diberikan Paracetamol dan obat kumur antiseptik',
+          weightKg: 68.0,
+          heightCm: 168.0,
+          bloodPressure: '122/80',
+          temperatureCelsius: 37.5,
+          pulsePerMinute: 84,
+          doctorName: 'Dr. Ahmad Fauzi',
+          prescriptionId: null,
+        },
+      ],
+    },
+  ]
+
+  for (const def of medicalRecordDefs) {
+    const customer = customers[def.customerName]
+    if (!customer) continue
+
+    let record = await prisma.medicalRecord.findUnique({ where: { customerId: customer.id } })
+    if (!record) {
+      record = await prisma.medicalRecord.create({
+        data: {
+          customerId: customer.id,
+          pharmacyId: pharmacy.id,
+          number: def.number,
+          bloodType: def.bloodType,
+          emergencyContactName: def.emergencyContactName,
+          emergencyContactPhone: def.emergencyContactPhone,
+          createdById: owner.id,
+          updatedById: owner.id,
+        },
+      })
+    }
+
+    for (const allergy of def.allergies) {
+      const existingAllergy = await prisma.medicalRecordAllergy.findFirst({
+        where: { medicalRecordId: record.id, allergenName: allergy.allergenName },
+      })
+      if (!existingAllergy) {
+        await prisma.medicalRecordAllergy.create({
+          data: {
+            medicalRecordId: record.id,
+            allergenName: allergy.allergenName,
+            allergenType: allergy.allergenType,
+            severity: allergy.severity,
+            reaction: allergy.reaction,
+            notes: allergy.notes,
+            createdById: owner.id,
+          },
+        })
+      }
+    }
+
+    for (const visit of def.visits) {
+      const existingVisit = await prisma.medicalVisit.findFirst({
+        where: { medicalRecordId: record.id, visitDate: visit.visitDate },
+      })
+      if (!existingVisit) {
+        const doctorId = visit.doctorName ? doctors[visit.doctorName]?.id : undefined
+        await prisma.medicalVisit.create({
+          data: {
+            medicalRecordId: record.id,
+            pharmacyId: pharmacy.id,
+            visitDate: visit.visitDate,
+            chiefComplaint: visit.chiefComplaint,
+            diagnosis: visit.diagnosis,
+            notes: visit.notes,
+            weightKg: visit.weightKg ? new Decimal(visit.weightKg.toFixed(2)) : null,
+            heightCm: visit.heightCm ? new Decimal(visit.heightCm.toFixed(2)) : null,
+            bloodPressure: visit.bloodPressure,
+            temperatureCelsius: visit.temperatureCelsius ? new Decimal(visit.temperatureCelsius.toFixed(1)) : null,
+            pulsePerMinute: visit.pulsePerMinute,
+            doctorId,
+            prescriptionId: visit.prescriptionId ?? undefined,
+            createdById: owner.id,
+          },
+        })
+      }
+    }
+  }
+
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log('\nSeed complete!')
   console.log('─────────────────────────────────────────────────────────────')
@@ -1390,6 +1722,10 @@ async function main() {
   console.log('Prescriptions    →  RX-APK1-20260110-001 (dispensed), RX-APK1-20260120-001 (partial)')
   console.log('Stock Return     →  SR-APK1-20260210-001 (Amoxicillin 5 pcs, completed)')
   console.log('Stock Disposal   →  SD-APK1-20260301-001 (Ibuprofen 3 pcs, damaged, completed)')
+  console.log('Patient Details  →  5 patients (NIK, gender, date of birth, BPJS)')
+  console.log('Medical Records  →  MR-APK1-0001 → 0005 (Budi, Siti, Agus, Dewi, Rudi)')
+  console.log('Allergies        →  Budi: Penisilin + Seafood | Siti: Aspirin | Dewi: Kacang Tanah + Debu')
+  console.log('Medical Visits   →  8 visits across 5 patients (2026-01-10 → 2026-05-12)')
   console.log('─────────────────────────────────────────────────────────────')
 }
 
