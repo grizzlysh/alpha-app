@@ -1,15 +1,14 @@
 import { Request, Response, NextFunction } from 'express'
 import { ZodSchema } from 'zod'
 import { ValidationException } from '@exceptions/ValidationException'
+import { formatZodErrors } from '@utils/zodErrors'
 
 export const validateBody =
   (schema: ZodSchema) =>
   (req: Request, _res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body)
+    const result = schema.safeParse(req.body ?? {})
     if (!result.success) {
-      throw new ValidationException(
-        result.error.flatten().fieldErrors as Record<string, any>
-      )
+      throw new ValidationException(formatZodErrors(result.error))
     }
     req.body = result.data
     next()
@@ -20,9 +19,7 @@ export const validateQuery =
   (req: Request, _res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.query)
     if (!result.success) {
-      throw new ValidationException(
-        result.error.flatten().fieldErrors as Record<string, any>
-      )
+      throw new ValidationException(formatZodErrors(result.error))
     }
     Object.defineProperty(req, 'query', {
       value: result.data,

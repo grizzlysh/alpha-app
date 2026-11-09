@@ -1160,4 +1160,36 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'You cannot grant permissions that you do not have yourself',
     id: 'Anda tidak dapat memberikan izin yang tidak Anda miliki sendiri',
   },
+  INVALID_JSON: {
+    en: 'The request data is malformed. Please refresh the page and try again.',
+    id: 'Format data yang dikirim tidak valid. Muat ulang halaman lalu coba lagi.',
+  },
+  PAYLOAD_TOO_LARGE: {
+    en: 'The data sent is too large',
+    id: 'Data yang dikirim terlalu besar',
+  },
+  INVALID_REQUEST: {
+    en: 'The request could not be processed. Please check the input and try again.',
+    id: 'Permintaan tidak dapat diproses. Periksa kembali isian lalu coba lagi.',
+  },
+  DUPLICATE_ENTRY: {
+    en: 'This data already exists',
+    id: 'Data ini sudah ada',
+  },
+  RECORD_IN_USE: {
+    en: 'This data is still used by other records and cannot be changed or deleted',
+    id: 'Data ini masih dipakai oleh data lain sehingga tidak dapat diubah atau dihapus',
+  },
+  CONCURRENT_UPDATE: {
+    en: 'This data was changed by someone else at the same time. Please try again.',
+    id: 'Data ini sedang diubah oleh pengguna lain pada saat yang sama. Silakan coba lagi.',
+  },
+  SERVER_BUSY: {
+    en: 'The server is busy. Please wait a moment and try again.',
+    id: 'Server sedang sibuk. Tunggu sebentar lalu coba lagi.',
+  },
+  DATABASE_UNAVAILABLE: {
+    en: 'Cannot connect to the database. Please try again shortly.',
+    id: 'Tidak dapat terhubung ke database. Silakan coba beberapa saat lagi.',
+  },
 }
