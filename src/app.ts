@@ -50,6 +50,8 @@ const corsOptions: CorsOptions = {
 }
 
 // ── Security Middlewares ─────────────────────
+// Behind a reverse proxy, trust its X-Forwarded-For so req.ip is the client.
+if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY)
 app.use(cors(corsOptions))
 app.options('/{*path}', cors(corsOptions))
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))

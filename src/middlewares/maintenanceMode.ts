@@ -29,7 +29,7 @@ export const maintenanceMode = async (
   if (authHeader?.startsWith('Bearer ')) {
     try {
       const token = authHeader.split(' ')[1]
-      const decoded = jwt.verify(token, env.JWT_SECRET as string) as any
+      const decoded = jwt.verify(token, env.JWT_SECRET as string, { algorithms: ['HS256'] }) as any
       if (decoded.platformRole === 'PLATFORM_ADMIN') {
         next()
         return

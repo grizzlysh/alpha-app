@@ -11,7 +11,6 @@ import {
   LoginUserData,
   CurrentPharmacyData,
   SelectPharmacyResponse,
-  RefreshTokenResponse,
   PharmacyRoleItem,
   MeResponse,
   PermissionMap,
@@ -24,17 +23,21 @@ import { PERMISSIONS } from '@constants/permissions'
 
 // ── Token Helpers ─────────────────────────────────────
 
+const ACCESS_TOKEN_MAX_MINUTES = 60
+
 const getSessionExpiry = async (): Promise<number> => {
   const param = await prisma.systemParameter.findUnique({
     where: { key: 'SESSION_TIMEOUT_MINUTES' },
     select: { value: true },
   })
   const minutes = parseInt(param?.value ?? '480', 10)
-  return minutes * 60 // JWT expiresIn expects seconds
+  // Permissions are baked into the access token, so keep it short-lived; the
+  // client renews it silently with the refresh cookie.
+  return Math.min(Number.isFinite(minutes) && minutes > 0 ? minutes : 480, ACCESS_TOKEN_MAX_MINUTES) * 60
 }
 
 const generateAccessToken = (payload: JwtPayload, expiresIn: number): string => {
-  return jwt.sign(payload, env.JWT_SECRET as string, { expiresIn })
+  return jwt.sign(payload, env.JWT_SECRET as string, { expiresIn, algorithm: 'HS256' })
 }
 
 const generateRefreshToken = (): string => {
@@ -341,7 +344,7 @@ export const selectPharmacy = async (
 
 export const refreshAccessToken = async (
   refreshToken: string
-): Promise<RefreshTokenResponse> => {
+): Promise<{ accessToken: string; refreshToken: string }> => {
   const hashed = hashToken(refreshToken)
 
   const userToken = await prisma.userToken.findUnique({

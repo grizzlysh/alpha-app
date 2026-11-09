@@ -126,7 +126,7 @@ const userIdFromToken = (req: Request): number | null => {
   const header = req.headers.authorization
   if (!header?.startsWith('Bearer ')) return null
   try {
-    const decoded = jwt.verify(header.slice(7), env.JWT_SECRET) as { id?: number }
+    const decoded = jwt.verify(header.slice(7), env.JWT_SECRET, { algorithms: ['HS256'] }) as { id?: number }
     return typeof decoded.id === 'number' ? decoded.id : null
   } catch {
     return null
