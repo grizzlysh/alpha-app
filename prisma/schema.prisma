@@ -208,6 +208,7 @@ model Role {
   updatedByUser   User?            @relation("RoleUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser   User?            @relation("RoleDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([pharmacyId])
   @@map("mst_roles")
 }
 
@@ -280,7 +281,7 @@ model Pharmacy {
   placements          Placement[]
   medicines           Medicine[]
   distributors        Distributor[]
-  customers          Customer[]
+  customers           Customer[]
   purchaseOrders      PurchaseOrder[]
   invoices            Invoice[]
   stocks              Stock[]
@@ -516,10 +517,10 @@ model User {
   stockReservationsCreated StockReservation[] @relation("StockReservationCreatedBy")
 
   // ── Audit: Doctor ─────────────────────────────────
-  doctorProfile  Doctor?   @relation("DoctorUserProfile")
-  doctorsCreated Doctor[]  @relation("DoctorCreatedBy")
-  doctorsUpdated Doctor[]  @relation("DoctorUpdatedBy")
-  doctorsDeleted Doctor[]  @relation("DoctorDeletedBy")
+  doctorProfile  Doctor?  @relation("DoctorUserProfile")
+  doctorsCreated Doctor[] @relation("DoctorCreatedBy")
+  doctorsUpdated Doctor[] @relation("DoctorUpdatedBy")
+  doctorsDeleted Doctor[] @relation("DoctorDeletedBy")
 
   // ── Audit: Prescription ───────────────────────────
   createdPrescriptions Prescription[] @relation("PrescriptionCreatedBy")
@@ -568,28 +569,29 @@ model UserToken {
   createdByUser User? @relation("UserTokenCreatedBy", fields: [createdById], references: [id])
   updatedByUser User? @relation("UserTokenUpdatedBy", fields: [updatedById], references: [id])
 
+  @@index([userId])
   @@map("mst_user_tokens")
 }
 
 model Placement {
-  id          Int          @id @default(autoincrement())
-  uuid        String       @unique @default(uuid())
-  userId      Int          @map("user_id")
-  pharmacyId  Int          @map("pharmacy_id")
-  roleId      Int          @map("role_id")
-  joinedAt    DateTime     @default(now()) @map("joined_at")
-  leftAt      DateTime?    @map("left_at")
-  status      RecordStatus @default(ACTIVE)
+  id               Int          @id @default(autoincrement())
+  uuid             String       @unique @default(uuid())
+  userId           Int          @map("user_id")
+  pharmacyId       Int          @map("pharmacy_id")
+  roleId           Int          @map("role_id")
+  joinedAt         DateTime     @default(now()) @map("joined_at")
+  leftAt           DateTime?    @map("left_at")
+  status           RecordStatus @default(ACTIVE)
   /// The pharmacy's responsible Head Pharmacist. Independent of role, so an
   /// owner (or any licensed role) can also be the Head Pharmacist. At most one
   /// active placement per pharmacy (partial unique index in migration).
-  isHeadPharmacist Boolean @default(false) @map("is_head_pharmacist")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  deletedAt   DateTime?    @map("deleted_at")
-  createdById Int?         @map("created_by_id")
-  updatedById Int?         @map("updated_by_id")
-  deletedById Int?         @map("deleted_by_id")
+  isHeadPharmacist Boolean      @default(false) @map("is_head_pharmacist")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+  createdById      Int?         @map("created_by_id")
+  updatedById      Int?         @map("updated_by_id")
+  deletedById      Int?         @map("deleted_by_id")
 
   user             User              @relation(fields: [userId], references: [id])
   pharmacy         Pharmacy          @relation(fields: [pharmacyId], references: [id])
@@ -599,6 +601,8 @@ model Placement {
   updatedByUser    User?             @relation("PlacementUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser    User?             @relation("PlacementDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([userId, pharmacyId])
+  @@index([pharmacyId])
   @@map("mst_placements")
 }
 
@@ -622,6 +626,7 @@ model PracticeLicense {
   updatedByUser User?     @relation("PracticeLicenseUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?     @relation("PracticeLicenseDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([placementId])
   @@map("mst_practice_licenses")
 }
 
@@ -646,6 +651,7 @@ model BusinessLicense {
   updatedByUser User?    @relation("BusinessLicenseUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?    @relation("BusinessLicenseDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([pharmacyId])
   @@map("mst_business_licenses")
 }
 
@@ -722,10 +728,10 @@ model StorageBin {
   updatedById Int?         @map("updated_by_id")
   deletedById Int?         @map("deleted_by_id")
 
-  shelf         StorageShelf   @relation(fields: [shelfId], references: [id])
-  createdByUser User?          @relation("StorageBinCreatedBy", fields: [createdById], references: [id])
-  updatedByUser User?          @relation("StorageBinUpdatedBy", fields: [updatedById], references: [id])
-  deletedByUser User?          @relation("StorageBinDeletedBy", fields: [deletedById], references: [id])
+  shelf         StorageShelf  @relation(fields: [shelfId], references: [id])
+  createdByUser User?         @relation("StorageBinCreatedBy", fields: [createdById], references: [id])
+  updatedByUser User?         @relation("StorageBinUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser User?         @relation("StorageBinDeletedBy", fields: [deletedById], references: [id])
   medicines     Medicine[]
   stockDetails  StockDetail[]
 
@@ -839,6 +845,8 @@ model Medicine {
   prescriptionDetails  PrescriptionDetail[]
   stockReservations    StockReservation[]
 
+  @@index([pharmacyId])
+  @@index([typeId])
   @@map("mst_medicines")
 }
 
@@ -856,6 +864,7 @@ model MedicineIngredient {
   createdByUser User?    @relation("MedicineIngredientCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?    @relation("MedicineIngredientUpdatedBy", fields: [updatedById], references: [id])
 
+  @@index([medicineId])
   @@map("mst_medicine_ingredients")
 }
 
@@ -889,6 +898,7 @@ model Distributor {
   stockDetails   StockDetail[]
   stockReturns   StockReturn[]
 
+  @@index([pharmacyId])
   @@map("mst_distributors")
 }
 
@@ -920,6 +930,7 @@ model Customer {
   professionalDetail ProfessionalDetail?
   medicalRecord      MedicalRecord?
 
+  @@index([pharmacyId, customerType])
   @@map("mst_customers")
 }
 
@@ -977,6 +988,7 @@ model PurchaseOrder {
   details       PurchaseOrderDetail[]
   invoices      Invoice[]
 
+  @@index([pharmacyId, orderedAt])
   @@map("trx_purchase_orders")
 }
 
@@ -1001,6 +1013,7 @@ model PurchaseOrderDetail {
   updatedByUser User?         @relation("PurchaseOrderDetailUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?         @relation("PurchaseOrderDetailDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([purchaseOrderId])
   @@map("trx_purchase_order_details")
 }
 
@@ -1043,6 +1056,8 @@ model Invoice {
   details       InvoiceDetail[]
   payments      InvoicePayment[]
 
+  @@index([pharmacyId, invoiceDate])
+  @@index([purchaseOrderId])
   @@map("trx_invoices")
 }
 
@@ -1073,6 +1088,7 @@ model InvoiceDetail {
   stockDetail    StockDetail?
   stockMovements StockMovement[]
 
+  @@index([invoiceId])
   @@map("trx_invoice_details")
 }
 
@@ -1093,6 +1109,7 @@ model InvoicePayment {
   updatedByUser User?                   @relation("InvoicePaymentUpdatedBy", fields: [updatedById], references: [id])
   history       InvoicePaymentHistory[]
 
+  @@index([invoiceId])
   @@map("trx_invoice_payments")
 }
 
@@ -1113,6 +1130,7 @@ model InvoicePaymentHistory {
   createdByUser  User?          @relation("InvoicePaymentHistoryCreatedBy", fields: [createdById], references: [id])
   updatedByUser  User?          @relation("InvoicePaymentHistoryUpdatedBy", fields: [updatedById], references: [id])
 
+  @@index([invoicePaymentId])
   @@map("trx_invoice_payment_history")
 }
 
@@ -1134,10 +1152,10 @@ model Stock {
   createdById     Int?     @map("created_by_id")
   updatedById     Int?     @map("updated_by_id")
 
-  pharmacy       Pharmacy        @relation(fields: [pharmacyId], references: [id])
-  medicine       Medicine        @relation(fields: [medicineId], references: [id])
-  createdByUser  User?           @relation("StockCreatedBy", fields: [createdById], references: [id])
-  updatedByUser  User?           @relation("StockUpdatedBy", fields: [updatedById], references: [id])
+  pharmacy       Pharmacy           @relation(fields: [pharmacyId], references: [id])
+  medicine       Medicine           @relation(fields: [medicineId], references: [id])
+  createdByUser  User?              @relation("StockCreatedBy", fields: [createdById], references: [id])
+  updatedByUser  User?              @relation("StockUpdatedBy", fields: [updatedById], references: [id])
   details        StockDetail[]
   stockMovements StockMovement[]
   reservations   StockReservation[]
@@ -1176,6 +1194,8 @@ model StockDetail {
   saleDetails          SaleDetail[]
   reservations         StockReservation[]
 
+  @@index([stockId, expiryDate])
+  @@index([invoiceDetailId])
   @@map("inv_stock_details")
 }
 
@@ -1212,6 +1232,9 @@ model StockMovement {
   createdByUser       User?                @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
   updatedByUser       User?                @relation("StockMovementUpdatedBy", fields: [updatedById], references: [id])
 
+  @@index([pharmacyId, createdAt])
+  @@index([stockDetailId, createdAt])
+  @@index([medicineId])
   @@map("inv_stock_movements")
 }
 
@@ -1234,6 +1257,8 @@ model StockReservation {
   medicine      Medicine    @relation(fields: [medicineId], references: [id])
   createdByUser User?       @relation("StockReservationCreatedBy", fields: [createdById], references: [id])
 
+  @@index([stockDetailId])
+  @@index([saleId])
   @@map("inv_stock_reservations")
 }
 
@@ -1268,6 +1293,7 @@ model StockReturn {
   deletedByUser User?               @relation("StockReturnDeletedBy", fields: [deletedById], references: [id])
   details       StockReturnDetail[]
 
+  @@index([pharmacyId, returnedAt])
   @@map("trx_stock_returns")
 }
 
@@ -1294,6 +1320,7 @@ model StockReturnDetail {
   updatedByUser  User?           @relation("StockReturnDetailUpdatedBy", fields: [updatedById], references: [id])
   stockMovements StockMovement[]
 
+  @@index([stockReturnId])
   @@map("trx_stock_return_details")
 }
 
@@ -1323,6 +1350,7 @@ model StockDisposal {
   deletedByUser User?                 @relation("StockDisposalDeletedBy", fields: [deletedById], references: [id])
   details       StockDisposalDetail[]
 
+  @@index([pharmacyId, disposedAt])
   @@map("trx_stock_disposals")
 }
 
@@ -1347,6 +1375,7 @@ model StockDisposalDetail {
   updatedByUser  User?           @relation("StockDisposalDetailUpdatedBy", fields: [updatedById], references: [id])
   stockMovements StockMovement[]
 
+  @@index([stockDisposalId])
   @@map("trx_stock_disposal_details")
 }
 
@@ -1378,39 +1407,42 @@ model Sale {
   updatedById        Int?       @map("updated_by_id")
   deletedById        Int?       @map("deleted_by_id")
 
-  pharmacy              Pharmacy      @relation(fields: [pharmacyId], references: [id])
-  customer             Customer      @relation(fields: [customerId], references: [id])
-  prescription          Prescription? @relation("SaleSourcePrescription", fields: [prescriptionId], references: [id])
-  dispensedPrescription Prescription? @relation("PrescriptionDispensedSale")
-  createdByUser         User?         @relation("SaleCreatedBy", fields: [createdById], references: [id])
-  updatedByUser         User?         @relation("SaleUpdatedBy", fields: [updatedById], references: [id])
-  deletedByUser         User?         @relation("SaleDeletedBy", fields: [deletedById], references: [id])
+  pharmacy              Pharmacy           @relation(fields: [pharmacyId], references: [id])
+  customer              Customer           @relation(fields: [customerId], references: [id])
+  prescription          Prescription?      @relation("SaleSourcePrescription", fields: [prescriptionId], references: [id])
+  dispensedPrescription Prescription?      @relation("PrescriptionDispensedSale")
+  createdByUser         User?              @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  updatedByUser         User?              @relation("SaleUpdatedBy", fields: [updatedById], references: [id])
+  deletedByUser         User?              @relation("SaleDeletedBy", fields: [deletedById], references: [id])
   details               SaleDetail[]
   payment               SalePayment?
   reservations          StockReservation[]
 
+  @@index([pharmacyId, soldAt])
+  @@index([pharmacyId, status])
+  @@index([customerId])
   @@map("trx_sales")
 }
 
 model SaleDetail {
-  id                 Int      @id @default(autoincrement())
-  uuid               String   @unique @default(uuid())
-  saleId             Int      @map("sale_id")
-  medicineId         Int      @map("medicine_id")
-  stockDetailId      Int      @map("stock_detail_id")
-  quantityPieces     Int      @map("quantity_pieces")
-  quantityBox        Int      @map("quantity_box")
-  isFefoOverride        Boolean  @default(false) @map("is_fefo_override")
-  requiresPrescription  Boolean  @default(false) @map("requires_prescription")
-  sellingPrice       Decimal  @map("selling_price") @db.Decimal(12, 2)
-  originalPrice      Decimal  @default(0) @map("original_price") @db.Decimal(12, 2)
-  discountPercentage Decimal  @default(0) @map("discount_percentage") @db.Decimal(5, 2)
-  discountAmount     Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
-  totalAmount        Decimal  @map("total_amount") @db.Decimal(12, 2)
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-  createdById        Int?     @map("created_by_id")
-  updatedById        Int?     @map("updated_by_id")
+  id                   Int      @id @default(autoincrement())
+  uuid                 String   @unique @default(uuid())
+  saleId               Int      @map("sale_id")
+  medicineId           Int      @map("medicine_id")
+  stockDetailId        Int      @map("stock_detail_id")
+  quantityPieces       Int      @map("quantity_pieces")
+  quantityBox          Int      @map("quantity_box")
+  isFefoOverride       Boolean  @default(false) @map("is_fefo_override")
+  requiresPrescription Boolean  @default(false) @map("requires_prescription")
+  sellingPrice         Decimal  @map("selling_price") @db.Decimal(12, 2)
+  originalPrice        Decimal  @default(0) @map("original_price") @db.Decimal(12, 2)
+  discountPercentage   Decimal  @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  discountAmount       Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  totalAmount          Decimal  @map("total_amount") @db.Decimal(12, 2)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  createdById          Int?     @map("created_by_id")
+  updatedById          Int?     @map("updated_by_id")
 
   sale           Sale            @relation(fields: [saleId], references: [id])
   medicine       Medicine        @relation(fields: [medicineId], references: [id])
@@ -1419,6 +1451,8 @@ model SaleDetail {
   updatedByUser  User?           @relation("SaleDetailUpdatedBy", fields: [updatedById], references: [id])
   stockMovements StockMovement[]
 
+  @@index([saleId])
+  @@index([stockDetailId])
   @@map("trx_sale_details")
 }
 
@@ -1439,6 +1473,7 @@ model SalePayment {
   updatedByUser User?                @relation("SalePaymentUpdatedBy", fields: [updatedById], references: [id])
   history       SalePaymentHistory[]
 
+  @@index([saleId])
   @@map("trx_sale_payments")
 }
 
@@ -1459,6 +1494,7 @@ model SalePaymentHistory {
   createdByUser User?       @relation("SalePaymentHistoryCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?       @relation("SalePaymentHistoryUpdatedBy", fields: [updatedById], references: [id])
 
+  @@index([salePaymentId])
   @@map("trx_sale_payment_history")
 }
 
@@ -1482,13 +1518,13 @@ model Doctor {
   updatedById   Int?         @map("updated_by_id")
   deletedById   Int?         @map("deleted_by_id")
 
-  pharmacy       Pharmacy       @relation(fields: [pharmacyId], references: [id])
-  user           User?          @relation("DoctorUserProfile", fields: [userId], references: [id])
-  prescriptions  Prescription[]
-  medicalVisits  MedicalVisit[]
-  createdBy      User?          @relation("DoctorCreatedBy", fields: [createdById], references: [id])
-  updatedBy      User?          @relation("DoctorUpdatedBy", fields: [updatedById], references: [id])
-  deletedBy      User?          @relation("DoctorDeletedBy", fields: [deletedById], references: [id])
+  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
+  user          User?          @relation("DoctorUserProfile", fields: [userId], references: [id])
+  prescriptions Prescription[]
+  medicalVisits MedicalVisit[]
+  createdBy     User?          @relation("DoctorCreatedBy", fields: [createdById], references: [id])
+  updatedBy     User?          @relation("DoctorUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy     User?          @relation("DoctorDeletedBy", fields: [deletedById], references: [id])
 
   @@unique([pharmacyId, licenseNumber])
   @@map("mst_doctors")
@@ -1515,17 +1551,19 @@ model Prescription {
   updatedById Int?      @map("updated_by_id")
   deletedById Int?      @map("deleted_by_id")
 
-  pharmacy      Pharmacy             @relation(fields: [pharmacyId], references: [id])
-  customer      Customer             @relation(fields: [customerId], references: [id])
-  sale          Sale?                @relation("PrescriptionDispensedSale", fields: [saleId], references: [id])
-  doctor        Doctor?              @relation(fields: [doctorId], references: [id])
-  createdBy     User?                @relation("PrescriptionCreatedBy", fields: [createdById], references: [id])
-  updatedBy     User?                @relation("PrescriptionUpdatedBy", fields: [updatedById], references: [id])
-  deletedBy     User?                @relation("PrescriptionDeletedBy", fields: [deletedById], references: [id])
-  details       PrescriptionDetail[]
-  sourceSale    Sale?                @relation("SaleSourcePrescription")
-  medicalVisit  MedicalVisit?
+  pharmacy     Pharmacy             @relation(fields: [pharmacyId], references: [id])
+  customer     Customer             @relation(fields: [customerId], references: [id])
+  sale         Sale?                @relation("PrescriptionDispensedSale", fields: [saleId], references: [id])
+  doctor       Doctor?              @relation(fields: [doctorId], references: [id])
+  createdBy    User?                @relation("PrescriptionCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?                @relation("PrescriptionUpdatedBy", fields: [updatedById], references: [id])
+  deletedBy    User?                @relation("PrescriptionDeletedBy", fields: [deletedById], references: [id])
+  details      PrescriptionDetail[]
+  sourceSale   Sale?                @relation("SaleSourcePrescription")
+  medicalVisit MedicalVisit?
 
+  @@index([pharmacyId, prescribedAt])
+  @@index([customerId])
   @@map("trx_prescriptions")
 }
 
@@ -1555,6 +1593,7 @@ model PrescriptionDetail {
   updatedBy    User?        @relation("PrescriptionDetailUpdatedBy", fields: [updatedById], references: [id])
   deletedBy    User?        @relation("PrescriptionDetailDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([prescriptionId])
   @@map("trx_prescription_details")
 }
 
@@ -1602,6 +1641,7 @@ model MedicalRecordAllergy {
   createdByUser User?         @relation("AllergyCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?         @relation("AllergyUpdatedBy", fields: [updatedById], references: [id])
 
+  @@index([medicalRecordId])
   @@map("trx_medical_record_allergies")
 }
 
@@ -1636,6 +1676,7 @@ model MedicalVisit {
   updatedByUser User?         @relation("MedicalVisitUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?         @relation("MedicalVisitDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([medicalRecordId, visitDate])
   @@map("trx_medical_visits")
 }
 
@@ -1649,5 +1690,6 @@ model IdempotencyKey {
   createdAt    DateTime @default(now()) @map("created_at")
   expiresAt    DateTime @map("expires_at")
 
+  @@index([expiresAt])
   @@map("sys_idempotency_keys")
 }
