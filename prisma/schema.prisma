@@ -580,6 +580,10 @@ model Placement {
   joinedAt    DateTime     @default(now()) @map("joined_at")
   leftAt      DateTime?    @map("left_at")
   status      RecordStatus @default(ACTIVE)
+  /// The pharmacy's responsible Head Pharmacist. Independent of role, so an
+  /// owner (or any licensed role) can also be the Head Pharmacist. At most one
+  /// active placement per pharmacy (partial unique index in migration).
+  isHeadPharmacist Boolean @default(false) @map("is_head_pharmacist")
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   deletedAt   DateTime?    @map("deleted_at")

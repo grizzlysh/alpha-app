@@ -275,7 +275,7 @@ export const selectPharmacy = async (
         deletedAt: null,
         leftAt: null,
         status: 'ACTIVE',
-        role: { type: AppRole.HEAD_PHARMACIST },
+        isHeadPharmacist: true,
       },
       select: { id: true },
     })

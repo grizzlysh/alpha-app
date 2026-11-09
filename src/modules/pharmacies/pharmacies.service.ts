@@ -56,7 +56,7 @@ const pharmacySelect = {
       status: 'ACTIVE' as const,
       deletedAt: null,
       leftAt: null,
-      role: { type: 'HEAD_PHARMACIST' as const },
+      isHeadPharmacist: true,
     },
     select: {
       uuid: true,

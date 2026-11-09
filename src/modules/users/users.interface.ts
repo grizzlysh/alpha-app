@@ -53,6 +53,7 @@ export interface CreateUserBody {
     roleUuid: string;
     joinedAt: string;
     license?: LicenseInput;
+    isHeadPharmacist?: boolean;
   };
 }
 
@@ -80,10 +81,12 @@ export interface CreatePlacementBody {
   roleUuid: string;
   joinedAt: string;
   license?: LicenseInput;
+  isHeadPharmacist?: boolean;
 }
 
 export interface UpdatePlacementBody {
   roleUuid?: string;
+  isHeadPharmacist?: boolean;
   joinedAt?: string;
   leftAt?: string | null;
   status?: RecordStatus;
@@ -124,6 +127,7 @@ export interface PlacementItem {
   uuid: string;
   pharmacy: { uuid: string; name: string; code: string };
   role: { uuid: string; name: string };
+  isHeadPharmacist: boolean;
   joinedAt: Date;
   leftAt: Date | null;
   status: RecordStatus;

@@ -677,12 +677,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
   },
   PHARMACY_ALREADY_HAS_HEAD_PHARMACIST: {
-    en: 'Pharmacy already has a pharmacist in charge',
-    id: 'Apotek sudah memiliki apoteker penanggung jawab',
+    en: 'This pharmacy already has a Head Pharmacist. Unmark the current one first.',
+    id: 'Apotek ini sudah memiliki Head Pharmacist. Lepaskan penanda Head Pharmacist yang lama terlebih dahulu.',
   },
   PHARMACY_NO_HEAD_PHARMACIST: {
-    en: 'This pharmacy does not have a pharmacist in charge yet. Please contact the pharmacy owner.',
-    id: 'Apotek ini belum memiliki apoteker penanggung jawab. Silakan hubungi pemilik apotek.',
+    en: 'This pharmacy does not have a Head Pharmacist yet. Please contact the pharmacy owner.',
+    id: 'Apotek ini belum memiliki Head Pharmacist. Silakan hubungi pemilik apotek.',
   },
   PLACEMENT_DATE_OVERLAP: {
     en: 'Placement dates overlap with an existing tenure at this pharmacy',

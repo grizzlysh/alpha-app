@@ -51,6 +51,7 @@ const placementSelect = {
   updatedAt: true,
   pharmacy: { select: { uuid: true, name: true, code: true } },
   role: { select: { uuid: true, name: true } },
+  isHeadPharmacist: true,
   practiceLicenses: {
     where: { deletedAt: null, status: RecordStatus.ACTIVE },
     select: licenseSelect,
@@ -91,6 +92,7 @@ function formatPlacement(a: any): PlacementItem {
     uuid: a.uuid,
     pharmacy: a.pharmacy,
     role: a.role,
+    isHeadPharmacist: a.isHeadPharmacist ?? false,
     joinedAt: a.joinedAt,
     leftAt: a.leftAt,
     status: a.status,
@@ -207,6 +209,34 @@ async function hasPlacementsElsewhere(userId: number, pharmacyId: number, includ
   });
   return other !== null;
 }
+
+// ─── Head Pharmacist ─────────────────────────────────────────────────────────
+// The Head Pharmacist is a responsibility flag on a placement, independent of the
+// role: an owner who is also the pharmacist in charge keeps the OWNER role and
+// sets the flag. A HEAD_PHARMACIST-type role always implies the flag.
+
+function headPharmacistFlag(roleType: AppRole, requested: boolean | undefined, current = false): boolean {
+  if (roleType === AppRole.HEAD_PHARMACIST) return true;
+  return requested ?? current;
+}
+
+async function ensureHeadPharmacistSlotFree(pharmacyId: number, excludePlacementId?: number): Promise<void> {
+  const existing = await prisma.placement.findFirst({
+    where: {
+      pharmacyId,
+      isHeadPharmacist: true,
+      deletedAt: null,
+      leftAt: null,
+      status: RecordStatus.ACTIVE,
+      ...(excludePlacementId ? { id: { not: excludePlacementId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (existing) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
+}
+
+const roleRequiresLicense = (roleType: AppRole): boolean =>
+  roleType === AppRole.PHARMACIST || roleType === AppRole.HEAD_PHARMACIST || roleType === AppRole.DOCTOR;
 
 /** Roles assignable at a pharmacy: global roles, or roles owned by that same pharmacy. */
 async function resolveAssignableRole(roleUuid: string, pharmacyId: number) {
@@ -515,21 +545,12 @@ export async function createUser(
     throw new ForbiddenException('CANNOT_ASSIGN_OWNER_ROLE');
   }
 
-  const licenseRequired = role.type === AppRole.PHARMACIST || role.type === AppRole.HEAD_PHARMACIST || role.type === AppRole.DOCTOR;
-  if (licenseRequired && !body.placement.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
-
-  if (role.type === AppRole.HEAD_PHARMACIST) {
-    const existingPic = await prisma.placement.findFirst({
-      where: {
-        pharmacyId: pharmacy.id,
-        deletedAt: null,
-        leftAt: null,
-        status: RecordStatus.ACTIVE,
-        role: { type: AppRole.HEAD_PHARMACIST },
-      },
-    });
-    if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
+  const isHeadPharmacist = headPharmacistFlag(role.type, body.placement.isHeadPharmacist);
+  // A Head Pharmacist needs a practice license (SIPA) whatever the role.
+  if ((roleRequiresLicense(role.type) || isHeadPharmacist) && !body.placement.license) {
+    throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
   }
+  if (isHeadPharmacist) await ensureHeadPharmacistSlotFree(pharmacy.id);
 
   const userUuid = await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
@@ -552,6 +573,7 @@ export async function createUser(
         userId: user.id,
         pharmacyId: pharmacy.id,
         roleId: role.id,
+        isHeadPharmacist,
         joinedAt: new Date(body.placement!.joinedAt),
         createdById,
         updatedById: createdById,
@@ -805,23 +827,13 @@ export async function createPlacement(
   });
   if (duplicate) throw new ConflictException('USER_ALREADY_PLACED_AT_PHARMACY');
 
-  // Max 1 SIGN_FULL role per pharmacy
-  // Max 1 HEAD_PHARMACIST per pharmacy
-  if (role.type === AppRole.HEAD_PHARMACIST) {
-    const existingPic = await prisma.placement.findFirst({
-      where: {
-        pharmacyId: pharmacy.id,
-        deletedAt: null,
-        leftAt: null,
-        status: RecordStatus.ACTIVE,
-        role: { type: AppRole.HEAD_PHARMACIST },
-      },
-    });
-    if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
-  }
+  // Max 1 active Head Pharmacist per pharmacy (also enforced by a partial unique index).
+  const isHeadPharmacist = headPharmacistFlag(role.type, body.isHeadPharmacist);
+  if (isHeadPharmacist) await ensureHeadPharmacistSlotFree(pharmacy.id);
 
-  const licenseRequired = role.type === AppRole.PHARMACIST || role.type === AppRole.HEAD_PHARMACIST || role.type === AppRole.DOCTOR;
-  if (licenseRequired && !body.license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
+  if ((roleRequiresLicense(role.type) || isHeadPharmacist) && !body.license) {
+    throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
+  }
 
   await checkPlacementOverlap(user.id, pharmacy.id, new Date(body.joinedAt), null);
 
@@ -831,6 +843,7 @@ export async function createPlacement(
         userId: user.id,
         pharmacyId: pharmacy.id,
         roleId: role.id,
+        isHeadPharmacist,
         joinedAt: new Date(body.joinedAt),
         createdById,
         updatedById: createdById,
@@ -874,12 +887,18 @@ export async function updatePlacement(
   });
   if (!placement) throw new NotFoundException('PLACEMENT_NOT_FOUND');
 
-  // Nobody below platform level edits their own role or status — that is self-promotion.
-  if (!isPlatformActor(actor) && user.id === actor.id && (body.roleUuid || body.status)) {
-    throw new ForbiddenException('CANNOT_MODIFY_OWN_PLACEMENT');
+  // Nobody below platform level edits their own role or status (self-promotion).
+  // The one exception: an owner may mark themselves as the Head Pharmacist —
+  // common in small pharmacies where the owner is the licensed pharmacist.
+  if (!isPlatformActor(actor) && user.id === actor.id) {
+    if (body.roleUuid || body.status) throw new ForbiddenException('CANNOT_MODIFY_OWN_PLACEMENT');
+    if (body.isHeadPharmacist !== undefined && !(await isActiveOwnerAt(actor.id, placement.pharmacyId))) {
+      throw new ForbiddenException('CANNOT_MODIFY_OWN_PLACEMENT');
+    }
   }
 
   let roleId: number | undefined;
+  let newRoleType: AppRole | undefined;
   if (body.roleUuid) {
     const role = await resolveAssignableRole(body.roleUuid, placement.pharmacyId);
 
@@ -887,21 +906,20 @@ export async function updatePlacement(
       throw new ForbiddenException('CANNOT_ASSIGN_OWNER_ROLE');
     }
 
-    if (role.type === AppRole.HEAD_PHARMACIST) {
-      const existingPic = await prisma.placement.findFirst({
-        where: {
-          pharmacyId: placement.pharmacyId,
-          deletedAt: null,
-          leftAt: null,
-          status: RecordStatus.ACTIVE,
-          id: { not: placement.id },
-          role: { type: AppRole.HEAD_PHARMACIST },
-        },
-      });
-      if (existingPic) throw new ConflictException('PHARMACY_ALREADY_HAS_HEAD_PHARMACIST');
-    }
-
     roleId = role.id;
+    newRoleType = role.type;
+  }
+
+  const currentRole = await prisma.role.findUnique({ where: { id: placement.roleId }, select: { type: true } });
+  const effectiveRoleType = newRoleType ?? currentRole!.type;
+  const isHeadPharmacist = headPharmacistFlag(effectiveRoleType, body.isHeadPharmacist, placement.isHeadPharmacist);
+  if (isHeadPharmacist && !placement.isHeadPharmacist) {
+    await ensureHeadPharmacistSlotFree(placement.pharmacyId, placement.id);
+    const license = await prisma.practiceLicense.findFirst({
+      where: { placementId: placement.id, deletedAt: null, status: RecordStatus.ACTIVE, validUntil: { gte: new Date() } },
+      select: { id: true },
+    });
+    if (!license) throw new BadRequestException('LICENSE_REQUIRED_FOR_ROLE');
   }
 
   if (body.joinedAt !== undefined || body.leftAt !== undefined) {
@@ -919,6 +937,7 @@ export async function updatePlacement(
     where: { id: placement.id },
     data: {
       ...(roleId && { roleId }),
+      isHeadPharmacist,
       ...(body.joinedAt && { joinedAt: new Date(body.joinedAt) }),
       ...(body.leftAt !== undefined && { leftAt: body.leftAt ? new Date(body.leftAt) : null }),
       ...(body.status && { status: body.status }),
