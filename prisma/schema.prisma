@@ -1637,6 +1637,8 @@ model MedicalRecordAllergy {
   updatedAt       DateTime        @updatedAt @map("updated_at")
   createdById     Int?            @map("created_by_id")
   updatedById     Int?            @map("updated_by_id")
+  deletedAt       DateTime?       @map("deleted_at")
+  deletedById     Int?            @map("deleted_by_id")
 
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
   createdByUser User?         @relation("AllergyCreatedBy", fields: [createdById], references: [id])

@@ -564,7 +564,6 @@ async function main() {
     { key: 'PASSWORD_MIN_LENGTH',       value: '8',                     dataType: DataType.NUMBER,  description: 'Minimum password length required for all users' },
 
     // Platform policy
-    { key: 'ALLOW_EXPIRED_MEDICINE_SALE', value: 'false',              dataType: DataType.BOOLEAN, description: 'Allow pharmacies to sell medicines past their expiry date' },
     { key: 'MAINTENANCE_MODE',          value: 'false',                 dataType: DataType.BOOLEAN, description: 'When true, only platform admins can access the system' },
   ]
   for (const sp of systemParams) {

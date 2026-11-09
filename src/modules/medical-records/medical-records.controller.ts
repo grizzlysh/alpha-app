@@ -58,7 +58,7 @@ export const updateAllergyController = async (req: UpdateAllergyRequest, res: Re
 }
 
 export const removeAllergyController = async (req: DeleteAllergyRequest, res: Response) => {
-  await removeAllergy(req.params.customer_uuid, req.params.allergy_uuid, req.user!.pharmacyId!)
+  await removeAllergy(req.params.customer_uuid, req.params.allergy_uuid, req.user!.pharmacyId!, req.user!.id)
   sendNoContent(res, MESSAGE_CODES.MEDICAL_ALLERGY_DELETED)
 }
 

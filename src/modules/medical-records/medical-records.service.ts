@@ -21,6 +21,7 @@ const recordSelect = {
     select: { uuid: true, name: true, phone: true },
   },
   allergies: {
+    where: { deletedAt: null },
     select: {
       uuid: true,
       allergenName: true,
@@ -190,7 +191,7 @@ export const updateAllergy = async (
   const existing = await resolveRecord(customerUuid, pharmacyId)
 
   const allergy = await prisma.medicalRecordAllergy.findFirst({
-    where: { uuid: allergyUuid, medicalRecordId: existing.id },
+    where: { uuid: allergyUuid, medicalRecordId: existing.id, deletedAt: null },
     select: { id: true },
   })
   if (!allergy) throw new NotFoundException('Allergy record not found')
@@ -214,17 +215,22 @@ export const updateAllergy = async (
 export const removeAllergy = async (
   customerUuid: string,
   allergyUuid: string,
-  pharmacyId: number
+  pharmacyId: number,
+  userId: number
 ): Promise<void> => {
   const existing = await resolveRecord(customerUuid, pharmacyId)
 
   const allergy = await prisma.medicalRecordAllergy.findFirst({
-    where: { uuid: allergyUuid, medicalRecordId: existing.id },
+    where: { uuid: allergyUuid, medicalRecordId: existing.id, deletedAt: null },
     select: { id: true },
   })
   if (!allergy) throw new NotFoundException('Allergy record not found')
 
-  await prisma.medicalRecordAllergy.delete({ where: { id: allergy.id } })
+  // Soft delete: clinical history is kept for audit.
+  await prisma.medicalRecordAllergy.update({
+    where: { id: allergy.id },
+    data: { deletedAt: new Date(), deletedById: userId },
+  })
 }
 
 // ── Visits ────────────────────────────────────────────

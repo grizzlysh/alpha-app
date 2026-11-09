@@ -349,7 +349,6 @@ export interface SaleActor {
 }
 
 interface SaleContext {
-  allowExpiredSale: boolean
   allowFefoOverride: boolean
   creditPaymentDays: number
   ppnPercentage: Decimal
@@ -364,8 +363,7 @@ const loadSaleContext = async (pharmacyId: number): Promise<SaleContext> => {
   const param = (key: string) =>
     prisma.businessParameter.findUnique({ where: { pharmacyId_key: { pharmacyId, key } }, select: { value: true } })
 
-  const [allowExpiredParam, allowFefoParam, creditDaysParam, ppnParam, maxDiscountParam] = await Promise.all([
-    prisma.systemParameter.findUnique({ where: { key: 'ALLOW_EXPIRED_MEDICINE_SALE' }, select: { value: true } }),
+  const [allowFefoParam, creditDaysParam, ppnParam, maxDiscountParam] = await Promise.all([
     param('ALLOW_FEFO_OVERRIDE'),
     param('CREDIT_PAYMENT_DAYS'),
     param('PPN_PERCENTAGE_SELL'),
@@ -378,7 +376,6 @@ const loadSaleContext = async (pharmacyId: number): Promise<SaleContext> => {
   }
 
   return {
-    allowExpiredSale: allowExpiredParam?.value === 'true',
     allowFefoOverride: allowFefoParam?.value !== 'false',
     creditPaymentDays: parseInt(creditDaysParam?.value ?? '30', 10),
     ppnPercentage: decimalOr(ppnParam?.value, 0),
@@ -451,7 +448,8 @@ const buildSaleLines = async (
     if (detail.isFefoOverride && !ctx.allowFefoOverride) {
       throw new BadRequestException('FEFO override is not allowed. Items must be sold in expiry order.')
     }
-    if (!ctx.allowExpiredSale && stockDetail.expiryDate < new Date()) {
+    // Selling expired medicine is never allowed (no parameter can enable it).
+    if (stockDetail.expiryDate < new Date()) {
       throw new BadRequestException(`Medicine batch is expired: ${label}`)
     }
 
