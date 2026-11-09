@@ -59,6 +59,18 @@ const getTimezone = async (): Promise<string> => {
   return param?.value ?? 'UTC'
 }
 
+const countExisting = async (type: DocType, pharmacyId: number, gte: Date, lte: Date): Promise<number> => {
+  const where = { pharmacyId, createdAt: { gte, lte } }
+  switch (type) {
+    case 'PO': return prisma.purchaseOrder.count({ where })
+    case 'INV': return prisma.invoice.count({ where })
+    case 'SL': return prisma.sale.count({ where })
+    case 'SR': return prisma.stockReturn.count({ where })
+    case 'SD': return prisma.stockDisposal.count({ where })
+    case 'MR': return prisma.medicalRecord.count({ where })
+  }
+}
+
 export const generateDocNumber = async (
   options: GenerateDocNumberOptions
 ): Promise<string> => {
@@ -71,42 +83,20 @@ export const generateDocNumber = async (
   const endOfDay = dt.endOf('day').toUTC().toJSDate()
   const dateStr = dt.toFormat('yyyyMMdd')
 
-  let count: number = 0
+  // Seed value used only the first time a (pharmacy, type, day) row is created,
+  // so documents issued before this counter existed are not re-numbered.
+  const existing = await countExisting(type, pharmacyId, startOfDay, endOfDay)
 
-  switch (type) {
-    case 'PO':
-      count = await prisma.purchaseOrder.count({
-        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
-      })
-      break
-    case 'INV':
-      count = await prisma.invoice.count({
-        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
-      })
-      break
-    case 'SL':
-      count = await prisma.sale.count({
-        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
-      })
-      break
-    case 'SR':
-      count = await prisma.stockReturn.count({
-        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
-      })
-      break
-    case 'SD':
-      count = await prisma.stockDisposal.count({
-        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
-      })
-      break
-    case 'MR':
-      count = await prisma.medicalRecord.count({
-        where: { pharmacyId, createdAt: { gte: startOfDay, lte: endOfDay } },
-      })
-      break
-  }
+  const rows = await prisma.$queryRaw<{ last_value: number }[]>`
+    INSERT INTO "sys_doc_sequences" ("pharmacy_id", "type", "date_key", "last_value", "updated_at")
+    VALUES (${pharmacyId}, ${type}, ${dateStr}, ${existing + 1}, NOW())
+    ON CONFLICT ("pharmacy_id", "type", "date_key")
+    DO UPDATE SET "last_value" = "sys_doc_sequences"."last_value" + 1, "updated_at" = NOW()
+    RETURNING "last_value"
+  `
+  const next = Number(rows[0].last_value)
 
-  const seq = String(count + 1).padStart(3, '0')
+  const seq = String(next).padStart(3, '0')
 
   return `${type}-${pharmacyCode.toUpperCase()}-${dateStr}-${seq}`
 }

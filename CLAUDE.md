@@ -76,7 +76,7 @@ The inventory uses a two-layer model:
 Selling price logic: if `Stock.isManualPrice = true`, use `sellingPrice`; otherwise use `calculatedPrice` (= `finalPrice + margin%`). Margin percentage is read from `BusinessParameter` key `MARGIN_PERCENTAGE`.
 
 ### Document Numbers
-`src/utils/generateDocNumbers.ts` generates sequential daily doc numbers in the format `{TYPE}-{PHARMACY_CODE}-{YYYYMMDD}-{SEQ}` (e.g., `INV-APK1-20240115-001`). Types: `PO`, `INV`, `SL`, `SR`, `SD`. The sequence resets daily — race conditions under concurrent creation are a known risk.
+`src/utils/generateDocNumbers.ts` generates sequential daily doc numbers in the format `{TYPE}-{PHARMACY_CODE}-{YYYYMMDD}-{SEQ}` (e.g., `INV-APK1-20240115-001`). Types: `PO`, `INV`, `SL`, `SR`, `SD`. The sequence resets daily and is drawn from `sys_doc_sequences` with an atomic upsert, so concurrent requests never get the same number (gaps are possible when a transaction rolls back).
 
 ### Database Schema Conventions
 - All models have `id` (int PK) + `uuid` (public-facing, used in API routes, never expose raw `id`)

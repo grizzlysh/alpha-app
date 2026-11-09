@@ -1680,6 +1680,21 @@ model MedicalVisit {
   @@map("trx_medical_visits")
 }
 
+// ── SYS DOCUMENT SEQUENCES ───────────────────────────
+// One row per (pharmacy, document type, day); incremented atomically so two
+// concurrent requests can never draw the same document number.
+
+model DocSequence {
+  pharmacyId Int      @map("pharmacy_id")
+  type       String
+  dateKey    String   @map("date_key")
+  lastValue  Int      @map("last_value")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@id([pharmacyId, type, dateKey])
+  @@map("sys_doc_sequences")
+}
+
 // ── SYS IDEMPOTENCY KEYS ─────────────────────────────────
 
 model IdempotencyKey {
