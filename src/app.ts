@@ -36,6 +36,7 @@ import doctorRoutes from '@modules/doctors/doctors.routes'
 import prescriptionRoutes from '@modules/prescriptions/prescriptions.routes'
 import inventoryRoutes from '@modules/inventory/inventory.routes'
 import medicalRecordRoutes from '@modules/medical-records/medical-records.routes'
+import examinationRoutes from '@modules/examinations/examinations.routes'
 
 
 
@@ -98,6 +99,7 @@ app.use('/api/doctors', doctorRoutes)
 app.use('/api/prescriptions', prescriptionRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/medical-records', medicalRecordRoutes)
+app.use('/api/examinations', examinationRoutes)
 
 // ── Health Check ─────────────────────────────
 app.get('/', (req: Request, res: Response): void => {

@@ -138,6 +138,16 @@ enum AllergyType {
   OTHER
 }
 
+// Examination workflow: a patient is checked in (WAITING), the doctor starts the
+// exam (IN_PROGRESS) and finishes it (COMPLETED). Visits entered after the fact
+// from the medical record are COMPLETED straight away.
+enum VisitStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 enum AllergySeverity {
   MILD
   MODERATE
@@ -1649,27 +1659,33 @@ model MedicalRecordAllergy {
 }
 
 model MedicalVisit {
-  id                 Int       @id @default(autoincrement())
-  uuid               String    @unique @default(uuid())
-  medicalRecordId    Int       @map("medical_record_id")
-  pharmacyId         Int       @map("pharmacy_id")
-  visitDate          DateTime  @map("visit_date")
-  chiefComplaint     String?   @map("chief_complaint")
+  id                 Int         @id @default(autoincrement())
+  uuid               String      @unique @default(uuid())
+  medicalRecordId    Int         @map("medical_record_id")
+  pharmacyId         Int         @map("pharmacy_id")
+  visitDate          DateTime    @map("visit_date")
+  chiefComplaint     String?     @map("chief_complaint")
   diagnosis          String?
   notes              String?
-  weightKg           Decimal?  @map("weight_kg") @db.Decimal(5, 2)
-  heightCm           Decimal?  @map("height_cm") @db.Decimal(5, 2)
-  bloodPressure      String?   @map("blood_pressure")
-  temperatureCelsius Decimal?  @map("temperature_celsius") @db.Decimal(4, 1)
-  pulsePerMinute     Int?      @map("pulse_per_minute")
-  prescriptionId     Int?      @unique @map("prescription_id")
-  doctorId           Int?      @map("doctor_id")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
-  deletedAt          DateTime? @map("deleted_at")
-  createdById        Int?      @map("created_by_id")
-  updatedById        Int?      @map("updated_by_id")
-  deletedById        Int?      @map("deleted_by_id")
+  weightKg           Decimal?    @map("weight_kg") @db.Decimal(5, 2)
+  heightCm           Decimal?    @map("height_cm") @db.Decimal(5, 2)
+  bloodPressure      String?     @map("blood_pressure")
+  temperatureCelsius Decimal?    @map("temperature_celsius") @db.Decimal(4, 1)
+  pulsePerMinute     Int?        @map("pulse_per_minute")
+  prescriptionId     Int?        @unique @map("prescription_id")
+  doctorId           Int?        @map("doctor_id")
+  status             VisitStatus @default(COMPLETED)
+  /// Daily queue number, set at check-in.
+  queueNumber        Int?        @map("queue_number")
+  checkedInAt        DateTime?   @map("checked_in_at")
+  startedAt          DateTime?   @map("started_at")
+  completedAt        DateTime?   @map("completed_at")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  deletedAt          DateTime?   @map("deleted_at")
+  createdById        Int?        @map("created_by_id")
+  updatedById        Int?        @map("updated_by_id")
+  deletedById        Int?        @map("deleted_by_id")
 
   medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id])
   pharmacy      Pharmacy      @relation(fields: [pharmacyId], references: [id])
@@ -1680,6 +1696,7 @@ model MedicalVisit {
   deletedByUser User?         @relation("MedicalVisitDeletedBy", fields: [deletedById], references: [id])
 
   @@index([medicalRecordId, visitDate])
+  @@index([pharmacyId, status, checkedInAt])
   @@map("trx_medical_visits")
 }
 

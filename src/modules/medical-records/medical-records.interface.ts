@@ -38,6 +38,8 @@ export interface MedicalVisitResponse {
   bloodPressure: string | null
   temperatureCelsius: number | null
   pulsePerMinute: number | null
+  status: string
+  queueNumber: number | null
   prescription: { uuid: string; prescriptionNumber: string | null; status: string } | null
   doctor: { uuid: string; name: string } | null
   createdAt: Date

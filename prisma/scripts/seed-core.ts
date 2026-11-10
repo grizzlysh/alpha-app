@@ -69,6 +69,9 @@ const PERMISSIONS = [
   { module: 'prescriptions',      action: 'delete' },
   { module: 'medical_records',    action: 'read' },
   { module: 'medical_records',    action: 'write' },
+  { module: 'examinations',      action: 'read' },
+  { module: 'examinations',      action: 'checkin' },
+  { module: 'examinations',      action: 'perform' },
   { module: 'reports',            action: 'read' },
   { module: 'reports',            action: 'export' },
   { module: 'users',              action: 'read' },
@@ -116,7 +119,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 
   HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
 
-  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters'),
+  // Pharmacists run the queue but don't examine patients (that's the doctor's job).
+  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters').filter((k) => k !== 'examinations.perform'),
 
   CASHIER: only(
     'customers.read', 'customers.create', 'customers.update',
@@ -127,6 +131,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'doctors.read',
     'storage.read',
     'medical_records.read',
+    'examinations.read', 'examinations.checkin',
     'dashboard.read',
     'sign.standard',
   ),
@@ -137,6 +142,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'doctors.read', 'doctors.create', 'doctors.update', 'doctors.delete',
     'prescriptions.read', 'prescriptions.create', 'prescriptions.update', 'prescriptions.delete',
     'medical_records.read', 'medical_records.write',
+    'examinations.read', 'examinations.checkin', 'examinations.perform',
     'dashboard.read',
   ),
 }

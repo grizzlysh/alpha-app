@@ -1,5 +1,5 @@
 import { prisma } from '@config/db'
-import { CustomerType } from '@prisma/client'
+import { CustomerType, VisitStatus } from '@prisma/client'
 import { UpdateMedicalRecordInput, CreateAllergyInput, UpdateAllergyInput, CreateVisitInput, UpdateVisitInput, VisitQueryInput } from './medical-records.validation'
 import { MedicalRecordResponse, AllergyResponse, MedicalVisitResponse } from './medical-records.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
@@ -47,6 +47,8 @@ const allergySelect = {
 
 const visitSelect = {
   uuid: true,
+  status: true,
+  queueNumber: true,
   visitDate: true,
   chiefComplaint: true,
   diagnosis: true,
@@ -244,7 +246,8 @@ export const getVisits = async (
   const { page, limit } = query
   const skip = (page - 1) * limit
 
-  const where = { medicalRecordId: existing.id, deletedAt: null }
+  // Cancelled check-ins (patient left before being seen) are not part of the history.
+  const where = { medicalRecordId: existing.id, deletedAt: null, status: { not: VisitStatus.CANCELLED } }
 
   const [visits, total] = await prisma.$transaction([
     prisma.medicalVisit.findMany({ where, select: visitSelect, orderBy: { visitDate: 'desc' }, skip, take: limit }),
@@ -300,6 +303,9 @@ export const createVisit = async (
       pulsePerMinute: visitData.pulsePerMinute,
       prescriptionId,
       doctorId,
+      // Entered after the fact from the medical record: already complete.
+      status: VisitStatus.COMPLETED,
+      completedAt: new Date(),
       createdById: userId,
     },
     select: visitSelect,
