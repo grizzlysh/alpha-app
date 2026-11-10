@@ -24,6 +24,7 @@ import { PERMISSIONS } from '@constants/permissions'
 // ── Token Helpers ─────────────────────────────────────
 
 const ACCESS_TOKEN_MAX_MINUTES = 60
+const REFRESH_REUSE_GRACE_MS = 30 * 1000
 
 const getSessionExpiry = async (): Promise<number> => {
   const param = await prisma.systemParameter.findUnique({
@@ -213,6 +214,8 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
   const refreshToken = generateRefreshToken()
   const hashedRefreshToken = hashToken(refreshToken)
 
+  // Housekeeping: drop this user's expired sessions (incl. rotated tokens past their grace window).
+  await prisma.userToken.deleteMany({ where: { userId: user.id, expiresAt: { lte: new Date() } } })
   await prisma.userToken.create({
     data: {
       userId: user.id,
@@ -381,7 +384,15 @@ export const refreshAccessToken = async (
       where: { id: user.lastSelectedPharmacyId, status: 'ACTIVE' },
       select: { id: true, uuid: true },
     })
-    if (pharmacy) {
+    // A non-admin must still hold an active placement there; otherwise the
+    // session continues without a pharmacy and the user picks again.
+    const stillPlaced =
+      pharmacy &&
+      (user.platformRole === PlatformRole.PLATFORM_ADMIN ||
+        (await prisma.placement.count({
+          where: { userId: user.id, pharmacyId: pharmacy.id, status: 'ACTIVE', deletedAt: null },
+        })) > 0)
+    if (pharmacy && stillPlaced) {
       pharmacyId = pharmacy.id
       pharmacyUuid = pharmacy.uuid
       if (user.platformRole === PlatformRole.PLATFORM_ADMIN) {
@@ -408,8 +419,15 @@ export const refreshAccessToken = async (
   const newRefreshToken = generateRefreshToken()
   const newHashedRefreshToken = hashToken(newRefreshToken)
 
+  // The old token stays valid for a short grace window instead of being deleted
+  // outright: the access token lives only in memory, so several tabs reloading
+  // at once all refresh with the same cookie, and only one of them can win.
+  const graceUntil = new Date(Date.now() + REFRESH_REUSE_GRACE_MS)
   await prisma.$transaction([
-    prisma.userToken.delete({ where: { id: userToken.id } }),
+    prisma.userToken.updateMany({
+      where: { id: userToken.id, expiresAt: { gt: graceUntil } },
+      data: { expiresAt: graceUntil },
+    }),
     prisma.userToken.create({
       data: {
         userId: user.id,
