@@ -55,6 +55,7 @@ const PERMISSIONS = [
   { module: 'examinations',      action: 'read' },
   { module: 'examinations',      action: 'checkin' },
   { module: 'examinations',      action: 'perform' },
+  { module: 'examinations',      action: 'triage' },
   { module: 'stock',              action: 'read' },
   { module: 'stock',              action: 'adjust' },
   { module: 'stock_movements',    action: 'read' },
@@ -160,7 +161,15 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'doctors.read', 'doctors.create', 'doctors.update', 'doctors.delete',
     'prescriptions.read', 'prescriptions.create', 'prescriptions.update', 'prescriptions.delete',
     'medical_records.read', 'medical_records.write',
-    'examinations.read', 'examinations.checkin', 'examinations.perform',
+    'examinations.read', 'examinations.checkin', 'examinations.triage', 'examinations.perform',
+    'dashboard.read',
+  ),
+
+  NURSE: only(
+    'customers.read', 'customers.create', 'customers.update',
+    'medicines.read', 'doctors.read', 'prescriptions.read',
+    'medical_records.read', 'medical_records.write',
+    'examinations.read', 'examinations.checkin', 'examinations.triage',
     'dashboard.read',
   ),
 }
@@ -479,6 +488,7 @@ async function main() {
     { name: 'Pharmacist',      type: AppRole.PHARMACIST,      description: 'Licensed pharmacist with dispensing access',                         requiresLicense: true  },
     { name: 'Cashier',         type: AppRole.CASHIER,         description: 'Cashier with sales and patient access',                             requiresLicense: false },
     { name: 'Doctor',          type: AppRole.DOCTOR,          description: 'Doctor with prescription management access',                         requiresLicense: true  },
+    { name: 'Nurse',           type: AppRole.NURSE,           description: 'Nurse: patient registration, vital signs and allergies',             requiresLicense: false },
   ]
   const roles: Record<string, { id: number }> = {}
   for (const def of roleDefs) {

@@ -9,6 +9,7 @@ import * as ExaminationService from './examinations.service'
 import {
   queueQuerySchema,
   checkInSchema,
+  triageSchema,
   startExamSchema,
   saveExamSchema,
   completeExamSchema,
@@ -16,6 +17,7 @@ import {
 } from './examinations.validation'
 import {
   CheckInRequest,
+  TriageRequest,
   ExaminationRequest,
   StartExamRequest,
   SaveExamRequest,
@@ -46,6 +48,12 @@ export const checkInController = async (req: CheckInRequest, res: Response) => {
   const data = checkInSchema.parse(req.body)
   const exam = await ExaminationService.checkIn(data, pharmacyOf(req), req.user!.id)
   sendCreated(res, MESSAGE_CODES.EXAMINATION_CHECKED_IN, exam)
+}
+
+export const triageController = async (req: TriageRequest, res: Response) => {
+  const data = triageSchema.parse(req.body)
+  const exam = await ExaminationService.triageExam(parseUuid(req.params.examination_uuid), data, pharmacyOf(req), req.user!.id)
+  sendSuccess(res, MESSAGE_CODES.EXAMINATION_TRIAGED, exam)
 }
 
 export const startExamController = async (req: StartExamRequest, res: Response) => {

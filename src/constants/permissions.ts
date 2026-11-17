@@ -143,6 +143,7 @@ export const PERMISSIONS = {
   EXAMINATIONS_READ: 'examinations.read',
   EXAMINATIONS_CHECKIN: 'examinations.checkin',
   EXAMINATIONS_PERFORM: 'examinations.perform',
+  EXAMINATIONS_TRIAGE: 'examinations.triage',
 
   // dashboard
   DASHBOARD_READ: 'dashboard.read',

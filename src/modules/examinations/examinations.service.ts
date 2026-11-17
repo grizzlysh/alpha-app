@@ -9,6 +9,7 @@ import { createPrescription } from '@modules/prescriptions/prescriptions.service
 import {
   QueueQueryInput,
   CheckInInput,
+  TriageInput,
   StartExamInput,
   SaveExamInput,
   CompleteExamInput,
@@ -24,16 +25,21 @@ const examSelect = {
   status: true,
   visitDate: true,
   checkedInAt: true,
+  triagedAt: true,
+  triagedByUser: { select: { uuid: true, name: true } },
   startedAt: true,
   completedAt: true,
   chiefComplaint: true,
+  findings: true,
   diagnosis: true,
+  advice: true,
   notes: true,
   weightKg: true,
   heightCm: true,
   bloodPressure: true,
   temperatureCelsius: true,
   pulsePerMinute: true,
+  oxygenSaturation: true,
   doctor: { select: { uuid: true, name: true } },
   prescription: {
     select: {
@@ -61,7 +67,7 @@ const examSelect = {
       },
       allergies: {
         where: { deletedAt: null },
-        select: { uuid: true, allergenName: true, allergenType: true, severity: true, reaction: true },
+        select: { uuid: true, allergenName: true, allergenType: true, severity: true, reaction: true, notes: true, createdAt: true },
         orderBy: { createdAt: 'asc' as const },
       },
     },
@@ -78,16 +84,21 @@ const format = (v: ExamRow): ExaminationResponse => ({
   status: v.status,
   visitDate: v.visitDate,
   checkedInAt: v.checkedInAt,
+  triagedAt: v.triagedAt,
+  triagedBy: v.triagedByUser,
   startedAt: v.startedAt,
   completedAt: v.completedAt,
   chiefComplaint: v.chiefComplaint,
+  findings: v.findings,
   diagnosis: v.diagnosis,
+  advice: v.advice,
   notes: v.notes,
   weightKg: num(v.weightKg),
   heightCm: num(v.heightCm),
   bloodPressure: v.bloodPressure,
   temperatureCelsius: num(v.temperatureCelsius),
   pulsePerMinute: v.pulsePerMinute,
+  oxygenSaturation: v.oxygenSaturation,
   doctor: v.doctor,
   prescription: v.prescription,
   patient: {
@@ -167,15 +178,22 @@ const doctorOfUser = async (userId: number, pharmacyId: number): Promise<number 
   return doctor?.id ?? null
 }
 
-const examFieldData = (data: SaveExamInput) => ({
+const vitalFieldData = (data: TriageInput) => ({
   ...(data.chiefComplaint !== undefined && { chiefComplaint: data.chiefComplaint || null }),
-  ...(data.diagnosis !== undefined && { diagnosis: data.diagnosis || null }),
-  ...(data.notes !== undefined && { notes: data.notes || null }),
   ...(data.bloodPressure !== undefined && { bloodPressure: data.bloodPressure || null }),
   ...(data.weightKg !== undefined && { weightKg: data.weightKg }),
   ...(data.heightCm !== undefined && { heightCm: data.heightCm }),
   ...(data.temperatureCelsius !== undefined && { temperatureCelsius: data.temperatureCelsius }),
   ...(data.pulsePerMinute !== undefined && { pulsePerMinute: data.pulsePerMinute }),
+  ...(data.oxygenSaturation !== undefined && { oxygenSaturation: data.oxygenSaturation }),
+})
+
+const examFieldData = (data: SaveExamInput) => ({
+  ...vitalFieldData(data),
+  ...(data.findings !== undefined && { findings: data.findings || null }),
+  ...(data.diagnosis !== undefined && { diagnosis: data.diagnosis || null }),
+  ...(data.advice !== undefined && { advice: data.advice || null }),
+  ...(data.notes !== undefined && { notes: data.notes || null }),
 })
 
 // ── Allergy check ─────────────────────────────────────
@@ -244,6 +262,7 @@ export const checkPrescriptionAllergies = async (
 
 export const getQueue = async (pharmacyId: number, query: QueueQueryInput): Promise<ExaminationQueueResponse> => {
   let range: { startOfDay: Date; endOfDay: Date; dateKey: string }
+  let isToday = !query.date
   if (query.date) {
     const dt = DateTime.fromISO(query.date, { zone: await getTimezone() })
     if (!dt.isValid) throw new BadRequestException('Invalid date')
@@ -252,23 +271,30 @@ export const getQueue = async (pharmacyId: number, query: QueueQueryInput): Prom
       endOfDay: dt.endOf('day').toUTC().toJSDate(),
       dateKey: dt.toFormat('yyyyMMdd'),
     }
+    isToday = range.dateKey === (await todayRange()).dateKey
   } else {
     range = await todayRange()
   }
 
-  const dayWhere = {
+  // Today's queue also carries over patients still waiting / being examined
+  // from earlier days, otherwise they'd be invisible yet still block check-in.
+  const dayWhere: Prisma.MedicalVisitWhereInput = {
     pharmacyId,
     deletedAt: null,
-    checkedInAt: { gte: range.startOfDay, lte: range.endOfDay },
+    OR: [
+      { checkedInAt: { gte: range.startOfDay, lte: range.endOfDay } },
+      ...(isToday ? [{ checkedInAt: { lt: range.startOfDay }, status: { in: [VisitStatus.WAITING, VisitStatus.IN_PROGRESS] } }] : []),
+    ],
   }
 
-  const [rows, grouped] = await Promise.all([
+  const [rows, grouped, triaged] = await Promise.all([
     prisma.medicalVisit.findMany({
       where: { ...dayWhere, ...(query.status && { status: query.status }) },
       select: examSelect,
-      orderBy: [{ queueNumber: 'asc' }, { checkedInAt: 'asc' }],
+      orderBy: [{ checkedInAt: 'asc' }, { queueNumber: 'asc' }],
     }),
     prisma.medicalVisit.groupBy({ by: ['status'], where: dayWhere, _count: { _all: true } }),
+    prisma.medicalVisit.count({ where: { ...dayWhere, status: VisitStatus.WAITING, triagedAt: { not: null } } }),
   ])
 
   const counts = { WAITING: 0, IN_PROGRESS: 0, COMPLETED: 0, CANCELLED: 0 } as Record<VisitStatus, number>
@@ -277,6 +303,7 @@ export const getQueue = async (pharmacyId: number, query: QueueQueryInput): Prom
   return {
     date: `${range.dateKey.slice(0, 4)}-${range.dateKey.slice(4, 6)}-${range.dateKey.slice(6, 8)}`,
     counts,
+    triaged,
     items: rows.map(format),
   }
 }
@@ -324,6 +351,26 @@ export const checkIn = async (data: CheckInInput, pharmacyId: number, userId: nu
     select: { uuid: true },
   })
   return loadExam(visit.uuid)
+}
+
+/**
+ * Vitals, complaint (and, from the client, allergies) recorded by a nurse or the
+ * front desk before the doctor. Optional: the doctor can call in a patient who
+ * skipped it. Can be corrected while the patient is waiting or being examined.
+ */
+export const triageExam = async (
+  uuid: string,
+  data: TriageInput,
+  pharmacyId: number,
+  userId: number
+): Promise<ExaminationResponse> => {
+  const visit = await findExam(uuid, pharmacyId)
+  requireStatus(visit.status, [VisitStatus.WAITING, VisitStatus.IN_PROGRESS], 'Vital signs can only be recorded before the examination is finished')
+  await prisma.medicalVisit.update({
+    where: { id: visit.id },
+    data: { ...vitalFieldData(data), triagedAt: new Date(), triagedById: userId, updatedById: userId },
+  })
+  return loadExam(uuid)
 }
 
 export const startExam = async (

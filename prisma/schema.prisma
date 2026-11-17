@@ -27,6 +27,7 @@ enum AppRole {
   HEAD_PHARMACIST
   CASHIER
   DOCTOR
+  NURSE
 }
 
 enum PharmacyCategory {
@@ -554,6 +555,7 @@ model User {
   medicalVisitsCreated MedicalVisit[] @relation("MedicalVisitCreatedBy")
   medicalVisitsUpdated MedicalVisit[] @relation("MedicalVisitUpdatedBy")
   medicalVisitsDeleted MedicalVisit[] @relation("MedicalVisitDeletedBy")
+  medicalVisitsTriaged MedicalVisit[] @relation("MedicalVisitTriagedBy")
 
   // ── Signing ───────────────────────────────────────────
   purchaseOrdersSigned PurchaseOrder[] @relation("PurchaseOrderSignedBy")
@@ -1672,12 +1674,21 @@ model MedicalVisit {
   bloodPressure      String?     @map("blood_pressure")
   temperatureCelsius Decimal?    @map("temperature_celsius") @db.Decimal(4, 1)
   pulsePerMinute     Int?        @map("pulse_per_minute")
+  /// SpO2 in percent.
+  oxygenSaturation   Int?        @map("oxygen_saturation")
+  /// Doctor's physical examination findings.
+  findings           String?
+  /// Treatment, advice and follow-up given by the doctor.
+  advice             String?
   prescriptionId     Int?        @unique @map("prescription_id")
   doctorId           Int?        @map("doctor_id")
   status             VisitStatus @default(COMPLETED)
   /// Daily queue number, set at check-in.
   queueNumber        Int?        @map("queue_number")
   checkedInAt        DateTime?   @map("checked_in_at")
+  /// Set when a nurse/front desk recorded vitals before the doctor (optional step).
+  triagedAt          DateTime?   @map("triaged_at")
+  triagedById        Int?        @map("triaged_by_id")
   startedAt          DateTime?   @map("started_at")
   completedAt        DateTime?   @map("completed_at")
   createdAt          DateTime    @default(now()) @map("created_at")
@@ -1694,6 +1705,7 @@ model MedicalVisit {
   createdByUser User?         @relation("MedicalVisitCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?         @relation("MedicalVisitUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?         @relation("MedicalVisitDeletedBy", fields: [deletedById], references: [id])
+  triagedByUser User?         @relation("MedicalVisitTriagedBy", fields: [triagedById], references: [id])
 
   @@index([medicalRecordId, visitDate])
   @@index([pharmacyId, status, checkedInAt])

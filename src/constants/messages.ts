@@ -1070,6 +1070,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Examination started',
     id: 'Pemeriksaan dimulai',
   },
+  EXAMINATION_TRIAGED: {
+    en: 'Vital signs saved',
+    id: 'Tanda vital berhasil disimpan',
+  },
   EXAMINATION_SAVED: {
     en: 'Examination saved',
     id: 'Pemeriksaan berhasil disimpan',

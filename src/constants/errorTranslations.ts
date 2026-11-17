@@ -46,6 +46,7 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Choose the examining doctor': 'Pilih dokter yang memeriksa',
   'This patient has just been called in by someone else': 'Pasien ini baru saja dipanggil oleh pengguna lain',
   'The examination is not in progress': 'Pemeriksaan ini tidak sedang berlangsung',
+  'Vital signs can only be recorded before the examination is finished': 'Tanda vital hanya bisa dicatat sebelum pemeriksaan selesai',
   'The examination was changed by someone else, please refresh': 'Pemeriksaan ini baru diubah pengguna lain, silakan muat ulang',
   'Only waiting or ongoing examinations can be cancelled': 'Hanya pemeriksaan yang menunggu atau berlangsung yang bisa dibatalkan',
   'Invalid date': 'Tanggal tidak valid',

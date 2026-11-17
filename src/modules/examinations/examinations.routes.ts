@@ -6,6 +6,7 @@ import {
   getQueueController,
   getExaminationController,
   checkInController,
+  triageController,
   startExamController,
   saveExamController,
   allergyCheckController,
@@ -23,6 +24,9 @@ router.post('/', requirePermission(PERMISSIONS.EXAMINATIONS_CHECKIN), checkInCon
 router.get('/:examination_uuid', requirePermission(PERMISSIONS.EXAMINATIONS_READ), getExaminationController)
 // Cancelling a waiting patient (left without being seen) is a front-desk action.
 router.post('/:examination_uuid/cancel', requirePermission(PERMISSIONS.EXAMINATIONS_CHECKIN), cancelExamController)
+
+// Triage (nurse / front desk): vitals before the doctor, optional
+router.put('/:examination_uuid/triage', requirePermission(PERMISSIONS.EXAMINATIONS_TRIAGE), triageController)
 
 // Examination (doctor)
 router.post('/:examination_uuid/start', requirePermission(PERMISSIONS.EXAMINATIONS_PERFORM), startExamController)
