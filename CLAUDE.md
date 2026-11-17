@@ -16,9 +16,17 @@ npm start                # node dist/app.js
 npm run prisma:migrate   # prisma migrate dev
 npm run prisma:studio    # open Prisma Studio GUI
 npx prisma generate      # regenerate Prisma client after schema changes
+
+# Quality
+npm run lint             # ESLint (flat config, eslint.config.mjs)
+npm test                 # Vitest + Supertest integration tests (tests/)
 ```
 
-There are no test scripts configured.
+Tests run against a separate database: the `DATABASE_URL` database name plus
+`_test` on the same server (created on first run). The global setup applies the
+migrations and the core seed; nothing is wiped, so every test creates its own
+uniquely named pharmacy and users (see `tests/helpers.ts`). Test files run one
+after another because they share that database.
 
 ## Architecture
 

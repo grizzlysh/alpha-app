@@ -4,7 +4,7 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-const prismaLogLevels: Prisma.LogLevel[] = ['query', 'error', 'warn']
+const prismaLogLevels: Prisma.LogLevel[] = process.env.NODE_ENV === 'test' ? ['error'] : ['query', 'error', 'warn']
 
 export const prisma: PrismaClient =
   globalForPrisma.prisma ?? new PrismaClient({

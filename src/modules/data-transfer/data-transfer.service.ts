@@ -1,4 +1,5 @@
 import { CustomerType, PaymentStatus, Prisma } from '@prisma/client'
+import { randomBytes } from 'crypto'
 import { prisma } from '@config/db'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { createCustomer } from '@modules/customers/customers.service'
@@ -243,7 +244,8 @@ export async function importOpeningStock(pharmacyId: number, userId: number, inp
   }
   if (input.dryRun || created === 0) return result
 
-  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 12)
+  // Unique even for two imports in the same second (invoice numbers are globally unique).
+  const stamp = `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomBytes(2).toString('hex')}`
   let n = 0
   for (const group of groups.values()) {
     n++

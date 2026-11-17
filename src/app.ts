@@ -117,12 +117,15 @@ app.get('/', (req: Request, res: Response): void => {
 app.use(errorHandler)
 
 // ── Server ──────────────────────
-app.listen(PORT, (error?: Error): void => {
-  if (error) {
-    console.error(`Failed to start server on port ${PORT}:`, error.message)
-    process.exit(1)
-  }
-  console.log(`Server running on port ${PORT}`)
-})
+// Tests drive the app in-process (supertest), without binding a port.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, (error?: Error): void => {
+    if (error) {
+      console.error(`Failed to start server on port ${PORT}:`, error.message)
+      process.exit(1)
+    }
+    console.log(`Server running on port ${PORT}`)
+  })
+}
 
 export default app
