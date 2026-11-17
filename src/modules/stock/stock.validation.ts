@@ -3,6 +3,8 @@ import { StockMovementType, StockMovementReason } from '@prisma/client'
 
 export const stockDetailQuerySchema = z.object({
   search: z.string().trim().optional(),
+  /** One medicine's sellable batches, earliest expiry first (FEFO), expired excluded. */
+  medicineUuid: z.string().trim().uuid().optional(),
 })
 
 export const stockCatalogQuerySchema = z.object({

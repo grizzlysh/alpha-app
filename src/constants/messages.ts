@@ -144,6 +144,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Customers fetched successfully',
     id: 'Data pelanggan berhasil diambil',
   },
+  CUSTOMER_PURCHASES_FETCHED: {
+    en: 'Purchase history retrieved',
+    id: 'Riwayat pembelian berhasil diambil',
+  },
   CUSTOMER_FETCHED: {
     en: 'Customer fetched successfully',
     id: 'Data pelanggan berhasil diambil',

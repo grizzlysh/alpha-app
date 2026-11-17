@@ -45,6 +45,12 @@ export const customerQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
 })
 
+export const purchaseHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(50).optional().default(10),
+})
+
+export type PurchaseHistoryQueryInput = z.infer<typeof purchaseHistoryQuerySchema>
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>
 export type CustomerQueryInput = z.infer<typeof customerQuerySchema>

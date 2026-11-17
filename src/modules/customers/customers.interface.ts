@@ -1,3 +1,5 @@
+import { PaginationMeta } from '@interfaces/common.interface'
+import { PaymentStatus, SaleStatus } from '@prisma/client'
 import { Request } from 'express'
 import { CreateCustomerInput, UpdateCustomerInput } from './customers.validation'
 
@@ -53,5 +55,38 @@ export interface UpdateCustomerRequest extends Request {
 }
 
 export interface DeleteCustomerRequest extends Request {
+  params: { customer_uuid: string }
+}
+
+export interface PurchaseHistoryResponse {
+  summary: {
+    /** Completed sales only. */
+    transactionCount: number
+    totalSpent: number
+    averageSpent: number
+    firstPurchaseAt: Date | null
+    lastPurchaseAt: Date | null
+  }
+  /** Most bought medicines in the last 12 months. */
+  frequentItems: {
+    medicine: { uuid: string; name: string; unit: string }
+    timesBought: number
+    totalPieces: number
+    lastBoughtAt: Date
+  }[]
+  sales: {
+    uuid: string
+    saleNumber: string
+    soldAt: Date
+    status: SaleStatus
+    paymentStatus: PaymentStatus | null
+    grandTotal: number
+    prescription: { uuid: string; prescriptionNumber: string | null } | null
+    items: { medicine: { uuid: string; name: string; unit: string }; quantityPieces: number; totalAmount: number }[]
+  }[]
+  meta: PaginationMeta
+}
+
+export interface PurchaseHistoryRequest extends Request {
   params: { customer_uuid: string }
 }

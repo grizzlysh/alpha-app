@@ -110,11 +110,12 @@ export const searchStockDetails = async (
   pharmacyId: number,
   query: StockDetailQueryInput
 ): Promise<StockDetailSearchResponse[]> => {
-  const { search } = query
+  const { search, medicineUuid } = query
 
   const where: any = {
-    stock: { pharmacyId },
+    stock: { pharmacyId, ...(medicineUuid && { medicine: { uuid: medicineUuid } }) },
     quantityPieces: { gt: 0 },
+    ...(medicineUuid && { expiryDate: { gt: new Date() } }),
     ...(search && {
       OR: [
         { stock: { medicine: { name: { contains: search, mode: 'insensitive' } } } },

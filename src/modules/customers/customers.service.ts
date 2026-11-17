@@ -1,7 +1,7 @@
 import { prisma } from '@config/db'
-import { CustomerType } from '@prisma/client'
-import { CreateCustomerInput, UpdateCustomerInput, CustomerQueryInput } from './customers.validation'
-import { CustomerDetailResponse, CustomerDropdownItem } from './customers.interface'
+import { CustomerType, Prisma, SaleStatus } from '@prisma/client'
+import { CreateCustomerInput, UpdateCustomerInput, CustomerQueryInput, PurchaseHistoryQueryInput } from './customers.validation'
+import { CustomerDetailResponse, CustomerDropdownItem, PurchaseHistoryResponse } from './customers.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -287,4 +287,122 @@ export const getCustomersDropdown = async (
     select: { uuid: true, name: true, phone: true, customerType: true, isWalkIn: true },
     orderBy: { name: 'asc' },
   }) as unknown as CustomerDropdownItem[]
+}
+
+// ── Purchase history ──────────────────────────────────────────────────────────
+
+/**
+ * What a customer bought here: totals, the medicines they buy most (for a quick
+ * "buy again" at the till) and their sales, newest first. Refunded/cancelled
+ * sales are listed but never counted in the totals.
+ */
+export const getPurchaseHistory = async (
+  uuid: string,
+  pharmacyId: number,
+  query: PurchaseHistoryQueryInput
+): Promise<PurchaseHistoryResponse> => {
+  const customer = await prisma.customer.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true },
+  })
+  if (!customer) throw new NotFoundException('Customer not found')
+
+  const saleWhere: Prisma.SaleWhereInput = {
+    customerId: customer.id,
+    pharmacyId,
+    deletedAt: null,
+    status: { in: [SaleStatus.COMPLETED, SaleStatus.REFUNDED, SaleStatus.CANCELLED] },
+  }
+  const completedWhere: Prisma.SaleWhereInput = { customerId: customer.id, pharmacyId, deletedAt: null, status: SaleStatus.COMPLETED }
+
+  const [aggregate, total, rows, frequent] = await Promise.all([
+    prisma.sale.aggregate({
+      where: completedWhere,
+      _count: { _all: true },
+      _sum: { grandTotal: true },
+      _min: { soldAt: true },
+      _max: { soldAt: true },
+    }),
+    prisma.sale.count({ where: saleWhere }),
+    prisma.sale.findMany({
+      where: saleWhere,
+      orderBy: { soldAt: 'desc' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        uuid: true,
+        saleNumber: true,
+        soldAt: true,
+        status: true,
+        grandTotal: true,
+        payment: { select: { paymentStatus: true } },
+        prescription: { select: { uuid: true, prescriptionNumber: true } },
+        details: {
+          orderBy: { id: 'asc' },
+          select: {
+            quantityPieces: true,
+            totalAmount: true,
+            medicine: { select: { uuid: true, name: true, unit: true } },
+          },
+        },
+      },
+    }),
+    prisma.$queryRaw<{ uuid: string; name: string; unit: string; times: number; pieces: number; last: Date }[]>`
+      SELECT m.uuid, m.name, m.unit,
+             COUNT(DISTINCT s.id)::int AS times,
+             SUM(d.quantity_pieces)::int AS pieces,
+             MAX(s.sold_at) AS last
+      FROM trx_sale_details d
+      JOIN trx_sales s ON s.id = d.sale_id
+      JOIN mst_medicines m ON m.id = d.medicine_id
+      WHERE s.customer_id = ${customer.id}
+        AND s.pharmacy_id = ${pharmacyId}
+        AND s.status = 'COMPLETED'
+        AND s.deleted_at IS NULL
+        AND m.deleted_at IS NULL
+        AND s.sold_at >= NOW() - INTERVAL '365 days'
+      GROUP BY m.id
+      ORDER BY times DESC, last DESC
+      LIMIT 8
+    `,
+  ])
+
+  const count = aggregate._count._all
+  const spent = Number(aggregate._sum.grandTotal ?? 0)
+
+  return {
+    summary: {
+      transactionCount: count,
+      totalSpent: spent,
+      averageSpent: count > 0 ? Math.round(spent / count) : 0,
+      firstPurchaseAt: aggregate._min.soldAt,
+      lastPurchaseAt: aggregate._max.soldAt,
+    },
+    frequentItems: frequent.map((f) => ({
+      medicine: { uuid: f.uuid, name: f.name, unit: f.unit },
+      timesBought: f.times,
+      totalPieces: f.pieces,
+      lastBoughtAt: f.last,
+    })),
+    sales: rows.map((r) => ({
+      uuid: r.uuid,
+      saleNumber: r.saleNumber,
+      soldAt: r.soldAt,
+      status: r.status,
+      paymentStatus: r.payment?.paymentStatus ?? null,
+      grandTotal: Number(r.grandTotal),
+      prescription: r.prescription,
+      items: r.details.map((d) => ({
+        medicine: d.medicine,
+        quantityPieces: d.quantityPieces,
+        totalAmount: Number(d.totalAmount),
+      })),
+    })),
+    meta: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+    },
+  }
 }
