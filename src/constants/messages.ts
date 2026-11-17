@@ -144,6 +144,18 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Customers fetched successfully',
     id: 'Data pelanggan berhasil diambil',
   },
+  DATA_EXPORTED: {
+    en: 'Data exported',
+    id: 'Data berhasil diekspor',
+  },
+  DATA_IMPORT_PREVIEWED: {
+    en: 'Import checked',
+    id: 'Impor sudah diperiksa',
+  },
+  DATA_IMPORTED: {
+    en: 'Data imported',
+    id: 'Data berhasil diimpor',
+  },
   CATALOG_EXPORTED: {
     en: 'Medicine catalog exported',
     id: 'Daftar obat berhasil diekspor',

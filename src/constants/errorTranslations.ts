@@ -83,6 +83,8 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Value must be a number of 0 or more': 'Nilai harus berupa angka 0 atau lebih',
   'Percentage must be between 0 and 100': 'Persentase harus antara 0 sampai 100',
   'Value must be true or false': 'Nilai harus true atau false',
+  'Invoice has recorded payments and cannot be deleted': 'Faktur sudah ada pembayarannya dan tidak bisa dihapus',
+  'Stock from this invoice has already been used and the invoice cannot be deleted': 'Stok dari faktur ini sudah terpakai (terjual, diretur, dimusnahkan, atau disesuaikan), jadi faktur tidak bisa dihapus',
   'Value must be one of UPPER, TITLE, LOWER, AS_TYPED': 'Pilihan harus UPPER, TITLE, LOWER, atau AS_TYPED',
   'Medicine type with this name already exists': 'Nama jenis obat sudah terdaftar',
   'Medicine with this name already exists': 'Nama obat sudah terdaftar',
