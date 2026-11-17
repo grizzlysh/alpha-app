@@ -121,8 +121,6 @@ const PERMISSIONS = [
   { module: 'settings',           action: 'update' },
   { module: 'dashboard',          action: 'read' },
   { module: 'dashboard',          action: 'advanced' },
-  { module: 'sign',               action: 'standard' },
-  { module: 'sign',               action: 'full' },
 ]
 
 const all = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
@@ -135,7 +133,26 @@ const only = (...keys: string[]) => keys
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   OWNER: all,
 
-  ADMIN: excluded('system_parameters', 'pharmacies'),
+  // Office staff: master data, purchasing and invoices, reports. No people or
+  // role management, no pricing parameters, no POS/returns, no stock changes.
+  ADMIN: only(
+    'medicine_shapes.read', 'medicine_shapes.create', 'medicine_shapes.update', 'medicine_shapes.delete',
+    'medicine_types.read', 'medicine_types.create', 'medicine_types.update', 'medicine_types.delete',
+    'medicine_classes.read', 'medicine_classes.create', 'medicine_classes.update', 'medicine_classes.delete',
+    'medicines.read', 'medicines.create', 'medicines.update', 'medicines.delete',
+    'distributors.read', 'distributors.create', 'distributors.update', 'distributors.delete',
+    'customers.read', 'customers.create', 'customers.update', 'customers.delete',
+    'doctors.read', 'doctors.create', 'doctors.update', 'doctors.delete',
+    'storage.read', 'storage.create', 'storage.update', 'storage.delete',
+    'stock.read', 'stock_movements.read',
+    'purchase_orders.read', 'purchase_orders.create', 'purchase_orders.update', 'purchase_orders.delete',
+    'invoices.read', 'invoices.create', 'invoices.update', 'invoices.delete', 'invoices.verify',
+    'sales.read', 'stock_return.read', 'stock_disposal.read', 'prescriptions.read',
+    'examinations.read', 'examinations.checkin',
+    'reports.read', 'reports.export',
+    'business_parameters.read', 'pharmacies.read', 'licenses.read',
+    'dashboard.read', 'dashboard.advanced',
+  ),
 
   HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
 
@@ -153,7 +170,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'medical_records.read',
     'examinations.read', 'examinations.checkin',
     'dashboard.read',
-    'sign.standard',
   ),
 
   DOCTOR: only(
@@ -484,7 +500,7 @@ async function main() {
   console.log('Creating roles...')
   const roleDefs: { name: string; type: AppRole; description: string; requiresLicense: boolean }[] = [
     { name: 'Owner',           type: AppRole.OWNER,           description: 'Pharmacy owner with full access',                                   requiresLicense: false },
-    { name: 'Admin',           type: AppRole.ADMIN,           description: 'Pharmacy administrator with full operational access',                requiresLicense: false },
+    { name: 'Admin',           type: AppRole.ADMIN,           description: 'Office staff: master data, purchasing, invoices and reports', requiresLicense: false },
     { name: 'Head Pharmacist', type: AppRole.HEAD_PHARMACIST, description: 'Senior licensed pharmacist with staff and license management access', requiresLicense: true  },
     { name: 'Pharmacist',      type: AppRole.PHARMACIST,      description: 'Licensed pharmacist with dispensing access',                         requiresLicense: true  },
     { name: 'Cashier',         type: AppRole.CASHIER,         description: 'Cashier with sales and patient access',                             requiresLicense: false },

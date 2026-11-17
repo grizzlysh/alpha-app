@@ -1,6 +1,6 @@
 import { PurchaseOrderStatus, RecordStatus, AppRole } from '@prisma/client'
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { purchaseOrderSignerLevel, resolveSigner } from '@utils/signer'
 import {
   CreatePurchaseOrderInput,
   UpdatePurchaseOrderInput,
@@ -10,7 +10,6 @@ import {
 import { PurchaseOrderResponse, PurchaseOrderDropdownItem, PurchaseOrderPrintResponse } from './purchase-orders.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 
@@ -161,36 +160,6 @@ export const createPurchaseOrder = async (
     })
     if (!distributor) throw new NotFoundException('Distributor not found')
 
-    // ── Resolve Signed By ─────────────────────────
-    let signedById: number | undefined
-    if (data.signedByUuid) {
-      const signer = await tx.user.findFirst({
-        where: { uuid: data.signedByUuid, deletedAt: null },
-        select: {
-          id: true,
-          placements: {
-            where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-            select: {
-              role: {
-                select: {
-                  rolePermissions: {
-                    where: { isEnabled: true },
-                    select: { permission: { select: { module: true, action: true } } },
-                  },
-                },
-              },
-            },
-          },
-        },
-      })
-      if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-      const hasSignFull = signer.placements[0].role.rolePermissions.some(
-        (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
-      )
-      if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign purchase orders')
-      signedById = signer.id
-    }
-
     // ── Generate Order Number ─────────────────────
     const pharmacy = await tx.pharmacy.findUnique({
       where: { id: pharmacyId },
@@ -230,6 +199,13 @@ export const createPurchaseOrder = async (
       })
     )
 
+    // ── Signer: a licensed pharmacist; the Head Pharmacist for controlled medicines ──
+    let signedById: number | undefined
+    if (data.signedByUuid) {
+      const level = await purchaseOrderSignerLevel(tx, details.map((d) => d.medicineId))
+      signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, level)
+    }
+
     // ── Create Purchase Order + Details ───────────
     return tx.purchaseOrder.create({
       data: {
@@ -259,7 +235,7 @@ export const updatePurchaseOrder = async (
   const purchaseOrder = await prisma.$transaction(async (tx) => {
     const existing = await tx.purchaseOrder.findFirst({
       where: { uuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true },
+      select: { id: true, status: true, signedById: true },
     })
 
     if (!existing) throw new NotFoundException('Purchase order not found')
@@ -273,35 +249,6 @@ export const updatePurchaseOrder = async (
       })
       if (!distributor) throw new NotFoundException('Distributor not found')
       distributorId = distributor.id
-    }
-
-    let signedById: number | undefined
-    if (data.signedByUuid) {
-      const signer = await tx.user.findFirst({
-        where: { uuid: data.signedByUuid, deletedAt: null },
-        select: {
-          id: true,
-          placements: {
-            where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-            select: {
-              role: {
-                select: {
-                  rolePermissions: {
-                    where: { isEnabled: true },
-                    select: { permission: { select: { module: true, action: true } } },
-                  },
-                },
-              },
-            },
-          },
-        },
-      })
-      if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-      const hasSignFull = signer.placements[0].role.rolePermissions.some(
-        (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
-      )
-      if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign purchase orders')
-      signedById = signer.id
     }
 
     let detailsCreate: any[] | undefined
@@ -322,6 +269,19 @@ export const updatePurchaseOrder = async (
           }
         })
       )
+    }
+
+    // Re-check the signer whenever it or the items change: adding a narcotic
+    // to an order signed by a Pharmacist must move it to the Head Pharmacist.
+    let signedById: number | undefined
+    const signer = data.signedByUuid ? { uuid: data.signedByUuid } : existing.signedById ? { id: existing.signedById } : null
+    if (signer && (data.signedByUuid || detailsCreate)) {
+      const medicineIds = detailsCreate
+        ? detailsCreate.map((d) => d.medicineId as number)
+        : (await tx.purchaseOrderDetail.findMany({ where: { purchaseOrderId: existing.id, deletedAt: null }, select: { medicineId: true } })).map((d) => d.medicineId)
+      const level = await purchaseOrderSignerLevel(tx, medicineIds)
+      const id = await resolveSigner(tx, signer, pharmacyId, level)
+      if (data.signedByUuid) signedById = id
     }
 
     return tx.purchaseOrder.update({

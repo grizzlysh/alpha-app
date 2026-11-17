@@ -37,6 +37,22 @@ export const requirePermission = (permission: string) => {
   }
 }
 
+/** Passes when the user holds at least one of the permissions. */
+export const requireAnyPermission = (...permissions: string[]) => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    try {
+      if (!req.user) throw new UnauthorizedException()
+      if (req.user.platformRole === PlatformRole.PLATFORM_ADMIN) return next()
+      if (!permissions.some((p) => req.user!.permissions.includes(p))) {
+        throw new ForbiddenException(`Missing permission: ${permissions.join(' | ')}`)
+      }
+      next()
+    } catch (err) {
+      next(err)
+    }
+  }
+}
+
 // ── Platform Role Guard ───────────────────────────────
 // checks if user has specific platform role
 // used for /api/platform/** routes only

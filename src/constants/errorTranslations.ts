@@ -137,10 +137,8 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Stock return must be signed before completing': 'Retur harus ditandatangani sebelum diselesaikan',
 
   // ── Signing ───────────────────────────────────────
-  'Only authorized personnel can sign stock adjustments': 'Hanya petugas berwenang yang dapat menandatangani penyesuaian stok',
-  'Only authorized personnel can sign this document': 'Hanya petugas berwenang yang dapat menandatangani dokumen ini',
-  'Only fully authorized personnel can sign disposal documents': 'Hanya petugas dengan wewenang penuh yang dapat menandatangani dokumen pemusnahan',
-  'Only fully authorized personnel can sign purchase orders': 'Hanya petugas dengan wewenang penuh yang dapat menandatangani surat pesanan',
+  'Only the Head Pharmacist with an active practice license can sign this document': 'Dokumen ini hanya bisa ditandatangani Head Pharmacist dengan izin praktik (SIPA) aktif',
+  'Only a pharmacist with an active practice license can sign this document': 'Dokumen ini hanya bisa ditandatangani apoteker dengan izin praktik (SIPA) aktif',
 
   // ── Ownership ─────────────────────────────────────
   'Global roles can only be modified by platform admin': 'Peran global hanya dapat diubah oleh platform admin',

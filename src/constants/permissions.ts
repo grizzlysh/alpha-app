@@ -149,10 +149,6 @@ export const PERMISSIONS = {
   DASHBOARD_READ: 'dashboard.read',
   DASHBOARD_ADVANCED: 'dashboard.advanced',
 
-  // signing
-  SIGN_STANDARD: 'sign.standard',
-  SIGN_FULL: 'sign.full',
-
 } as const
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS]

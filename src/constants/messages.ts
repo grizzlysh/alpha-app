@@ -692,10 +692,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'User is already placed at this pharmacy',
     id: 'Pengguna sudah ditempatkan di apotek ini',
   },
-  PHARMACY_ALREADY_HAS_SIGN_FULL_USER: {
-    en: 'Pharmacy already has a user with full signing authority',
-    id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
-  },
   PHARMACY_ALREADY_HAS_HEAD_PHARMACIST: {
     en: 'This pharmacy already has a Head Pharmacist. Unmark the current one first.',
     id: 'Apotek ini sudah memiliki Head Pharmacist. Lepaskan penanda Head Pharmacist yang lama terlebih dahulu.',

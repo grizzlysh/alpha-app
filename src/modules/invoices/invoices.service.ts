@@ -1,13 +1,13 @@
 import { PaymentStatus, PurchaseOrderStatus } from '@prisma/client'
 import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { resolveSigner } from '@utils/signer'
 import { withDocNumberRetry } from '@utils/generateDocNumbers'
 import { generateBarcode } from '@utils/generateBarcode'
 import { AddPaymentInput, CreateInvoiceInput, InvoiceQueryInput, UpdatePaymentHistoryInput } from './invoices.validation'
 import { InvoicePaymentResponse, InvoiceResponse } from './invoices.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -277,32 +277,8 @@ export const createInvoice = async (
       throw new ConflictException('Invoice number already exists')
     }
 
-    // ── Resolve Signed By ─────────────────────────
-    const signer = await tx.user.findFirst({
-      where: { uuid: data.signedByUuid, deletedAt: null },
-      select: {
-        id: true,
-        placements: {
-          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-          select: {
-            role: {
-              select: {
-                rolePermissions: {
-                  where: { isEnabled: true },
-                  select: { permission: { select: { module: true, action: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
-    })
-    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-    const hasSignPermission = signer.placements[0].role.rolePermissions.some(
-      (rp) => rp.permission.module === 'sign'
-    )
-    if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign this document')
-    const signedById = signer.id
+    // ── Resolve Signed By: the pharmacist who received the goods (active SIPA) ──
+    const signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, 'PHARMACIST')
 
     // ── Resolve Purchase Order ────────────────────
     let purchaseOrderId: number | undefined

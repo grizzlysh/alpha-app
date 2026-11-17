@@ -94,6 +94,14 @@ export async function getUsersDropdown(
   } catch (err) { next(err); }
 }
 
+export async function getSignersDropdown(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const level = req.query.level === 'HEAD_PHARMACIST' ? 'HEAD_PHARMACIST' : 'PHARMACIST';
+    const data = await userService.getSignersDropdown(req.user!.pharmacyId!, level);
+    sendSuccess(res, 'USERS_FETCHED', data);
+  } catch (err) { next(err); }
+}
+
 export async function listUsers(
   req: Request<ParamsDictionary, any, any, ListUserQuery>,
   res: Response,

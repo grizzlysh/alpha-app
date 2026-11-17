@@ -1,6 +1,7 @@
 import { RecordStatus, AppRole, PlatformRole, User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateTemporaryPassword } from '@utils/tempPassword';
+import { signerPlacementWhere, SignerLevel } from '@utils/signer';
 import { prisma } from '@config/db';
 import { BadRequestException } from '@exceptions/BadRequestException';
 import { ConflictException } from '@exceptions/ConflictException';
@@ -427,6 +428,27 @@ export async function getUsersDropdown(
     select: { uuid: true, name: true, email: true },
     orderBy: { name: 'asc' },
   });
+}
+
+// ─── Signers Dropdown ────────────────────────────────────────────────────────
+
+/** People who may sign at this pharmacy at the given level (licensed pharmacists / the Head Pharmacist). */
+export async function getSignersDropdown(
+  pharmacyId: number,
+  level: SignerLevel
+): Promise<(UserDropdownItem & { isHeadPharmacist: boolean })[]> {
+  const where = signerPlacementWhere(pharmacyId, level);
+  const users = await prisma.user.findMany({
+    where: { deletedAt: null, status: RecordStatus.ACTIVE, placements: { some: where } },
+    select: {
+      uuid: true,
+      name: true,
+      email: true,
+      placements: { where: { ...where, isHeadPharmacist: true }, select: { id: true }, take: 1 },
+    },
+    orderBy: { name: 'asc' },
+  });
+  return users.map((u) => ({ uuid: u.uuid, name: u.name, email: u.email, isHeadPharmacist: u.placements.length > 0 }));
 }
 
 // ─── Get User ─────────────────────────────────────────────────────────────────

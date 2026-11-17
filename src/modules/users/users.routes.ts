@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '@middlewares/auth';
-import { requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard';
+import { requireAnyPermission, requirePharmacyAccess, requirePermission } from '@middlewares/roleGuard';
 import { validateBody, validateQuery } from '@middlewares/validate';
 import { PERMISSIONS } from '@constants/permissions';
 import * as userController from './users.controller';
@@ -27,6 +27,9 @@ meRouter.put('/password', validateBody(changePasswordSchema), userController.cha
 export const userRouter = Router();
 userRouter.use(authenticate);
 
+// Who may sign purchase orders / disposals here. Needed by anyone writing those
+// documents, so it is gated on those permissions rather than users.read.
+userRouter.get('/signers', requirePharmacyAccess, requireAnyPermission(PERMISSIONS.PURCHASE_ORDERS_CREATE, PERMISSIONS.PURCHASE_ORDERS_UPDATE, PERMISSIONS.STOCK_DISPOSAL_CREATE, PERMISSIONS.STOCK_DISPOSAL_UPDATE), userController.getSignersDropdown);
 userRouter.get('/dropdown', requirePharmacyAccess, requirePermission(PERMISSIONS.USERS_READ), userController.getUsersDropdown);
 userRouter.get('/', requirePermission(PERMISSIONS.USERS_READ), validateQuery(listUserSchema), userController.listUsers);
 userRouter.get('/:user_uuid', requirePermission(PERMISSIONS.USERS_READ), userController.getUser);
