@@ -83,6 +83,7 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Value must be a number of 0 or more': 'Nilai harus berupa angka 0 atau lebih',
   'Percentage must be between 0 and 100': 'Persentase harus antara 0 sampai 100',
   'Value must be true or false': 'Nilai harus true atau false',
+  'Value must be one of UPPER, TITLE, LOWER, AS_TYPED': 'Pilihan harus UPPER, TITLE, LOWER, atau AS_TYPED',
   'Medicine type with this name already exists': 'Nama jenis obat sudah terdaftar',
   'Medicine with this name already exists': 'Nama obat sudah terdaftar',
   'Pharmacy code already exists': 'Kode apotek sudah dipakai',

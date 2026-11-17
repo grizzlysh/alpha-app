@@ -1,3 +1,4 @@
+import { NameCase } from '@constants/defaultCatalog'
 import { Request } from 'express'
 import { PlatformRole, AppRole } from '@prisma/client'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
@@ -83,6 +84,8 @@ export interface CurrentPharmacyData {
   name: string
   role: PharmacyRoleItem | null
   permissions: PermissionMap
+  /** Display preference for names (business parameter NAME_DISPLAY_CASE). */
+  nameCase: NameCase
 }
 
 export interface LoginResponse {

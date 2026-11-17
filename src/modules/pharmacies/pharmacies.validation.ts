@@ -22,7 +22,7 @@ const codeField = z
 const requiredText = (label: string) => z.string().trim().min(1, { message: `${label} is required` })
 
 export const createPharmacySchema = z.object({
-  name: z.string().trim().toLowerCase().min(1, { message: 'Name is required' }),
+  name: z.string().trim().min(1, { message: 'Name is required' }),
   code: codeField,
   category: z.enum(PharmacyCategory),
   phone: requiredText('Phone'),
@@ -63,7 +63,7 @@ export const createPharmacySchema = z.object({
 })
 
 export const updatePharmacySchema = z.object({
-  name: z.string().trim().toLowerCase().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
   code: codeField.optional(),
   category: z.enum(PharmacyCategory).optional(),
   phone: requiredText('Phone').optional(),

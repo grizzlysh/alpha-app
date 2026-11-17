@@ -2,12 +2,12 @@ import { z } from 'zod'
 import { RecordStatus } from '@prisma/client'
 
 export const createMedicineClassSchema = z.object({
-  name: z.string().trim().toLowerCase().min(1, { message: 'Name is required' }),
+  name: z.string().trim().min(1, { message: 'Name is required' }),
   status: z.enum(RecordStatus),
 })
 
 export const updateMedicineClassSchema = z.object({
-  name: z.string().trim().toLowerCase().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
   status: z.enum(RecordStatus).optional(),
 })
 

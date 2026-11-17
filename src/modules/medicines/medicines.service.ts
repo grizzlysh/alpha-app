@@ -43,7 +43,7 @@ const checkDuplicate = async (
 ): Promise<void> => {
   const existing = await prisma.medicine.findFirst({
     where: {
-      name,
+      name: { equals: name, mode: 'insensitive' },
       pharmacyId,
       deletedAt: null,
       ...(excludeUuid && {

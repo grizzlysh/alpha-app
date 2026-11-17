@@ -58,6 +58,11 @@ export interface DefaultBusinessParam {
   description: string
 }
 
+/** How names (medicines, distributors, patients…) are shown and printed. */
+export const NAME_CASES = ['UPPER', 'TITLE', 'LOWER', 'AS_TYPED'] as const
+export type NameCase = (typeof NAME_CASES)[number]
+export const NAME_DISPLAY_CASE_KEY = 'NAME_DISPLAY_CASE'
+
 export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'MARGIN_PERCENTAGE',         value: '20',    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
   { key: 'PPN_PERCENTAGE_SELL',       value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
@@ -69,5 +74,6 @@ export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'CREDIT_PAYMENT_DAYS',       value: '30',    dataType: DataType.NUMBER,     description: 'Default credit term in days for non-cash sales' },
   { key: 'RETURN_POLICY_DAYS',        value: '7',     dataType: DataType.NUMBER,     description: 'Number of days after sale within which a return is accepted' },
   { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
+  { key: 'NAME_DISPLAY_CASE',         value: 'UPPER', dataType: DataType.STRING,     description: 'How names are displayed and printed: UPPER, TITLE, LOWER or AS_TYPED' },
   { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
 ]

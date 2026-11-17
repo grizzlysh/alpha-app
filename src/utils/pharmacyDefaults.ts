@@ -36,18 +36,18 @@ export async function ensureBusinessParams(
 /** The default medicine shapes, regulatory types and therapeutic classes. */
 export async function seedDefaultClassifications(tx: Tx, pharmacyId: number, userId: number | null): Promise<void> {
   await tx.medicineShape.createMany({
-    data: DEFAULT_MEDICINE_SHAPES.map((name) => ({ pharmacyId, name: name.toLowerCase(), createdById: userId })),
+    data: DEFAULT_MEDICINE_SHAPES.map((name) => ({ pharmacyId, name, createdById: userId })),
   })
   await tx.medicineType.createMany({
     data: DEFAULT_MEDICINE_TYPES.map((t) => ({
       pharmacyId,
-      name: t.name.toLowerCase(),
+      name: t.name,
       requiredPrescription: t.requiredPrescription,
       createdById: userId,
     })),
   })
   await tx.medicineClass.createMany({
-    data: DEFAULT_MEDICINE_CLASSES.map((name) => ({ pharmacyId, name: name.toLowerCase(), createdById: userId })),
+    data: DEFAULT_MEDICINE_CLASSES.map((name) => ({ pharmacyId, name, createdById: userId })),
   })
 }
 

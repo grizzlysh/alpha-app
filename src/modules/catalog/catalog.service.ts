@@ -85,7 +85,7 @@ export async function applyCatalog(
     nameIndex(tx.medicine.findMany(live)),
   ])
 
-  // ── Validate medicine rows ──
+  // ── Validate medicine rows ── (names keep their typed case; matching ignores it)
   const invalid: CatalogInvalidRow[] = []
   const seen = new Set<string>()
   const rows: CatalogImportInput['medicines'] = []
@@ -97,22 +97,31 @@ export async function applyCatalog(
     if (!m.shape) return fail('SHAPE_REQUIRED')
     if (!m.type) return fail('TYPE_REQUIRED')
     if (!m.class) return fail('CLASS_REQUIRED')
-    if (seen.has(m.name)) return fail('DUPLICATE_IN_FILE')
-    seen.add(m.name)
+    if (seen.has(key(m.name))) return fail('DUPLICATE_IN_FILE')
+    seen.add(key(m.name))
     rows.push({ ...m, ingredients })
   })
 
-  // ── Classifications: listed ones plus any a medicine refers to ──
-  const wantShapes = new Set([...input.shapes.map((s) => s.name), ...rows.map((m) => m.shape)])
-  const wantClasses = new Set([...input.classes.map((c) => c.name), ...rows.map((m) => m.class)])
-  const wantTypes = new Map<string, boolean>()
-  for (const t of input.types) wantTypes.set(t.name, t.requiredPrescription ?? DEFAULT_RX.get(t.name) ?? false)
-  for (const m of rows) if (!wantTypes.has(m.type)) wantTypes.set(m.type, DEFAULT_RX.get(m.type) ?? false)
+  // ── Classifications: listed ones plus any a medicine refers to (key → name as first written) ──
+  const collect = (names: string[]): Map<string, string> => {
+    const map = new Map<string, string>()
+    for (const n of names) if (!map.has(key(n))) map.set(key(n), n)
+    return map
+  }
+  const wantShapes = collect([...input.shapes.map((x) => x.name), ...rows.map((m) => m.shape)])
+  const wantClasses = collect([...input.classes.map((x) => x.name), ...rows.map((m) => m.class)])
+  const wantTypes = new Map<string, { name: string; rx: boolean }>()
+  for (const t of input.types) {
+    if (!wantTypes.has(key(t.name))) wantTypes.set(key(t.name), { name: t.name, rx: t.requiredPrescription ?? DEFAULT_RX.get(key(t.name)) ?? false })
+  }
+  for (const m of rows) {
+    if (!wantTypes.has(key(m.type))) wantTypes.set(key(m.type), { name: m.type, rx: DEFAULT_RX.get(key(m.type)) ?? false })
+  }
 
-  const newShapes = [...wantShapes].filter((n) => !shapeIds.has(n))
-  const newClasses = [...wantClasses].filter((n) => !classIds.has(n))
-  const newTypes = [...wantTypes].filter(([n]) => !typeIds.has(n))
-  const newMedicines = rows.filter((m) => !medicineIds.has(m.name))
+  const newShapes = [...wantShapes].filter(([k]) => !shapeIds.has(k)).map(([, n]) => n)
+  const newClasses = [...wantClasses].filter(([k]) => !classIds.has(k)).map(([, n]) => n)
+  const newTypes = [...wantTypes].filter(([k]) => !typeIds.has(k)).map(([, v]) => v)
+  const newMedicines = rows.filter((m) => !medicineIds.has(key(m.name)))
 
   const result: CatalogImportResult = {
     dryRun: input.dryRun,
@@ -131,7 +140,7 @@ export async function applyCatalog(
   }
   if (newTypes.length) {
     const created = await tx.medicineType.createManyAndReturn({
-      data: newTypes.map(([name, requiredPrescription]) => ({ ...by, name, requiredPrescription })),
+      data: newTypes.map((t) => ({ ...by, name: t.name, requiredPrescription: t.rx })),
       select: { id: true, name: true },
     })
     for (const r of created) typeIds.set(key(r.name), r.id)
@@ -147,15 +156,15 @@ export async function applyCatalog(
         ...by,
         name: m.name,
         unit: m.unit,
-        shapeId: shapeIds.get(m.shape)!,
-        typeId: typeIds.get(m.type)!,
-        medicineClassId: classIds.get(m.class)!,
+        shapeId: shapeIds.get(key(m.shape))!,
+        typeId: typeIds.get(key(m.type))!,
+        medicineClassId: classIds.get(key(m.class))!,
       })),
       select: { id: true, name: true },
     })
-    const idByName = new Map(created.map((r) => [r.name, r.id]))
+    const idByName = new Map(created.map((r) => [key(r.name), r.id]))
     const ingredients = newMedicines.flatMap((m) =>
-      m.ingredients.map((name) => ({ medicineId: idByName.get(m.name)!, name, createdById: userId }))
+      m.ingredients.map((name) => ({ medicineId: idByName.get(key(m.name))!, name, createdById: userId }))
     )
     if (ingredients.length) await tx.medicineIngredient.createMany({ data: ingredients })
   }
@@ -172,16 +181,9 @@ export async function copyCatalog(tx: Tx, sourcePharmacyId: number, targetPharma
   const source = await exportCatalog(sourcePharmacyId, tx)
   return applyCatalog(tx, targetPharmacyId, userId, {
     dryRun: false,
-    shapes: source.shapes.map((s) => ({ name: key(s.name) })),
-    types: source.types.map((t) => ({ name: key(t.name), requiredPrescription: t.requiredPrescription })),
-    classes: source.classes.map((c) => ({ name: key(c.name) })),
-    medicines: source.medicines.map((m) => ({
-      name: key(m.name),
-      unit: key(m.unit),
-      shape: key(m.shape),
-      type: key(m.type),
-      class: key(m.class),
-      ingredients: m.ingredients.map(key),
-    })),
+    shapes: source.shapes,
+    types: source.types,
+    classes: source.classes,
+    medicines: source.medicines,
   })
 }

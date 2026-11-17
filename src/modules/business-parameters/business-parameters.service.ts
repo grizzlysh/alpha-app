@@ -1,5 +1,6 @@
 import { DataType, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { NAME_CASES, NAME_DISPLAY_CASE_KEY } from '@constants/defaultCatalog'
 import {
   BusinessParameterQueryInput,
   UpdateBusinessParameterInput,
@@ -98,6 +99,9 @@ export const updateBusinessParameter = async (
   if (!existing) throw new NotFoundException('Business parameter not found')
 
   assertValueMatchesType(existing.dataType, data.value)
+  if (existing.key === NAME_DISPLAY_CASE_KEY && !(NAME_CASES as readonly string[]).includes(data.value)) {
+    throw new BadRequestException('Value must be one of UPPER, TITLE, LOWER, AS_TYPED')
+  }
 
   return prisma.$transaction(async (tx) => {
     const param = await tx.businessParameter.update({

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { AppRole, PlatformRole } from '@prisma/client'
 import { prisma } from '@config/db'
+import { NAME_CASES, NAME_DISPLAY_CASE_KEY, NameCase } from '@constants/defaultCatalog'
 import { env } from '@config/env'
 import { LoginInput, SelectPharmacyInput } from './auth.validation'
 import {
@@ -135,6 +136,15 @@ const getPharmaciesForUser = async (
     ...p.pharmacy,
     role: { name: p.role.name, type: p.role.type },
   }))
+}
+
+/** The pharmacy's name display preference; UPPER when unset or invalid. */
+const getNameCase = async (pharmacyId: number): Promise<NameCase> => {
+  const param = await prisma.businessParameter.findUnique({
+    where: { pharmacyId_key: { pharmacyId, key: NAME_DISPLAY_CASE_KEY } },
+    select: { value: true },
+  })
+  return (NAME_CASES as readonly string[]).includes(param?.value ?? '') ? (param!.value as NameCase) : 'UPPER'
 }
 
 // ── Services ──────────────────────────────────────────
@@ -341,6 +351,7 @@ export const selectPharmacy = async (
     name: pharmacy.name,
     role: pharmacyRole,
     permissions: toPermissionMap(permissions),
+    nameCase: await getNameCase(pharmacy.id),
   }
 
   return {
@@ -509,6 +520,7 @@ export const getMe = async (
     name: pharmacy.name,
     role,
     permissions: toPermissionMap(permissions),
+    nameCase: await getNameCase(pharmacyId),
   }
 
   return { user: userData, currentPharmacy }
