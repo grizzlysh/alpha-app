@@ -7,7 +7,6 @@ import { RecordStatus } from '@prisma/client'
 export interface MedicineTypeQueryParams {
   search?: string
   status?: RecordStatus
-  isGlobal?: string
   sortBy?: 'name' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
   page?: string
@@ -22,7 +21,6 @@ export interface CreateMedicineTypeBody {
   name: string
   requiredPrescription: boolean
   status: RecordStatus
-  pharmacyUuid?: string
 }
 
 export interface UpdateMedicineTypeBody {
@@ -70,8 +68,8 @@ export interface MedicineTypeResponse {
   uuid: string
   name: string
   requiredPrescription: boolean
-  isGlobal: boolean
   status: RecordStatus
+  medicineCount: number
   createdAt: Date
   updatedAt: Date
 }
@@ -80,5 +78,4 @@ export interface MedicineTypeDropdownItem {
   uuid: string
   name: string
   requiredPrescription: boolean
-  isGlobal: boolean
 }

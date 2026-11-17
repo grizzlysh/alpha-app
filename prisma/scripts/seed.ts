@@ -18,6 +18,7 @@ import {
   AllergyType,
   AllergySeverity,
 } from '@prisma/client'
+import { ensureBusinessParams, seedDefaultClassifications } from '../../src/utils/pharmacyDefaults'
 import bcrypt from 'bcryptjs'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -592,38 +593,7 @@ async function main() {
 
   // ── 10. Business parameters ───────────────────────────────────────────────
   console.log('Creating business parameters...')
-  const businessParams = [
-    // Pricing
-    { key: 'MARGIN_PERCENTAGE',         value: '20',                    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
-    { key: 'PPN_PERCENTAGE_SELL',       value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
-    { key: 'PPN_PERCENTAGE_BUY',        value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
-    { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',                    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
-    // Stock management
-    { key: 'REORDER_LEVEL_DEFAULT',     value: '10',                    dataType: DataType.NUMBER,  description: 'Default low-stock alert threshold in pieces' },
-    { key: 'LOW_STOCK_ALERT_THRESHOLD', value: '5',                     dataType: DataType.NUMBER,  description: 'Critical stock threshold in pieces before urgent reorder alert' },
-    { key: 'ALLOW_FEFO_OVERRIDE',       value: 'true',                  dataType: DataType.BOOLEAN, description: 'Allow staff to select non-FEFO batches during sale' },
-    // Sales & payment
-    { key: 'CREDIT_PAYMENT_DAYS',       value: '30',                    dataType: DataType.NUMBER,  description: 'Default credit term in days for non-cash sales' },
-    { key: 'RETURN_POLICY_DAYS',        value: '7',                     dataType: DataType.NUMBER,  description: 'Number of days after sale within which a return is accepted' },
-    // Receipt
-    { key: 'RECEIPT_HEADER',            value: 'Apotek Sejahtera',       dataType: DataType.STRING,  description: 'Header text printed on patient receipts' },
-    { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
-  ]
-  for (const bp of businessParams) {
-    const existing = await prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId: pharmacy.id, key: bp.key } },
-    })
-    if (!existing) {
-      await prisma.businessParameter.create({
-        data: {
-          pharmacyId: pharmacy.id,
-          ...bp,
-          createdById: owner.id,
-          updatedById: owner.id,
-        },
-      })
-    }
-  }
+  await ensureBusinessParams(prisma as never, pharmacy.id, owner.id, { RECEIPT_HEADER: 'Apotek Sejahtera' })
 
   // ── 11. Storage ───────────────────────────────────────────────────────────
   console.log('Creating storage cabinets, shelves, and bins...')
@@ -717,47 +687,16 @@ async function main() {
   // ── 12. Medicine master data ──────────────────────────────────────────────
   console.log('Creating medicine master data...')
 
-  const shapeNames = ['Tablet', 'Kapsul', 'Sirup', 'Salep', 'Injeksi']
-  const shapes: Record<string, { id: number }> = {}
-  for (const name of shapeNames) {
-    const existing = await prisma.medicineShape.findFirst({
-      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
-    })
-    const shape = existing ?? await prisma.medicineShape.create({
-      data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
-    })
-    shapes[name] = shape
+  // Each pharmacy owns its classifications; start from the default template.
+  if ((await prisma.medicineShape.count({ where: { pharmacyId: pharmacy.id } })) === 0) {
+    await seedDefaultClassifications(prisma as never, pharmacy.id, owner.id)
   }
-
-  const typeNames = ['Obat Bebas', 'Obat Bebas Terbatas', 'Obat Keras', 'Narkotika']
-  const types: Record<string, { id: number }> = {}
-  for (const name of typeNames) {
-    const existing = await prisma.medicineType.findFirst({
-      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
-    })
-    const type = existing ?? await prisma.medicineType.create({
-      data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
-    })
-    types[name] = type
-  }
-
-  const classNames = [
-    'Analgesik & Antipiretik',
-    'Antibiotik',
-    'Antihipertensi',
-    'Vitamin & Suplemen',
-    'Antiinflamasi Nonsteroid',
-  ]
-  const classes: Record<string, { id: number }> = {}
-  for (const name of classNames) {
-    const existing = await prisma.medicineClass.findFirst({
-      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
-    })
-    const cls = existing ?? await prisma.medicineClass.create({
-      data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
-    })
-    classes[name] = cls
-  }
+  const byName = <T extends { id: number; name: string }>(rows: T[]) =>
+    Object.fromEntries(rows.map((r) => [r.name.toLowerCase(), r])) as Record<string, T>
+  const live = { where: { pharmacyId: pharmacy.id, deletedAt: null }, select: { id: true, name: true } }
+  const shapes = byName(await prisma.medicineShape.findMany(live))
+  const types = byName(await prisma.medicineType.findMany(live))
+  const classes = byName(await prisma.medicineClass.findMany(live))
 
   // ── 12. Medicines ─────────────────────────────────────────────────────────
   console.log('Creating medicines...')
@@ -777,9 +716,9 @@ async function main() {
       data: {
         pharmacyId: pharmacy.id,
         name: def.name,
-        shapeId: shapes[def.shape].id,
-        typeId: types[def.type].id,
-        medicineClassId: classes[def.cls].id,
+        shapeId: shapes[def.shape.toLowerCase()].id,
+        typeId: types[def.type.toLowerCase()].id,
+        medicineClassId: classes[def.cls.toLowerCase()].id,
         unit: def.unit,
         status: RecordStatus.ACTIVE,
         createdById: owner.id,

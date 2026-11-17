@@ -28,8 +28,7 @@ export const getMedicineClasses = async (
 ): Promise<void> => {
   try {
     const { data, meta } = await MedicineClassService.getMedicineClasses(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query as any
     )
 
@@ -47,8 +46,7 @@ export const getMedicineClass = async (
   try {
     const medicine_class = await MedicineClassService.getMedicineClassByUuid(
       parseUuid(req.params.medicine_class_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole
+      req.user!.pharmacyId!
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_CLASS_FETCHED, medicine_class)
@@ -65,8 +63,7 @@ export const createMedicineClass = async (
   try {
     const medicine_class = await MedicineClassService.createMedicineClass(
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -85,8 +82,7 @@ export const updateMedicineClass = async (
     const medicine_class = await MedicineClassService.updateMedicineClass(
       parseUuid(req.params.medicine_class_uuid),
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -104,8 +100,7 @@ export const deleteMedicineClass = async (
   try {
     await MedicineClassService.deleteMedicineClass(
       parseUuid(req.params.medicine_class_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -122,8 +117,7 @@ export const getMedicineClassesDropdown = async (
 ): Promise<void> => {
   try {
     const data = await MedicineClassService.getMedicineClassesDropdown(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query.search as string | undefined
     )
     sendSuccess(res, MESSAGE_CODES.MEDICINE_CLASSES_FETCHED, data)

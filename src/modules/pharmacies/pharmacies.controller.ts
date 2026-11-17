@@ -217,3 +217,12 @@ export const deleteBusinessLicense = async (
     sendNoContent(res, MESSAGE_CODES.BUSINESS_LICENSE_DELETED)
   } catch (err) { next(err) }
 }
+
+export const getSetupStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data = await PharmacyService.getSetupStatus(req.user!.pharmacyId!)
+    sendSuccess(res, MESSAGE_CODES.PHARMACY_FETCHED, data)
+  } catch (err) {
+    next(err)
+  }
+}

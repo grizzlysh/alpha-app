@@ -80,6 +80,9 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Invoice number already exists': 'Nomor faktur sudah terdaftar',
   'Medicine class with this name already exists': 'Nama kelas obat sudah terdaftar',
   'Medicine shape with this name already exists': 'Nama bentuk obat sudah terdaftar',
+  'Value must be a number of 0 or more': 'Nilai harus berupa angka 0 atau lebih',
+  'Percentage must be between 0 and 100': 'Persentase harus antara 0 sampai 100',
+  'Value must be true or false': 'Nilai harus true atau false',
   'Medicine type with this name already exists': 'Nama jenis obat sudah terdaftar',
   'Medicine with this name already exists': 'Nama obat sudah terdaftar',
   'Pharmacy code already exists': 'Kode apotek sudah dipakai',
@@ -157,6 +160,11 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
  * originals embed internal UUIDs that mean nothing to a cashier.
  */
 export const PATTERN_TRANSLATIONS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) => string; id: (m: RegExpMatchArray) => string }> = [
+  {
+    pattern: /^Medicine (shape|type|class) is still used by (\d+) medicine\(s\)$/,
+    en: (m) => `This medicine ${m[1]} is still used by ${m[2]} medicine(s)`,
+    id: (m) => `Masih dipakai oleh ${m[2]} obat — pindahkan obatnya dulu sebelum menghapus`,
+  },
   {
     pattern: /^Allergy warning: (.+)$/,
     en: (m) => `Allergy warning: ${m[1]}. Confirm to continue.`,

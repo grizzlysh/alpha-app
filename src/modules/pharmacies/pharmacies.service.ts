@@ -1,4 +1,5 @@
-import { CustomerType, DataType, PlatformRole, Prisma } from '@prisma/client'
+import { AppRole, PlatformRole, Prisma, RecordStatus } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { prisma } from '@config/db'
 import {
@@ -9,27 +10,15 @@ import {
   CreateBusinessLicenseInput,
   UpdateBusinessLicenseInput,
 } from './pharmacies.validation'
-import { PharmacyResponse, PharmacyDdlItem, BusinessLicenseItem } from './pharmacies.interface'
+import { PharmacyResponse, PharmacyDdlItem, BusinessLicenseItem, PharmacyCreateResult, PharmacySetupStatus } from './pharmacies.interface'
+import { BadRequestException } from '@exceptions/BadRequestException'
+import { generateTemporaryPassword } from '@utils/tempPassword'
+import { ensureBusinessParams, ensureWalkInCustomer, seedDefaultClassifications } from '@utils/pharmacyDefaults'
+import { copyCatalog } from '@modules/catalog/catalog.service'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
-
-// ── Default business parameters seeded on pharmacy creation ──────────────────
-
-const DEFAULT_BUSINESS_PARAMS: Array<{ key: string; value: string; dataType: DataType; description: string }> = [
-  { key: 'MARGIN_PERCENTAGE',         value: '20',    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
-  { key: 'PPN_PERCENTAGE_SELL',       value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
-  { key: 'PPN_PERCENTAGE_BUY',        value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
-  { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
-  { key: 'REORDER_LEVEL_DEFAULT',     value: '10',    dataType: DataType.NUMBER,     description: 'Default low-stock alert threshold in pieces' },
-  { key: 'LOW_STOCK_ALERT_THRESHOLD', value: '5',     dataType: DataType.NUMBER,     description: 'Critical stock threshold in pieces before urgent reorder alert' },
-  { key: 'ALLOW_FEFO_OVERRIDE',       value: 'true',  dataType: DataType.BOOLEAN,    description: 'Allow staff to select non-FEFO batches during sale' },
-  { key: 'CREDIT_PAYMENT_DAYS',       value: '30',    dataType: DataType.NUMBER,     description: 'Default credit term in days for non-cash sales' },
-  { key: 'RETURN_POLICY_DAYS',        value: '7',     dataType: DataType.NUMBER,     description: 'Number of days after sale within which a return is accepted' },
-  { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
-  { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
-]
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -70,6 +59,13 @@ const pharmacySelect = {
     },
     take: 1,
   },
+  _count: {
+    select: {
+      placements: {
+        where: { status: 'ACTIVE' as const, deletedAt: null, leftAt: null, role: { type: AppRole.OWNER } },
+      },
+    },
+  },
 }
 
 const formatResponse = (pharmacy: Prisma.PharmacyGetPayload<{ select: typeof pharmacySelect }>): PharmacyResponse => ({
@@ -90,17 +86,16 @@ const formatResponse = (pharmacy: Prisma.PharmacyGetPayload<{ select: typeof pha
         activeLicense: pharmacy.placements[0].practiceLicenses[0] ?? null,
       }
     : null,
+  hasOwner: pharmacy._count.placements > 0,
   createdAt: pharmacy.createdAt,
   updatedAt: pharmacy.updatedAt,
 })
 
 const ensureUniqueCode = async (code: string, excludeUuid?: string): Promise<void> => {
+  // The unique index covers deleted pharmacies too, so their codes stay taken.
   const existing = await prisma.pharmacy.findFirst({
-    where: {
-      code,
-      deletedAt: null,
-      ...(excludeUuid && { NOT: { uuid: excludeUuid } }),
-    },
+    where: { code, ...(excludeUuid && { NOT: { uuid: excludeUuid } }) },
+    select: { id: true },
   })
   if (existing) throw new ConflictException('Pharmacy code already exists')
 }
@@ -114,6 +109,10 @@ export const getPharmacies = async (
 ): Promise<{ data: PharmacyResponse[]; meta: PaginationMeta }> => {
   const { search, status, category, sortBy, sortOrder, page, limit } = query
   const skip = (page - 1) * limit
+
+  if (platformRole !== PlatformRole.PLATFORM_ADMIN && !pharmacyId) {
+    throw new ForbiddenException('You do not have access to this pharmacy')
+  }
 
   // PLATFORM_ADMIN sees all, others see only their own
   const pharmacyFilter =
@@ -172,59 +171,143 @@ export const getPharmacyByUuid = async (
   return formatResponse(pharmacy)
 }
 
+/**
+ * Onboards a pharmacy in one transaction: the pharmacy, its business license,
+ * its owner's account and placement, and its starting data (business
+ * parameters, walk-in customer and medicine classifications — the default
+ * template, or a copy of another pharmacy's catalog). Nothing is left
+ * half-created if any step fails.
+ */
 export const createPharmacy = async (
   data: CreatePharmacyInput,
   userId: number
-): Promise<PharmacyResponse> => {
-  try {
-    const pharmacy = await prisma.$transaction(async (tx) => {
-      const created = await tx.pharmacy.create({
-        data: {
-          name: data.name,
-          code: data.code,
-          category: data.category,
-          phone: data.phone,
-          address: data.address,
-          location: data.location,
-          email: data.email,
-          createdById: userId,
-          updatedById: userId,
-        },
-      })
+): Promise<PharmacyCreateResult> => {
+  await ensureUniqueCode(data.code)
 
-      await tx.businessParameter.createMany({
-        data: DEFAULT_BUSINESS_PARAMS.map((p) => ({
-          pharmacyId: created.id,
-          key: p.key,
-          value: p.key === 'RECEIPT_HEADER' ? data.name : p.value,
-          dataType: p.dataType,
-          description: p.description,
-          createdById: userId,
-          updatedById: userId,
-        })),
-      })
+  // ── Resolve everything that can fail before writing ──
+  const source = data.copyFromPharmacyUuid
+    ? await prisma.pharmacy.findFirst({ where: { uuid: data.copyFromPharmacyUuid, deletedAt: null }, select: { id: true } })
+    : null
+  if (data.copyFromPharmacyUuid && !source) throw new NotFoundException('Pharmacy not found')
 
-      await tx.customer.create({
-        data: {
-          pharmacyId: created.id,
-          customerType: CustomerType.PATIENT,
-          name: 'Walk-in Patient',
-          isWalkIn: true,
-          createdById: userId,
-        },
+  const ownerRole = data.owner
+    ? await prisma.role.findFirst({
+        where: { type: AppRole.OWNER, pharmacyId: null, deletedAt: null, status: RecordStatus.ACTIVE },
+        select: { id: true },
       })
+    : null
+  if (data.owner && !ownerRole) throw new NotFoundException('ROLE_NOT_FOUND')
 
-      return tx.pharmacy.findFirst({ where: { id: created.id }, select: pharmacySelect })
+  let existingOwner: { id: number; uuid: string; name: string; email: string } | null = null
+  if (data.owner?.mode === 'existing') {
+    existingOwner = await prisma.user.findFirst({
+      where: { uuid: data.owner.userUuid, deletedAt: null },
+      select: { id: true, uuid: true, name: true, email: true, platformRole: true, status: true },
+    }).then((u) => {
+      if (!u) throw new NotFoundException('USER_NOT_FOUND')
+      if (u.platformRole !== null) throw new BadRequestException('PLATFORM_USER_CANNOT_OWN_PHARMACY')
+      if (u.status !== RecordStatus.ACTIVE) throw new BadRequestException('USER_INACTIVE')
+      return u
     })
+  }
+  if (data.owner?.mode === 'new') {
+    const taken = await prisma.user.findFirst({ where: { email: data.owner.email }, select: { deletedAt: true } })
+    if (taken) throw new ConflictException(taken.deletedAt ? 'EMAIL_BELONGS_TO_DELETED_USER' : 'EMAIL_ALREADY_EXISTS')
+  }
 
-    return formatResponse(pharmacy!)
+  const temporaryPassword = data.owner?.mode === 'new' ? generateTemporaryPassword() : null
+  const passwordHash = temporaryPassword ? await bcrypt.hash(temporaryPassword, 10) : null
+
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const created = await tx.pharmacy.create({
+          data: {
+            name: data.name,
+            code: data.code,
+            category: data.category,
+            phone: data.phone,
+            address: data.address,
+            location: data.location,
+            email: data.email,
+            createdById: userId,
+            updatedById: userId,
+          },
+        })
+
+        if (data.license) {
+          await tx.businessLicense.create({
+            data: {
+              pharmacyId: created.id,
+              licenseNumber: data.license.licenseNumber,
+              validFrom: data.license.validFrom,
+              validUntil: data.license.validUntil,
+              createdById: userId,
+              updatedById: userId,
+            },
+          })
+        }
+
+        // ── Owner ──
+        let owner: PharmacyCreateResult['owner'] = null
+        if (data.owner && ownerRole) {
+          const account =
+            existingOwner ??
+            (await tx.user.create({
+              data: {
+                name: data.owner.mode === 'new' ? data.owner.name : '',
+                email: data.owner.mode === 'new' ? data.owner.email : '',
+                phone: data.owner.mode === 'new' ? data.owner.phone : undefined,
+                password: passwordHash!,
+                mustChangePassword: true,
+                createdById: userId,
+                updatedById: userId,
+              },
+              select: { id: true, uuid: true, name: true, email: true },
+            }))
+          await tx.placement.create({
+            data: {
+              userId: account.id,
+              pharmacyId: created.id,
+              roleId: ownerRole.id,
+              joinedAt: new Date(),
+              createdById: userId,
+              updatedById: userId,
+            },
+          })
+          owner = { uuid: account.uuid, name: account.name, email: account.email, temporaryPassword }
+        }
+
+        // ── Starting data ──
+        let copied: PharmacyCreateResult['copied'] = null
+        if (source) {
+          const result = await copyCatalog(tx, source.id, created.id, userId)
+          copied = {
+            medicines: result.medicines.created,
+            shapes: result.shapes.created,
+            types: result.types.created,
+            classes: result.classes.created,
+          }
+          // Same pricing and policy settings as the source branch (receipt header excepted).
+          const sourceParams = await tx.businessParameter.findMany({ where: { pharmacyId: source.id }, select: { key: true, value: true } })
+          const values = Object.fromEntries(sourceParams.map((p) => [p.key, p.value]))
+          await ensureBusinessParams(tx, created.id, userId, { ...values, RECEIPT_HEADER: data.name })
+        } else {
+          await seedDefaultClassifications(tx, created.id, userId)
+          await ensureBusinessParams(tx, created.id, userId, { RECEIPT_HEADER: data.name })
+        }
+        await ensureWalkInCustomer(tx, created.id, userId)
+
+        const pharmacy = await tx.pharmacy.findFirstOrThrow({ where: { id: created.id }, select: pharmacySelect })
+        return { pharmacy: formatResponse(pharmacy), owner, copied }
+      },
+      { timeout: 60_000, maxWait: 10_000 }
+    )
   } catch (e) {
-    if (
-      e instanceof PrismaClientKnownRequestError &&
-      e.code === 'P2002' &&
-      (e.meta?.target as string[] | undefined)?.some((f) => f === 'code')
-    ) {
-      throw new ConflictException('Pharmacy code already exists')
+    if (e instanceof PrismaClientKnownRequestError && e.code === 'P2002') {
+      const target = (e.meta?.target as string[] | undefined) ?? []
+      if (target.includes('code')) throw new ConflictException('Pharmacy code already exists')
+      if (target.includes('email')) throw new ConflictException('EMAIL_ALREADY_EXISTS')
     }
     throw e
   }
@@ -260,13 +343,19 @@ export const updatePharmacy = async (
     await ensureUniqueCode(data.code, uuid)
   }
 
-  const pharmacy = await prisma.pharmacy.update({
-    where: { id: existing.id },
-    data: { ...data, updatedById: userId },
-    select: pharmacySelect,
-  })
-
-  return formatResponse(pharmacy)
+  try {
+    const pharmacy = await prisma.pharmacy.update({
+      where: { id: existing.id },
+      data: { ...data, updatedById: userId },
+      select: pharmacySelect,
+    })
+    return formatResponse(pharmacy)
+  } catch (e) {
+    if (e instanceof PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw new ConflictException('Pharmacy code already exists')
+    }
+    throw e
+  }
 }
 
 
@@ -492,12 +581,36 @@ export const getPharmaciesDdl = async (
 ): Promise<PharmacyDdlItem[]> => {
   const where =
     platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { status: 'ACTIVE' as const }
-      : { id: pharmacyId!, status: 'ACTIVE' as const }
+      ? { status: 'ACTIVE' as const, deletedAt: null }
+      : { id: pharmacyId ?? -1, status: 'ACTIVE' as const, deletedAt: null }
 
   return prisma.pharmacy.findMany({
     where,
     select: { uuid: true, name: true, code: true },
     orderBy: { name: 'asc' },
   })
+}
+// ── Setup status (onboarding checklist) ───────────────
+
+/** What a newly onboarded pharmacy still has to set up before it can run. */
+export const getSetupStatus = async (pharmacyId: number): Promise<PharmacySetupStatus> => {
+  const now = new Date()
+  const [license, headPharmacist, staff, medicines, distributors, cabinets, stock] = await Promise.all([
+    prisma.businessLicense.count({ where: { pharmacyId, deletedAt: null, status: 'ACTIVE', validUntil: { gte: now } } }),
+    prisma.placement.count({ where: { pharmacyId, deletedAt: null, leftAt: null, status: 'ACTIVE', isHeadPharmacist: true } }),
+    prisma.placement.count({ where: { pharmacyId, deletedAt: null, leftAt: null, status: 'ACTIVE', role: { type: { not: AppRole.OWNER } } } }),
+    prisma.medicine.count({ where: { pharmacyId, deletedAt: null } }),
+    prisma.distributor.count({ where: { pharmacyId, deletedAt: null } }),
+    prisma.storageCabinet.count({ where: { pharmacyId, deletedAt: null } }),
+    prisma.stock.count({ where: { pharmacyId, totalPieces: { gt: 0 } } }),
+  ])
+  return {
+    hasActiveLicense: license > 0,
+    hasHeadPharmacist: headPharmacist > 0,
+    staffCount: staff,
+    medicineCount: medicines,
+    distributorCount: distributors,
+    storageCabinetCount: cabinets,
+    stockedMedicineCount: stock,
+  }
 }

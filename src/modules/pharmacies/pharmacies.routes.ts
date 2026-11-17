@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import * as PharmacyController from './pharmacies.controller'
 import { authenticate } from '@middlewares/auth'
-import { requirePermission, requirePlatformRole } from '@middlewares/roleGuard'
+import { requirePermission, requirePharmacyAccess, requirePlatformRole } from '@middlewares/roleGuard'
 import { validateBody, validateQuery } from '@middlewares/validate'
 import { PERMISSIONS } from '@constants/permissions'
 import { PlatformRole } from '@prisma/client'
@@ -18,6 +18,8 @@ const router: Router = Router()
 router.use(authenticate)
 
 router.get('/', requirePermission(PERMISSIONS.PHARMACIES_READ), validateQuery(pharmacyQuerySchema), PharmacyController.getPharmacies)
+// The selected pharmacy's onboarding checklist (before /:pharmacy_uuid so it isn't read as a uuid).
+router.get('/setup-status', requirePharmacyAccess, requirePermission(PERMISSIONS.PHARMACIES_READ), PharmacyController.getSetupStatus)
 router.get('/dropdown', requirePermission(PERMISSIONS.PHARMACIES_READ), PharmacyController.getPharmaciesDdl)
 router.get('/:pharmacy_uuid', requirePermission(PERMISSIONS.PHARMACIES_READ), PharmacyController.getPharmacy)
 router.post('/', requirePlatformRole(PlatformRole.PLATFORM_ADMIN), validateBody(createPharmacySchema), PharmacyController.createPharmacy)

@@ -31,7 +31,7 @@
     "zod": "^4.4.3"
   },
   "prisma": {
-    "seed": "ts-node --transpile-only -P tsconfig.seed.json -r tsconfig-paths/register prisma/seed.ts"
+    "seed": "ts-node --transpile-only -P tsconfig.seed.json -r tsconfig-paths/register prisma/scripts/seed.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

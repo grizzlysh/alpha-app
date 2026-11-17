@@ -1,6 +1,6 @@
 import { RecordStatus, AppRole, PlatformRole, User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { generateTemporaryPassword } from '@utils/tempPassword';
 import { prisma } from '@config/db';
 import { BadRequestException } from '@exceptions/BadRequestException';
 import { ConflictException } from '@exceptions/ConflictException';
@@ -103,23 +103,6 @@ function formatPlacement(a: any): PlacementItem {
 }
 
 
-async function getDefaultPassword(): Promise<string> {
-  const param = await prisma.systemParameter.findFirst({
-    where: { key: 'DEFAULT_PASSWORD' },
-  });
-  if (!param) throw new BadRequestException('DEFAULT_PASSWORD_NOT_CONFIGURED');
-  return param.value;
-}
-
-// Unambiguous alphabet (no 0/O, 1/l/I) so the password can be read aloud or copied by hand.
-const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-
-function generateTemporaryPassword(length = 10): string {
-  const bytes = crypto.randomBytes(length);
-  let out = '';
-  for (let i = 0; i < length; i++) out += TEMP_PASSWORD_ALPHABET[bytes[i] % TEMP_PASSWORD_ALPHABET.length];
-  return out;
-}
 
 // ─── Tenant Scoping ───────────────────────────────────────────────────────────
 //
@@ -491,10 +474,14 @@ export async function getUser(actor: UserActor, userUuid: string): Promise<UserD
 
 // ─── Create User ──────────────────────────────────────────────────────────────
 
+/**
+ * New accounts get a random one-time password, returned once so the creator can
+ * hand it over; the user must change it at first sign-in.
+ */
 export async function createUser(
   actor: UserActor,
   body: CreateUserBody
-): Promise<UserDetailItem> {
+): Promise<UserDetailItem & { temporaryPassword: string }> {
   const createdById = actor.id;
   const callerPlatformRole = actor.platformRole;
 
@@ -504,13 +491,12 @@ export async function createUser(
     if (!body.placement) throw new BadRequestException('PLACEMENT_REQUIRED');
   }
 
-  const duplicate = await prisma.user.findFirst({
-    where: { email: body.email, deletedAt: null },
-  });
-  if (duplicate) throw new ConflictException('EMAIL_ALREADY_EXISTS');
+  // Emails are unique across all accounts, deleted ones included (DB constraint).
+  const duplicate = await prisma.user.findFirst({ where: { email: body.email }, select: { deletedAt: true } });
+  if (duplicate) throw new ConflictException(duplicate.deletedAt ? 'EMAIL_BELONGS_TO_DELETED_USER' : 'EMAIL_ALREADY_EXISTS');
 
-  const defaultPassword = await getDefaultPassword();
-  const hashed = await bcrypt.hash(defaultPassword, BCRYPT_ROUNDS);
+  const temporaryPassword = generateTemporaryPassword();
+  const hashed = await bcrypt.hash(temporaryPassword, BCRYPT_ROUNDS);
 
   if (!body.placement) {
     const user = await prisma.user.create({
@@ -527,7 +513,7 @@ export async function createUser(
       },
       select: { ...userBaseSelect, updatedAt: true },
     });
-    return { ...user, placementCount: 0, placements: [] };
+    return { ...user, placementCount: 0, placements: [], temporaryPassword };
   }
 
   const pharmacy = await prisma.pharmacy.findFirst({
@@ -598,7 +584,7 @@ export async function createUser(
     return user.uuid;
   });
 
-  return getUser(actor, userUuid);
+  return { ...(await getUser(actor, userUuid)), temporaryPassword };
 }
 
 // ─── Update User ──────────────────────────────────────────────────────────────
@@ -622,9 +608,10 @@ export async function updateUser(
 
   if (body.email && body.email !== user.email) {
     const duplicate = await prisma.user.findFirst({
-      where: { email: body.email, deletedAt: null, id: { not: user.id } },
+      where: { email: body.email, id: { not: user.id } },
+      select: { deletedAt: true },
     });
-    if (duplicate) throw new ConflictException('EMAIL_ALREADY_EXISTS');
+    if (duplicate) throw new ConflictException(duplicate.deletedAt ? 'EMAIL_BELONGS_TO_DELETED_USER' : 'EMAIL_ALREADY_EXISTS');
   }
 
   await prisma.user.update({
@@ -817,10 +804,13 @@ export async function createPlacement(
     throw new ForbiddenException('CANNOT_ASSIGN_OWNER_ROLE');
   }
 
-  const activeCount = await prisma.placement.count({
-    where: { userId: user.id, deletedAt: null, status: RecordStatus.ACTIVE, leftAt: null },
-  });
-  if (activeCount >= 3) throw new BadRequestException('MAX_PLACEMENTS_REACHED');
+  // Staff work at no more than 3 pharmacies at once; an owner may own any number of branches.
+  if (role.type !== AppRole.OWNER) {
+    const activeCount = await prisma.placement.count({
+      where: { userId: user.id, deletedAt: null, status: RecordStatus.ACTIVE, leftAt: null, role: { type: { not: AppRole.OWNER } } },
+    });
+    if (activeCount >= 3) throw new BadRequestException('MAX_PLACEMENTS_REACHED');
+  }
 
   const duplicate = await prisma.placement.findFirst({
     where: { userId: user.id, pharmacyId: pharmacy.id, deletedAt: null, leftAt: null, status: RecordStatus.ACTIVE },

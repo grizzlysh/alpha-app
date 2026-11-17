@@ -5,7 +5,6 @@ import { ParamsDictionary } from 'express-serve-static-core'
 
 export interface BusinessParameterQueryParams {
   search?: string
-  pharmacyUuid?: string
   sortBy?: 'key' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
   page?: string

@@ -64,6 +64,7 @@ export interface LoginUserData {
   name: string
   email: string
   platformRole: PlatformRole | null
+  mustChangePassword: boolean
   accessiblePharmacies: PharmacyItem[]
 }
 

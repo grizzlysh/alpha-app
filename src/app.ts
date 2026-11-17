@@ -37,6 +37,7 @@ import prescriptionRoutes from '@modules/prescriptions/prescriptions.routes'
 import inventoryRoutes from '@modules/inventory/inventory.routes'
 import medicalRecordRoutes from '@modules/medical-records/medical-records.routes'
 import examinationRoutes from '@modules/examinations/examinations.routes'
+import catalogRoutes from '@modules/catalog/catalog.routes'
 
 
 
@@ -60,6 +61,8 @@ app.use(rateLimiter)
 
 // ── Body Parser ──────────────────────────────
 app.use(cookieParser()) 
+// A whole medicine catalog can exceed the default 100kb body limit.
+app.use('/api/catalog', express.json({ limit: '5mb' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -85,6 +88,7 @@ app.use('/api/medicines', medicineRoutes)
 app.use('/api/medicine-shapes', medicineShapeRoutes)
 app.use('/api/medicine-types', medicineTypeRoutes)
 app.use('/api/medicine-classes', medicineClassRoutes)
+app.use('/api/catalog', catalogRoutes)
 app.use('/api/purchase-orders', purchaseOrderRoutes)
 app.use('/api/invoices', invoiceRoutes)
 app.use('/api/stock', stockRoutes)

@@ -21,8 +21,7 @@ export const getBusinessParameters = async (
 ): Promise<void> => {
   try {
     const { data, meta } = await BusinessParameterService.getBusinessParameters(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query as any
     )
 
@@ -40,8 +39,7 @@ export const getBusinessParameter = async (
   try {
     const param = await BusinessParameterService.getBusinessParameterByUuid(
       parseUuid(req.params.business_parameter_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole
+      req.user!.pharmacyId!
     )
 
     sendSuccess(res, MESSAGE_CODES.PHARMACY_PARAMETERS_FETCHED, param)
@@ -59,8 +57,7 @@ export const updateBusinessParameter = async (
     const param = await BusinessParameterService.updateBusinessParameter(
       parseUuid(req.params.business_parameter_uuid),
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 

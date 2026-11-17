@@ -121,10 +121,8 @@ export const getRolesDdl = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const data = await RoleService.getRolesDdl(
-      req.user!.pharmacyId,
-      req.user!.platformRole
-    )
+    const pharmacyUuid = typeof req.query.pharmacyUuid === 'string' ? parseUuid(req.query.pharmacyUuid) : undefined
+    const data = await RoleService.getRolesDdl(req.user!.pharmacyId, req.user!.platformRole, pharmacyUuid)
     sendSuccess(res, MESSAGE_CODES.ROLES_FETCHED, data)
   } catch (err) {
     next(err)

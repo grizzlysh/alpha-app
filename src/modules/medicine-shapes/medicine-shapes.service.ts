@@ -1,4 +1,4 @@
-import { PlatformRole, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   CreateMedicineShapeInput,
@@ -8,298 +8,157 @@ import {
 import { MedicineShapeResponse, MedicineShapeDropdownItem } from './medicine-shapes.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
+
+// Every pharmacy owns its own list — there are no shared/global rows. A new
+// pharmacy starts from the default template (see constants/defaultCatalog).
 
 // ── Helpers ───────────────────────────────────────────
 
 const medicineShapeSelect = {
   uuid: true,
   name: true,
-  pharmacyId: true,
   status: true,
   createdAt: true,
   updatedAt: true,
-}
+  _count: { select: { medicines: { where: { deletedAt: null } } } },
+} satisfies Prisma.MedicineShapeSelect
 
-const formatResponse = (medicine_shape: Prisma.MedicineShapeGetPayload<{ select: typeof medicineShapeSelect }>): MedicineShapeResponse => ({
-  uuid: medicine_shape.uuid,
-  name: medicine_shape.name,
-  isGlobal: medicine_shape.pharmacyId === null,
-  status: medicine_shape.status,
-  createdAt: medicine_shape.createdAt,
-  updatedAt: medicine_shape.updatedAt,
+const formatResponse = (row: Prisma.MedicineShapeGetPayload<{ select: typeof medicineShapeSelect }>): MedicineShapeResponse => ({
+  uuid: row.uuid,
+  name: row.name,
+  status: row.status,
+  medicineCount: row._count.medicines,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
 })
 
-const checkDuplicate = async (
-  name: string,
-  pharmacyId: number | null,
-  excludeUuid?: string
-): Promise<void> => {
+const checkDuplicate = async (name: string, pharmacyId: number, excludeUuid?: string): Promise<void> => {
   const existing = await prisma.medicineShape.findFirst({
     where: {
-      name,
+      name: { equals: name, mode: 'insensitive' },
       pharmacyId,
       deletedAt: null,
-      ...(excludeUuid && { NOT: { uuid: excludeUuid } })
-    }
+      ...(excludeUuid && { NOT: { uuid: excludeUuid } }),
+    },
+    select: { id: true },
   })
-
-  if (existing) {
-    throw new ConflictException('Medicine shape with this name already exists')
-  }
+  if (existing) throw new ConflictException('Medicine shape with this name already exists')
 }
 
-const checkGlobalAccess = async (
-  uuid: string,
-  platformRole: PlatformRole | null
-): Promise<void> => {
-  const medicine_shape = await prisma.medicineShape.findUnique({
-    where: { uuid },
-    select: { pharmacyId: true }
+const findOwn = async (uuid: string, pharmacyId: number): Promise<{ id: number }> => {
+  const row = await prisma.medicineShape.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true },
   })
-
-  if (medicine_shape?.pharmacyId === null &&
-    platformRole !== PlatformRole.PLATFORM_ADMIN) {
-    throw new ForbiddenException(
-      'Global records can only be modified by platform admin'
-    )
-  }
-}
-
-const resolvePharmacyId = async (
-  pharmacyUuid?: string
-): Promise<number | null> => {
-  if (!pharmacyUuid) return null
-
-  const pharmacy = await prisma.pharmacy.findUnique({
-    where: { uuid: pharmacyUuid },
-    select: { id: true }
-  })
-
-  if (!pharmacy) throw new NotFoundException('Pharmacy not found')
-
-  return pharmacy.id
+  if (!row) throw new NotFoundException('Medicine shape not found')
+  return row
 }
 
 // ── Services ──────────────────────────────────────────
 
 export const getMedicineShapes = async (
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   query: MedicineShapeQueryInput
 ): Promise<{ data: MedicineShapeResponse[]; meta: PaginationMeta }> => {
-  const { search, status, isGlobal, sortBy, sortOrder, page, limit } = query
+  const { search, status, sortBy, sortOrder, page, limit } = query
 
-  const skip: number = (page - 1) * limit
-
-  // build where based on role
-  let pharmacyFilter = {}
-
-  if (platformRole === PlatformRole.PLATFORM_ADMIN) {
-    // platform admin sees all
-    if (isGlobal === 'true') {
-      pharmacyFilter = { pharmacyId: null }
-    } else if (isGlobal === 'false') {
-      pharmacyFilter = { pharmacyId: { not: null } }
-    }
-    // no filter = sees everything
-  } else {
-    // pharmacy user sees global + their own
-    pharmacyFilter = {
-      OR: [
-        { pharmacyId: null },
-        { pharmacyId }
-      ]
-    }
-
-    if (isGlobal === 'true') {
-      pharmacyFilter = { pharmacyId: null }
-    } else if (isGlobal === 'false') {
-      pharmacyFilter = { pharmacyId }
-    }
-  }
-
-  const where = {
-    ...pharmacyFilter,
+  const where: Prisma.MedicineShapeWhereInput = {
+    pharmacyId,
     deletedAt: null,
     ...(status && { status }),
-    ...(search && {
-      name: { contains: search, mode: 'insensitive' as const }
-    })
+    ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
   }
 
-  const [medicine_shapes, total] = await prisma.$transaction([
+  const [rows, total] = await prisma.$transaction([
     prisma.medicineShape.findMany({
       where,
       select: medicineShapeSelect,
       orderBy: { [sortBy]: sortOrder },
-      skip,
+      skip: (page - 1) * limit,
       take: limit,
     }),
     prisma.medicineShape.count({ where }),
   ])
 
-  const meta: PaginationMeta = {
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-  }
-
   return {
-    data: medicine_shapes.map(formatResponse),
-    meta
+    data: rows.map(formatResponse),
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
   }
 }
 
-export const getMedicineShapeByUuid = async (
-  uuid: string,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null
-): Promise<MedicineShapeResponse> => {
-  const where =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { uuid, deletedAt: null }
-      : {
-        uuid,
-        deletedAt: null,
-        OR: [{ pharmacyId: null }, { pharmacyId }]
-      }
-
-  const medicine_shape = await prisma.medicineShape.findFirst({
-    where,
+export const getMedicineShapeByUuid = async (uuid: string, pharmacyId: number): Promise<MedicineShapeResponse> => {
+  const row = await prisma.medicineShape.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
     select: medicineShapeSelect,
   })
-
-  if (!medicine_shape) throw new NotFoundException('Medicine shape not found')
-
-  return formatResponse(medicine_shape)
+  if (!row) throw new NotFoundException('Medicine shape not found')
+  return formatResponse(row)
 }
 
 export const createMedicineShape = async (
   data: CreateMedicineShapeInput,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   userId: number
 ): Promise<MedicineShapeResponse> => {
-  let resolvedPharmacyId: number | null
+  await checkDuplicate(data.name, pharmacyId)
 
-  if (platformRole === PlatformRole.PLATFORM_ADMIN) {
-    // platform admin: use pharmacyUuid from body or null (global)
-    resolvedPharmacyId = data.pharmacyUuid
-      ? await resolvePharmacyId(data.pharmacyUuid)
-      : null
-  } else {
-    // pharmacy user: always use their own pharmacyId
-    resolvedPharmacyId = pharmacyId
-  }
-
-  await checkDuplicate(data.name, resolvedPharmacyId)
-
-  const medicine_shape = await prisma.medicineShape.create({
+  const row = await prisma.medicineShape.create({
     data: {
       name: data.name,
       status: data.status,
-      pharmacyId: resolvedPharmacyId,
+      pharmacyId,
       createdById: userId,
     },
     select: medicineShapeSelect,
   })
 
-  return formatResponse(medicine_shape)
+  return formatResponse(row)
 }
 
 export const updateMedicineShape = async (
   uuid: string,
   data: UpdateMedicineShapeInput,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   userId: number
 ): Promise<MedicineShapeResponse> => {
-  const existing = await prisma.medicineShape.findFirst({
-    where: { uuid, deletedAt: null },
-    select: { id: true, pharmacyId: true }
-  })
+  const existing = await findOwn(uuid, pharmacyId)
+  if (data.name) await checkDuplicate(data.name, pharmacyId, uuid)
 
-  if (!existing) throw new NotFoundException('Medicine shape not found')
-
-  // check global access
-  await checkGlobalAccess(uuid, platformRole)
-
-  // check pharmacy user only edits their own custom
-  if (
-    platformRole !== PlatformRole.PLATFORM_ADMIN &&
-    existing.pharmacyId !== pharmacyId
-  ) {
-    throw new ForbiddenException('You can only edit your own pharmacy records')
-  }
-
-  if (data.name) {
-    await checkDuplicate(data.name, existing.pharmacyId, uuid)
-  }
-
-  const medicine_shape = await prisma.medicineShape.update({
+  const row = await prisma.medicineShape.update({
     where: { id: existing.id },
     data: { ...data, updatedById: userId },
     select: medicineShapeSelect,
   })
 
-  return formatResponse(medicine_shape)
+  return formatResponse(row)
 }
 
-export const deleteMedicineShape = async (
-  uuid: string,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
-  userId: number
-): Promise<void> => {
-  const existing = await prisma.medicineShape.findFirst({
-    where: { uuid, deletedAt: null },
-    select: { id: true, pharmacyId: true }
-  })
+export const deleteMedicineShape = async (uuid: string, pharmacyId: number, userId: number): Promise<void> => {
+  const existing = await findOwn(uuid, pharmacyId)
 
-  if (!existing) throw new NotFoundException('Medicine shape not found')
-
-  // check global access
-  await checkGlobalAccess(uuid, platformRole)
-
-  // check pharmacy user only deletes their own custom
-  if (
-    platformRole !== PlatformRole.PLATFORM_ADMIN &&
-    existing.pharmacyId !== pharmacyId
-  ) {
-    throw new ForbiddenException('You can only delete your own pharmacy records')
+  const inUse = await prisma.medicine.count({ where: { shapeId: existing.id, deletedAt: null } })
+  if (inUse > 0) {
+    throw new ConflictException(`Medicine shape is still used by ${inUse} medicine(s)`)
   }
 
   await prisma.medicineShape.update({
     where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    }
+    data: { deletedAt: new Date(), deletedById: userId },
   })
 }
 
 export const getMedicineShapesDropdown = async (
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   search?: string
 ): Promise<MedicineShapeDropdownItem[]> => {
-  const pharmacyFilter =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? {}
-      : { OR: [{ pharmacyId: null }, { pharmacyId }] }
-
-  const rows = await prisma.medicineShape.findMany({
+  return prisma.medicineShape.findMany({
     where: {
-      ...pharmacyFilter,
+      pharmacyId,
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, pharmacyId: true },
+    select: { uuid: true, name: true },
     orderBy: { name: 'asc' },
   })
-
-  return rows.map(r => ({ uuid: r.uuid, name: r.name, isGlobal: r.pharmacyId === null }))
 }

@@ -151,6 +151,31 @@ export interface PharmacyResponse {
   status: RecordStatus
   activeLicense: ActiveBusinessLicense | null
   pharmacistInCharge: PharmacistInCharge | null
+  /** False until someone holds an active Owner placement — onboarding isn't finished. */
+  hasOwner: boolean
   createdAt: Date
   updatedAt: Date
+}
+export interface PharmacyCreateResult {
+  pharmacy: PharmacyResponse
+  owner: {
+    uuid: string
+    name: string
+    email: string
+    /** Only for a newly created account; shown once, never stored in plain text. */
+    temporaryPassword: string | null
+  } | null
+  /** What was copied when the pharmacy started from another one's catalog. */
+  copied: { medicines: number; shapes: number; types: number; classes: number } | null
+}
+
+export interface PharmacySetupStatus {
+  hasActiveLicense: boolean
+  hasHeadPharmacist: boolean
+  /** Active placements other than owners. */
+  staffCount: number
+  medicineCount: number
+  distributorCount: number
+  storageCabinetCount: number
+  stockedMedicineCount: number
 }
