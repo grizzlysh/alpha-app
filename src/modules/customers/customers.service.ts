@@ -7,6 +7,7 @@ import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
+import { AllergyConflict, checkPrescriptionAllergies } from '@utils/allergyCheck'
 
 // ── Selects ───────────────────────────────────────────
 
@@ -405,4 +406,28 @@ export const getPurchaseHistory = async (
       totalPages: Math.max(1, Math.ceil(total / query.limit)),
     },
   }
+}
+
+// ── Allergy check ─────────────────────────────────────
+
+/** Which of these medicines clash with the customer's recorded allergies (POS / prescription form). */
+export const checkAllergies = async (
+  uuid: string,
+  pharmacyId: number,
+  items: { medicineUuid?: string; medicineName?: string }[]
+): Promise<AllergyConflict[]> => {
+  const customer = await prisma.customer.findFirst({ where: { uuid, pharmacyId, deletedAt: null }, select: { id: true, isWalkIn: true } })
+  if (!customer) throw new NotFoundException('Customer not found')
+  if (customer.isWalkIn || items.length === 0) return []
+
+  const uuids = items.map((i) => i.medicineUuid).filter((u): u is string => !!u)
+  const names = new Map(
+    (await prisma.medicine.findMany({ where: { uuid: { in: uuids }, pharmacyId, deletedAt: null }, select: { uuid: true, name: true } })).map(
+      (m) => [m.uuid, m.name]
+    )
+  )
+  const lines = items
+    .map((i) => ({ medicineUuid: i.medicineUuid, medicineName: (i.medicineUuid && names.get(i.medicineUuid)) || i.medicineName || '' }))
+    .filter((l) => l.medicineName)
+  return checkPrescriptionAllergies(customer.id, pharmacyId, lines)
 }

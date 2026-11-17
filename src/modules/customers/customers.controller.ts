@@ -9,7 +9,7 @@ import {
   DeleteCustomerRequest,
   PurchaseHistoryRequest,
 } from './customers.interface'
-import { purchaseHistoryQuerySchema } from './customers.validation'
+import { purchaseHistoryQuerySchema, AllergyCheckInput } from './customers.validation'
 import { sendSuccess, sendCreated, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 
@@ -65,4 +65,17 @@ export const getPurchaseHistory = async (req: PurchaseHistoryRequest, res: Respo
     const history = await CustomerService.getPurchaseHistory(parseUuid(req.params.customer_uuid), req.user!.pharmacyId!, query)
     sendSuccess(res, MESSAGE_CODES.CUSTOMER_PURCHASES_FETCHED, history)
   } catch (err) { next(err) }
+}
+
+export const checkAllergies = async (
+  req: Request<{ customer_uuid: string }, {}, AllergyCheckInput>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await CustomerService.checkAllergies(parseUuid(req.params.customer_uuid), req.user!.pharmacyId!, req.body.items)
+    sendSuccess(res, MESSAGE_CODES.CUSTOMER_FETCHED, data)
+  } catch (err) {
+    next(err)
+  }
 }

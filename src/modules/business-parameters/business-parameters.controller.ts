@@ -2,15 +2,10 @@ import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as BusinessParameterService from './business-parameters.service'
 import {
-  businessParameterQuerySchema,
-  updateBusinessParameterSchema,
-} from './business-parameters.validation'
-import {
   GetBusinessParametersRequest,
   GetBusinessParameterRequest,
   UpdateBusinessParameterRequest,
 } from './business-parameters.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 

@@ -4,12 +4,14 @@ import { RecordStatus } from '@prisma/client'
 export const createMedicineTypeSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name is required' }),
   requiredPrescription: z.boolean({ error: 'requiredPrescription must be a boolean' }),
+  isControlled: z.boolean().optional().default(false),
   status: z.enum(RecordStatus),
 })
 
 export const updateMedicineTypeSchema = z.object({
   name: z.string().trim().min(1).optional(),
   requiredPrescription: z.boolean().optional(),
+  isControlled: z.boolean().optional(),
   status: z.enum(RecordStatus).optional(),
 })
 

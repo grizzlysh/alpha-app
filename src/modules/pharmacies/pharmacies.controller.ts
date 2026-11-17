@@ -13,15 +13,6 @@ import {
   UpdateBusinessLicenseRequest,
   DeleteBusinessLicenseRequest,
 } from './pharmacies.interface'
-import {
-  pharmacyQuerySchema,
-  createPharmacySchema,
-  updatePharmacySchema,
-  businessLicenseQuerySchema,
-  createBusinessLicenseSchema,
-  updateBusinessLicenseSchema,
-} from './pharmacies.validation'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess, sendCreated, sendPaginated, sendNoContent } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 

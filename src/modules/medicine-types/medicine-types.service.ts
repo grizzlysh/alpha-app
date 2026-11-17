@@ -19,6 +19,7 @@ const medicineTypeSelect = {
   uuid: true,
   name: true,
   requiredPrescription: true,
+  isControlled: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -29,6 +30,7 @@ const formatResponse = (row: Prisma.MedicineTypeGetPayload<{ select: typeof medi
   uuid: row.uuid,
   name: row.name,
   requiredPrescription: row.requiredPrescription,
+  isControlled: row.isControlled,
   status: row.status,
   medicineCount: row._count.medicines,
   createdAt: row.createdAt,
@@ -108,7 +110,9 @@ export const createMedicineType = async (
   const row = await prisma.medicineType.create({
     data: {
       name: data.name,
-      requiredPrescription: data.requiredPrescription,
+      // A controlled medicine always needs a prescription.
+      requiredPrescription: data.requiredPrescription || data.isControlled,
+      isControlled: data.isControlled,
       status: data.status,
       pharmacyId,
       createdById: userId,
@@ -130,7 +134,7 @@ export const updateMedicineType = async (
 
   const row = await prisma.medicineType.update({
     where: { id: existing.id },
-    data: { ...data, updatedById: userId },
+    data: { ...data, ...(data.isControlled && { requiredPrescription: true }), updatedById: userId },
     select: medicineTypeSelect,
   })
 
@@ -161,7 +165,7 @@ export const getMedicineTypesDropdown = async (
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, requiredPrescription: true },
+    select: { uuid: true, name: true, requiredPrescription: true, isControlled: true },
     orderBy: { name: 'asc' },
   })
 }

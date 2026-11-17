@@ -21,7 +21,7 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
   const live = { pharmacyId, deletedAt: null }
   const [shapes, types, classes, medicines] = await Promise.all([
     db.medicineShape.findMany({ where: live, select: { name: true }, orderBy: { name: 'asc' } }),
-    db.medicineType.findMany({ where: live, select: { name: true, requiredPrescription: true }, orderBy: { name: 'asc' } }),
+    db.medicineType.findMany({ where: live, select: { name: true, requiredPrescription: true, isControlled: true }, orderBy: { name: 'asc' } }),
     db.medicineClass.findMany({ where: live, select: { name: true }, orderBy: { name: 'asc' } }),
     db.medicine.findMany({
       where: live,
@@ -56,7 +56,7 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
 
 // ── Import ────────────────────────────────────────────
 
-const DEFAULT_RX = new Map(DEFAULT_MEDICINE_TYPES.map((t) => [key(t.name), t.requiredPrescription]))
+const DEFAULT_TYPE = new Map(DEFAULT_MEDICINE_TYPES.map((t) => [key(t.name), { rx: t.requiredPrescription, controlled: t.isControlled ?? false }]))
 
 /** name (lowercase) → id for a pharmacy's live rows. */
 async function nameIndex(rows: Promise<{ id: number; name: string }[]>): Promise<Map<string, number>> {
@@ -110,12 +110,16 @@ export async function applyCatalog(
   }
   const wantShapes = collect([...input.shapes.map((x) => x.name), ...rows.map((m) => m.shape)])
   const wantClasses = collect([...input.classes.map((x) => x.name), ...rows.map((m) => m.class)])
-  const wantTypes = new Map<string, { name: string; rx: boolean }>()
+  const wantTypes = new Map<string, { name: string; rx: boolean; controlled: boolean }>()
   for (const t of input.types) {
-    if (!wantTypes.has(key(t.name))) wantTypes.set(key(t.name), { name: t.name, rx: t.requiredPrescription ?? DEFAULT_RX.get(key(t.name)) ?? false })
+    const d = DEFAULT_TYPE.get(key(t.name))
+    if (!wantTypes.has(key(t.name))) {
+      wantTypes.set(key(t.name), { name: t.name, rx: t.requiredPrescription ?? d?.rx ?? false, controlled: t.isControlled ?? d?.controlled ?? false })
+    }
   }
   for (const m of rows) {
-    if (!wantTypes.has(key(m.type))) wantTypes.set(key(m.type), { name: m.type, rx: DEFAULT_RX.get(key(m.type)) ?? false })
+    const d = DEFAULT_TYPE.get(key(m.type))
+    if (!wantTypes.has(key(m.type))) wantTypes.set(key(m.type), { name: m.type, rx: d?.rx ?? false, controlled: d?.controlled ?? false })
   }
 
   const newShapes = [...wantShapes].filter(([k]) => !shapeIds.has(k)).map(([, n]) => n)
@@ -140,7 +144,7 @@ export async function applyCatalog(
   }
   if (newTypes.length) {
     const created = await tx.medicineType.createManyAndReturn({
-      data: newTypes.map((t) => ({ ...by, name: t.name, requiredPrescription: t.rx })),
+      data: newTypes.map((t) => ({ ...by, name: t.name, requiredPrescription: t.rx, isControlled: t.controlled })),
       select: { id: true, name: true },
     })
     for (const r of created) typeIds.set(key(r.name), r.id)

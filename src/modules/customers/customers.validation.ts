@@ -54,3 +54,13 @@ export type PurchaseHistoryQueryInput = z.infer<typeof purchaseHistoryQuerySchem
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>
 export type CustomerQueryInput = z.infer<typeof customerQuerySchema>
+
+export const allergyCheckSchema = z.object({
+  /** Cart lines carry the medicine id; free-text prescription lines only a name. */
+  items: z
+    .array(z.object({ medicineUuid: z.string().uuid().optional(), medicineName: z.string().trim().max(200).optional() }))
+    .max(100)
+    .default([]),
+})
+
+export type AllergyCheckInput = z.infer<typeof allergyCheckSchema>

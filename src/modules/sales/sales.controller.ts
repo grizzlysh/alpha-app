@@ -3,12 +3,6 @@ import { Response, NextFunction } from 'express'
 import { SaleStatus } from '@prisma/client'
 import * as SaleService from './sales.service'
 import {
-  createSaleSchema,
-  cancelSaleSchema,
-  addPaymentSchema,
-  saleQuerySchema,
-} from './sales.validation'
-import {
   GetSalesRequest,
   GetSaleRequest,
   CreateSaleRequest,
@@ -20,7 +14,6 @@ import {
   UpdateSalePaymentHistoryRequest,
   DeleteSalePaymentHistoryRequest,
 } from './sales.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

@@ -20,12 +20,13 @@ export const DEFAULT_MEDICINE_SHAPES: string[] = [
 ]
 
 /** Regulatory groups. `requiredPrescription` drives the prescription check at the POS. */
-export const DEFAULT_MEDICINE_TYPES: Array<{ name: string; requiredPrescription: boolean }> = [
+export const DEFAULT_MEDICINE_TYPES: Array<{ name: string; requiredPrescription: boolean; isControlled?: boolean }> = [
   { name: 'Obat Bebas', requiredPrescription: false },
   { name: 'Obat Bebas Terbatas', requiredPrescription: false },
   { name: 'Obat Keras', requiredPrescription: true },
-  { name: 'Psikotropika', requiredPrescription: true },
-  { name: 'Narkotika', requiredPrescription: true },
+  { name: 'Psikotropika', requiredPrescription: true, isControlled: true },
+  { name: 'Narkotika', requiredPrescription: true, isControlled: true },
+  { name: 'Prekursor', requiredPrescription: true, isControlled: true },
   { name: 'Jamu & Herbal', requiredPrescription: false },
   { name: 'Suplemen', requiredPrescription: false },
   { name: 'Alat Kesehatan', requiredPrescription: false },

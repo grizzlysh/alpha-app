@@ -2,12 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as RoleService from './roles.service'
 import {
-  roleQuerySchema,
-  createRoleSchema,
-  updateRoleSchema,
-  setRolePermissionsSchema,
-} from './roles.validation'
-import {
   GetRolesRequest,
   GetRoleRequest,
   CreateRoleRequest,
@@ -15,7 +9,6 @@ import {
   SetRolePermissionsRequest,
   DeleteRoleRequest,
 } from './roles.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess, sendCreated, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 

@@ -4,19 +4,17 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 
 // Who may sign pharmacy documents is decided by the person's practice license,
 // not by a permission toggle:
-//  - a regular purchase order (surat pesanan): a pharmacist with an active SIPA
-//    — the Head Pharmacist or a Pharmacist (an owner counts only when marked
-//    Head Pharmacist);
-//  - a purchase order with narcotics, psychotropics or precursors, and a stock
-//    disposal record: only the Head Pharmacist.
+//  - purchase orders, invoice receipts, returns and stock adjustments: a
+//    pharmacist with an active SIPA — the Head Pharmacist or a Pharmacist (an
+//    owner counts only when marked Head Pharmacist);
+//  - any of those covering a controlled medicine (type marked isControlled:
+//    narcotics, psychotropics, precursors), and every disposal record: only
+//    the Head Pharmacist.
 
 export type SignerLevel = 'PHARMACIST' | 'HEAD_PHARMACIST'
 
 type Db = Prisma.TransactionClient
 
-/** Regulatory types whose orders and disposals need the Head Pharmacist. */
-const CONTROLLED_TYPE = /narkotik|psikotropik|prekursor/i
-export const isControlledType = (typeName: string): boolean => CONTROLLED_TYPE.test(typeName)
 
 /** Placement filter: active at the pharmacy, licensed, and senior enough. */
 export function signerPlacementWhere(pharmacyId: number, level: SignerLevel, now = new Date()): Prisma.PlacementWhereInput {
@@ -61,12 +59,12 @@ export async function resolveSigner(
   return user.id
 }
 
-/** Purchase orders containing controlled medicines need the Head Pharmacist. */
-export async function purchaseOrderSignerLevel(db: Db, medicineIds: number[]): Promise<SignerLevel> {
+/**
+ * Documents covering controlled medicines (a medicine type marked
+ * isControlled: narcotics, psychotropics, precursors) need the Head Pharmacist.
+ */
+export async function signerLevelForMedicines(db: Db, medicineIds: number[]): Promise<SignerLevel> {
   if (medicineIds.length === 0) return 'PHARMACIST'
-  const types = await db.medicine.findMany({
-    where: { id: { in: medicineIds } },
-    select: { type: { select: { name: true } } },
-  })
-  return types.some((m) => isControlledType(m.type.name)) ? 'HEAD_PHARMACIST' : 'PHARMACIST'
+  const controlled = await db.medicine.count({ where: { id: { in: medicineIds }, type: { isControlled: true } } })
+  return controlled > 0 ? 'HEAD_PHARMACIST' : 'PHARMACIST'
 }

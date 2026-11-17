@@ -1,4 +1,3 @@
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
 import { resolveSigner } from '@utils/signer'
 import {

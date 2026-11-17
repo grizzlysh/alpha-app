@@ -1,7 +1,6 @@
 import { PaymentStatus, PurchaseOrderStatus } from '@prisma/client'
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
-import { resolveSigner } from '@utils/signer'
+import { resolveSigner, signerLevelForMedicines } from '@utils/signer'
 import { withDocNumberRetry } from '@utils/generateDocNumbers'
 import { generateBarcode } from '@utils/generateBarcode'
 import { AddPaymentInput, CreateInvoiceInput, InvoiceQueryInput, UpdatePaymentHistoryInput } from './invoices.validation'
@@ -277,9 +276,6 @@ export const createInvoice = async (
       throw new ConflictException('Invoice number already exists')
     }
 
-    // ── Resolve Signed By: the pharmacist who received the goods (active SIPA) ──
-    const signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, 'PHARMACIST')
-
     // ── Resolve Purchase Order ────────────────────
     let purchaseOrderId: number | undefined
     if (data.purchaseOrderUuid) {
@@ -385,6 +381,11 @@ export const createInvoice = async (
     const ppnPercentage = data.ppnPercentage ?? 0
     const ppnAmount = (netAmount * ppnPercentage) / 100
     const grandTotal = netAmount + ppnAmount
+
+    // ── Signed By: the pharmacist who received the goods (active SIPA);
+    //    the Head Pharmacist when the delivery includes controlled medicines ──
+    const signerLevel = await signerLevelForMedicines(tx, detailsData.map((d) => d.medicineId))
+    const signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, signerLevel)
 
     // ── Create Invoice + Details ──────────────────
     const invoice = await tx.invoice.create({

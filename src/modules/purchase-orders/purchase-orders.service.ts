@@ -1,6 +1,6 @@
-import { PurchaseOrderStatus, RecordStatus, AppRole } from '@prisma/client'
+import { PurchaseOrderStatus, RecordStatus } from '@prisma/client'
 import { prisma } from '@config/db'
-import { purchaseOrderSignerLevel, resolveSigner } from '@utils/signer'
+import { signerLevelForMedicines, resolveSigner } from '@utils/signer'
 import {
   CreatePurchaseOrderInput,
   UpdatePurchaseOrderInput,
@@ -202,7 +202,7 @@ export const createPurchaseOrder = async (
     // ── Signer: a licensed pharmacist; the Head Pharmacist for controlled medicines ──
     let signedById: number | undefined
     if (data.signedByUuid) {
-      const level = await purchaseOrderSignerLevel(tx, details.map((d) => d.medicineId))
+      const level = await signerLevelForMedicines(tx, details.map((d) => d.medicineId))
       signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, level)
     }
 
@@ -279,7 +279,7 @@ export const updatePurchaseOrder = async (
       const medicineIds = detailsCreate
         ? detailsCreate.map((d) => d.medicineId as number)
         : (await tx.purchaseOrderDetail.findMany({ where: { purchaseOrderId: existing.id, deletedAt: null }, select: { medicineId: true } })).map((d) => d.medicineId)
-      const level = await purchaseOrderSignerLevel(tx, medicineIds)
+      const level = await signerLevelForMedicines(tx, medicineIds)
       const id = await resolveSigner(tx, signer, pharmacyId, level)
       if (data.signedByUuid) signedById = id
     }

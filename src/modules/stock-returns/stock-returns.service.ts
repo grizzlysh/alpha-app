@@ -1,7 +1,6 @@
 import { StockReturnStatus, Prisma } from '@prisma/client'
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
-import { resolveSigner } from '@utils/signer'
+import { resolveSigner, signerLevelForMedicines } from '@utils/signer'
 import {
   CreateStockReturnInput,
   UpdateStockReturnInput,
@@ -85,6 +84,15 @@ const resolveSignedBy = async (
   pharmacyId: number,
   tx: Prisma.TransactionClient
 ): Promise<{ id: number }> => ({ id: await resolveSigner(tx, { uuid: signedByUuid }, pharmacyId, 'PHARMACIST') })
+
+/** Once the items are known: a return containing a controlled medicine needs the Head Pharmacist. */
+const assertReturnSigner = async (stockReturnId: number, pharmacyId: number, tx: Prisma.TransactionClient): Promise<void> => {
+  const ret = await tx.stockReturn.findUnique({ where: { id: stockReturnId }, select: { signedById: true } })
+  if (!ret?.signedById) return
+  const details = await tx.stockReturnDetail.findMany({ where: { stockReturnId }, select: { medicineId: true } })
+  const level = await signerLevelForMedicines(tx, details.map((d) => d.medicineId))
+  if (level === 'HEAD_PHARMACIST') await resolveSigner(tx, { id: ret.signedById }, pharmacyId, level)
+}
 
 const resolveStockDetail = async (
   stockDetailUuid: string,
@@ -378,6 +386,8 @@ export const createStockReturn = async (
       })
     }
 
+    await assertReturnSigner(stockReturn.id, pharmacyId, tx)
+
     // Update header with final totalAmount
     await tx.stockReturn.update({
       where: { id: stockReturn.id },
@@ -497,7 +507,7 @@ export const updateStockReturn = async (
       newTotalAmount = newTotalAmount.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
     }
 
-    return tx.stockReturn.update({
+    const updated = await tx.stockReturn.update({
       where: { id: existing.id },
       data: {
         ...(distributorId && { distributorId }),
@@ -509,6 +519,8 @@ export const updateStockReturn = async (
       },
       select: stockReturnSelect,
     })
+    await assertReturnSigner(existing.id, pharmacyId, tx)
+    return updated
   }, { timeout: 10000, maxWait: 5000 })
 
   return stockReturn as unknown as StockReturnResponse

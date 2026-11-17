@@ -2,7 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { sendSuccess, sendCreated, sendPaginated, sendNoContent } from '@utils/responseHelper';
-import { ValidationException } from '@exceptions/ValidationException';
 import * as userService from './users.service';
 import {
   UserUuidParam,
@@ -20,19 +19,6 @@ import {
   CreateLicenseBody,
   UpdateLicenseBody,
 } from './users.interface';
-import {
-  listUserSchema,
-  createUserSchema,
-  updateUserSchema,
-  updateMeSchema,
-  changePasswordSchema,
-  listPlacementSchema,
-  createPlacementSchema,
-  updatePlacementSchema,
-  listLicenseSchema,
-  createLicenseSchema,
-  updateLicenseSchema,
-} from './users.validation';
 
 const actorOf = (req: Request<any, any, any, any>): userService.UserActor => ({
   id: req.user!.id,

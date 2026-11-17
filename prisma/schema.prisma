@@ -782,6 +782,8 @@ model MedicineType {
   pharmacyId           Int          @map("pharmacy_id")
   name                 String
   requiredPrescription Boolean      @default(false) @map("required_prescription")
+  /// Narcotics, psychotropics, precursors: orders, receipts, returns and disposals need the Head Pharmacist.
+  isControlled         Boolean      @default(false) @map("is_controlled")
   status               RecordStatus @default(ACTIVE)
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")

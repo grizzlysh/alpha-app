@@ -1,12 +1,10 @@
 import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as PermissionService from './permissions.service'
-import { permissionQuerySchema } from './permissions.validation'
 import {
   GetPermissionsRequest,
   GetPermissionRequest,
 } from './permissions.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 

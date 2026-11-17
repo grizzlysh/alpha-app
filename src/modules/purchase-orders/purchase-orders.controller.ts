@@ -2,12 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as PurchaseOrderService from './purchase-orders.service'
 import {
-  createPurchaseOrderSchema,
-  updatePurchaseOrderSchema,
-  cancelPurchaseOrderSchema,
-  purchaseOrderQuerySchema,
-} from './purchase-orders.validation'
-import {
   GetPurchaseOrdersRequest,
   GetPurchaseOrderRequest,
   CreatePurchaseOrderRequest,
@@ -18,7 +12,6 @@ import {
   DeletePurchaseOrderRequest,
   PurchaseOrderUuidParam,
 } from './purchase-orders.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

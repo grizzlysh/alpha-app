@@ -2,10 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as InvoiceService from './invoices.service'
 import {
-  createInvoiceSchema,
-  invoiceQuerySchema,
-} from './invoices.validation'
-import {
   GetInvoicesRequest,
   GetInvoiceRequest,
   CreateInvoiceRequest,
@@ -15,7 +11,6 @@ import {
   UpdatePaymentHistoryRequest,
   DeletePaymentHistoryRequest,
 } from './invoices.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

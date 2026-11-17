@@ -14,7 +14,7 @@ export interface CatalogExport {
   pharmacy: { name: string; code: string }
   exportedAt: Date
   shapes: { name: string }[]
-  types: { name: string; requiredPrescription: boolean }[]
+  types: { name: string; requiredPrescription: boolean; isControlled: boolean }[]
   classes: { name: string }[]
   medicines: CatalogMedicine[]
 }

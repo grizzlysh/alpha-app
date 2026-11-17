@@ -43,6 +43,7 @@ export async function seedDefaultClassifications(tx: Tx, pharmacyId: number, use
       pharmacyId,
       name: t.name,
       requiredPrescription: t.requiredPrescription,
+      isControlled: t.isControlled ?? false,
       createdById: userId,
     })),
   })

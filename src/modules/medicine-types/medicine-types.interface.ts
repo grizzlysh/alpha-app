@@ -20,12 +20,14 @@ export interface MedicineTypeUuidParam extends ParamsDictionary {
 export interface CreateMedicineTypeBody {
   name: string
   requiredPrescription: boolean
+  isControlled?: boolean
   status: RecordStatus
 }
 
 export interface UpdateMedicineTypeBody {
   name?: string
   requiredPrescription?: boolean
+  isControlled?: boolean
   status?: RecordStatus
 }
 
@@ -68,6 +70,7 @@ export interface MedicineTypeResponse {
   uuid: string
   name: string
   requiredPrescription: boolean
+  isControlled: boolean
   status: RecordStatus
   medicineCount: number
   createdAt: Date
@@ -78,4 +81,5 @@ export interface MedicineTypeDropdownItem {
   uuid: string
   name: string
   requiredPrescription: boolean
+  isControlled: boolean
 }

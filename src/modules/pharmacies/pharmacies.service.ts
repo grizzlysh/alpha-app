@@ -359,6 +359,11 @@ export const updatePharmacy = async (
 }
 
 
+/**
+ * Soft-deletes a pharmacy and closes it for everyone: staff placements end
+ * today and nobody lands on it as their last pharmacy. Its code stays reserved
+ * because document numbers already issued contain it.
+ */
 export const deletePharmacy = async (
   uuid: string,
   userId: number
@@ -369,13 +374,21 @@ export const deletePharmacy = async (
   })
   if (!existing) throw new NotFoundException('Pharmacy not found')
 
-  await prisma.pharmacy.update({
-    where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    },
-  })
+  const now = new Date()
+  await prisma.$transaction([
+    prisma.pharmacy.update({
+      where: { id: existing.id },
+      data: { deletedAt: now, deletedById: userId, status: RecordStatus.INACTIVE },
+    }),
+    prisma.placement.updateMany({
+      where: { pharmacyId: existing.id, deletedAt: null, leftAt: null },
+      data: { leftAt: now, status: RecordStatus.INACTIVE, updatedById: userId },
+    }),
+    prisma.user.updateMany({
+      where: { lastSelectedPharmacyId: existing.id },
+      data: { lastSelectedPharmacyId: null },
+    }),
+  ])
 }
 
 // ── Business License Helpers ──────────────────────────

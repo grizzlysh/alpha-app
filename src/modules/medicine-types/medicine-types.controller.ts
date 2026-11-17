@@ -1,11 +1,7 @@
 import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineTypeService from './medicine-types.service'
-import {
-  createMedicineTypeSchema,
-  updateMedicineTypeSchema,
-  medicineTypeQuerySchema,
-} from './medicine-types.validation'
+import type { CreateMedicineTypeInput } from './medicine-types.validation'
 import {
   GetMedicineTypesRequest,
   GetMedicineTypeRequest,
@@ -13,7 +9,6 @@ import {
   UpdateMedicineTypeRequest,
   DeleteMedicineTypeRequest,
 } from './medicine-types.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,
@@ -62,7 +57,8 @@ export const createMedicineType = async (
 ): Promise<void> => {
   try {
     const medicine_type = await MedicineTypeService.createMedicineType(
-      req.body,
+      // validateBody has applied the schema defaults (isControlled → false)
+      req.body as CreateMedicineTypeInput,
       req.user!.pharmacyId!,
       req.user!.id
     )

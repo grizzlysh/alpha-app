@@ -2,18 +2,12 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineClassService from './medicine-classes.service'
 import {
-  createMedicineClassSchema,
-  updateMedicineClassSchema,
-  medicineClassQuerySchema,
-} from './medicine-classes.validation'
-import {
   GetMedicineClassesRequest,
   GetMedicineClassRequest,
   CreateMedicineClassRequest,
   UpdateMedicineClassRequest,
   DeleteMedicineClassRequest,
 } from './medicine-classes.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

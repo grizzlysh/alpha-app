@@ -9,7 +9,7 @@ export const catalogImportSchema = z.object({
   /** Validate and count only; nothing is written. */
   dryRun: z.boolean().optional().default(false),
   shapes: z.array(z.object({ name })).max(500).optional().default([]),
-  types: z.array(z.object({ name, requiredPrescription: z.boolean().optional() })).max(500).optional().default([]),
+  types: z.array(z.object({ name, requiredPrescription: z.boolean().optional(), isControlled: z.boolean().optional() })).max(500).optional().default([]),
   classes: z.array(z.object({ name })).max(500).optional().default([]),
   medicines: z
     .array(
