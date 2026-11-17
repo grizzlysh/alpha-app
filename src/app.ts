@@ -8,6 +8,7 @@ import { rateLimiter } from '@middlewares/rateLimiter'
 import { errorHandler } from '@middlewares/errorHandler'
 import { maintenanceMode } from '@middlewares/maintenanceMode'
 import { idempotency } from '@middlewares/idempotency'
+import { startScheduler } from '@jobs/scheduler'
 
 import authRoutes from '@modules/auth/auth.routes'
 import pharmacyRoutes from '@modules/pharmacies/pharmacies.routes'
@@ -39,6 +40,8 @@ import medicalRecordRoutes from '@modules/medical-records/medical-records.routes
 import examinationRoutes from '@modules/examinations/examinations.routes'
 import catalogRoutes from '@modules/catalog/catalog.routes'
 import dataTransferRoutes from '@modules/data-transfer/data-transfer.routes'
+import notificationRoutes from '@modules/notifications/notifications.routes'
+import jobRoutes from '@modules/jobs/jobs.routes'
 
 
 
@@ -107,6 +110,8 @@ app.use('/api/prescriptions', prescriptionRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/medical-records', medicalRecordRoutes)
 app.use('/api/examinations', examinationRoutes)
+app.use('/api/notifications', notificationRoutes)
+app.use('/api/jobs', jobRoutes)
 
 // ── Health Check ─────────────────────────────
 app.get('/', (req: Request, res: Response): void => {
@@ -125,6 +130,7 @@ if (process.env.NODE_ENV !== 'test') {
       process.exit(1)
     }
     console.log(`Server running on port ${PORT}`)
+    startScheduler().catch((err: unknown) => console.error('[jobs] scheduler failed to start:', err))
   })
 }
 
