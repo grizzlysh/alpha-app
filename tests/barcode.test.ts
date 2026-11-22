@@ -57,6 +57,14 @@ describe('medicine barcode', () => {
     const byBatch = (await as(token).get(`/api/stock/details?barcode=${late.barcode}`)).body.data
     expect(byBatch.map((d: { batchNumber: string }) => d.batchNumber.toUpperCase())).toEqual(['LATE-1'])
 
+    expect(byMedicine[0].scanMatch).toBe('MEDICINE')
+    expect(byBatch[0].scanMatch).toBe('BATCH')
+
+    // One item of a batch: the batch code plus "-" and the item number.
+    const byItem = (await as(token).get(`/api/stock/details?barcode=${late.barcode}-007`)).body.data
+    expect(byItem).toHaveLength(1)
+    expect(byItem[0]).toMatchObject({ uuid: late.uuid, scanMatch: 'ITEM' })
+
     expect((await as(token).get('/api/stock/details?barcode=NOPE-404')).body.data).toEqual([])
   })
 })

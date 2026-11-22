@@ -107,7 +107,29 @@ const formatStock = (stock: any, lowStockThreshold: number = 0): StockResponse =
 
 // ── Services ──────────────────────────────────────────
 
+/** Item labels carry the batch code plus "-" and the item number, e.g. 4823519076241835-003. */
+const ITEM_CODE = /^(.+)-(\d{1,4})$/
+
 export const searchStockDetails = async (
+  pharmacyId: number,
+  query: StockDetailQueryInput
+): Promise<StockDetailSearchResponse[]> => {
+  const results = await findStockDetails(pharmacyId, query)
+  const { barcode } = query
+  if (!barcode) return results
+  if (results.length > 0) {
+    return results.map((r) => ({ ...r, scanMatch: r.barcode === barcode ? ('BATCH' as const) : ('MEDICINE' as const) }))
+  }
+  // Not a batch or medicine code: maybe one item of a batch.
+  const item = ITEM_CODE.exec(barcode)
+  if (!item) return []
+  const batch = await findStockDetails(pharmacyId, { ...query, barcode: item[1] })
+  return batch
+    .filter((r) => r.barcode === item[1])
+    .map((r) => ({ ...r, scanMatch: 'ITEM' as const }))
+}
+
+const findStockDetails = async (
   pharmacyId: number,
   query: StockDetailQueryInput
 ): Promise<StockDetailSearchResponse[]> => {
