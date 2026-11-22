@@ -294,6 +294,8 @@ export interface StockCardResponse {
     location: string | null
   }
   reorderLevel: number
+  /** Stock of the medicine across all its batches (for the medicine label). */
+  medicineTotalPieces: number
   sellingPrice: number
   /** Balance before the first recorded movement (stock brought in before movements were logged). */
   openingBalance: number

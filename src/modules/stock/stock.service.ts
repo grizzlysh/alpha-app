@@ -759,6 +759,7 @@ export const getStockCard = async (stockDetailUuid: string, pharmacyId: number):
       stock: {
         select: {
           reorderLevel: true,
+          totalPieces: true,
           sellingPrice: true,
           calculatedPrice: true,
           pharmacy: { select: { name: true, code: true } },
@@ -843,6 +844,7 @@ export const getStockCard = async (stockDetailUuid: string, pharmacyId: number):
       location: bin ? `${bin.shelf.cabinet.name} · ${bin.shelf.code} · ${bin.code}` : null,
     },
     reorderLevel: d.stock.reorderLevel,
+    medicineTotalPieces: d.stock.totalPieces,
     sellingPrice: getEffectiveSellingPrice(d.stock.sellingPrice, d.stock.calculatedPrice),
     openingBalance,
     lines,

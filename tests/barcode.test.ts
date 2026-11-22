@@ -84,6 +84,7 @@ describe('stock card', () => {
     expect(card.batch.batchNumber.toUpperCase()).toBe('EARLY-1')
     expect(card.batch.quantityPieces).toBe(5)
     expect(card.medicine.barcode).toBe(EAN)
+    expect(card.medicineTotalPieces).toBe(15) // 5 left in EARLY-1 + 10 in LATE-1
     const last = card.lines[card.lines.length - 1]
     expect(last).toMatchObject({ type: 'OUT', quantity: 3, balance: 5, documentNumber: sale.body.data.saleNumber })
     expect(card.lines[0]).toMatchObject({ type: 'IN', balance: 8 })
