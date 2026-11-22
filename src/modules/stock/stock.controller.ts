@@ -4,6 +4,7 @@ import * as StockService from './stock.service'
 import {
   stockDetailQuerySchema,
   stockCatalogQuerySchema,
+  MedicineStockCardQueryInput,
 } from './stock.validation'
 import {
   GetStockDetailsRequest,
@@ -201,10 +202,23 @@ export const getCrossPharmacyStock = async (
   }
 }
 
-export const getStockCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const getBatchLabel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const card = await StockService.getStockCard(parseUuid(String(req.params.stock_detail_uuid)), req.user!.pharmacyId!)
-    sendSuccess(res, MESSAGE_CODES.STOCK_DETAIL_FETCHED, card)
+    const label = await StockService.getBatchLabel(parseUuid(String(req.params.stock_detail_uuid)), req.user!.pharmacyId!)
+    sendSuccess(res, MESSAGE_CODES.STOCK_DETAIL_FETCHED, label)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicineStockCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const card = await StockService.getMedicineStockCard(
+      parseUuid(String(req.params.medicine_uuid)),
+      req.user!.pharmacyId!,
+      req.query as MedicineStockCardQueryInput
+    )
+    sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, card)
   } catch (err) {
     next(err)
   }

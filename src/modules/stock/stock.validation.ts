@@ -55,6 +55,17 @@ export const adjustStockSchema = z.object({
   description: z.string().trim().min(1, { message: 'Description is required for adjustment' }),
 })
 
+const isoDate = z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date must be yyyy-MM-dd' })
+
+export const medicineStockCardQuerySchema = z
+  .object({ from: isoDate.optional(), to: isoDate.optional() })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, { message: 'Start date must be before end date', path: ['from'] })
+  .refine((q) => !q.from || !q.to || (Date.parse(q.to) - Date.parse(q.from)) / 86_400_000 <= 366, {
+    message: 'The period can be at most one year',
+    path: ['to'],
+  })
+
+export type MedicineStockCardQueryInput = z.infer<typeof medicineStockCardQuerySchema>
 export type StockDetailQueryInput = z.infer<typeof stockDetailQuerySchema>
 export type StockCatalogQueryInput = z.infer<typeof stockCatalogQuerySchema>
 export type StockQueryInput = z.infer<typeof stockQuerySchema>

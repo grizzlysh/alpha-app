@@ -69,28 +69,44 @@ describe('medicine barcode', () => {
   })
 })
 
-describe('stock card', () => {
-  it('lists each movement with its document and a running balance', async () => {
-    const token = await enter(cashier.email, NEW_PASSWORD, f.pharmacyUuid)
-    const early = (await as(token).get(`/api/stock/details?barcode=${EAN}`)).body.data[0]
-    const sale = await as(token).post('/api/sales', {
-      details: [{ stockDetailUuid: early.uuid, quantityPieces: 3 }],
-      paidAmount: 100000,
-      payment: { paymentMethod: 'CASH' },
-    })
-    expect(sale.status).toBe(201)
+describe('batch label and stock card', () => {
+  it('the label carries the batch and the medicine total', async () => {
+    const early = (await as(f.owner).get(`/api/stock/details?barcode=${EAN}`)).body.data[0]
+    const label = (await as(f.owner).get(`/api/stock/details/${early.uuid}/label`)).body.data
+    expect(label.batch.batchNumber.toUpperCase()).toBe('EARLY-1')
+    expect(label.medicine.barcode).toBe(EAN)
+    expect(label.medicineTotalPieces).toBe(18)
+    expect(label.lines).toBeUndefined()
+    expect((await as(f.owner).get('/api/stock/details/00000000-0000-4000-8000-000000000000/label')).status).toBe(404)
+  })
 
-    const card = (await as(f.owner).get(`/api/stock/details/${early.uuid}/card`)).body.data
-    expect(card.batch.batchNumber.toUpperCase()).toBe('EARLY-1')
-    expect(card.batch.quantityPieces).toBe(5)
-    expect(card.medicine.barcode).toBe(EAN)
-    expect(card.medicineTotalPieces).toBe(15) // 5 left in EARLY-1 + 10 in LATE-1
-    const last = card.lines[card.lines.length - 1]
-    expect(last).toMatchObject({ type: 'OUT', quantity: 3, balance: 5, documentNumber: sale.body.data.saleNumber })
-    expect(card.lines[0]).toMatchObject({ type: 'IN', balance: 8 })
+  it('the medicine card has one row per day over all batches', async () => {
+    const token = await enter(cashier.email, NEW_PASSWORD, f.pharmacyUuid)
+    const [early, late] = (await as(token).get(`/api/stock/details?barcode=${EAN}`)).body.data
+    for (const [uuid, qty] of [[early.uuid, 3], [late.uuid, 2]] as const) {
+      const sale = await as(token).post('/api/sales', {
+        details: [{ stockDetailUuid: uuid, quantityPieces: qty }],
+        paidAmount: 100000,
+        payment: { paymentMethod: 'CASH' },
+      })
+      expect(sale.status).toBe(201)
+    }
+
+    const card = (await as(f.owner).get(`/api/stock/medicines/${medicineUuid}/card`)).body.data
+    expect(card.totalPieces).toBe(13)
+    expect(card.closingBalance).toBe(13)
+    expect(card.batches.map((b: { batchNumber: string }) => b.batchNumber.toUpperCase())).toEqual(['EARLY-1', 'LATE-1'])
+    // Opening stock and both sales happen today: one row.
+    expect(card.days).toHaveLength(1)
+    expect(card.days[0]).toMatchObject({ in: 18, out: 5, balance: 13, sales: 2 })
     expect(card.openingBalance).toBe(0)
 
-    expect((await as(f.owner).get('/api/stock/details/00000000-0000-4000-8000-000000000000/card')).status).toBe(404)
+    // A period before anything happened: no rows, balance 0.
+    const old = (await as(f.owner).get(`/api/stock/medicines/${medicineUuid}/card?from=2020-01-01&to=2020-01-31`)).body.data
+    expect(old).toMatchObject({ days: [], openingBalance: 0, closingBalance: 0 })
+
+    expect((await as(f.owner).get(`/api/stock/medicines/${medicineUuid}/card?from=2026-02-01&to=2026-01-01`)).status).toBe(422)
+    expect((await as(f.owner).get('/api/stock/medicines/00000000-0000-4000-8000-000000000000/card')).status).toBe(404)
   })
 })
 
