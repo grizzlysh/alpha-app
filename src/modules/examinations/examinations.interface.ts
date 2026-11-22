@@ -52,11 +52,20 @@ export interface ExaminationResponse {
   patient: ExaminationPatient
 }
 
+/** A doctor the queue can be split by. */
+export interface QueueDoctor {
+  uuid: string
+  name: string
+  /** The signed-in user is this doctor. */
+  isMe: boolean
+}
+
 export interface ExaminationQueueResponse {
   date: string
   counts: Record<VisitStatus, number>
   /** Waiting patients whose vitals are already recorded. */
   triaged: number
+  doctors: QueueDoctor[]
   items: ExaminationResponse[]
 }
 
