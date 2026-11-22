@@ -1,5 +1,5 @@
 import { parseUuid } from '@utils/parseUuid'
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as StockService from './stock.service'
 import {
   stockDetailQuerySchema,
@@ -196,6 +196,15 @@ export const getCrossPharmacyStock = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, stocks)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getStockCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const card = await StockService.getStockCard(parseUuid(String(req.params.stock_detail_uuid)), req.user!.pharmacyId!)
+    sendSuccess(res, MESSAGE_CODES.STOCK_DETAIL_FETCHED, card)
   } catch (err) {
     next(err)
   }

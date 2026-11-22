@@ -22,6 +22,7 @@ router.get('/alerts', requirePermission(PERMISSIONS.STOCK_READ), StockController
 router.get('/movements', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockMovementQuerySchema), StockController.getStockMovements)
 router.get('/cross-pharmacy/:medicine_uuid', requirePermission(PERMISSIONS.STOCK_READ), StockController.getCrossPharmacyStock)
 router.get('/details', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockDetailQuerySchema), StockController.getStockDetails)
+router.get('/details/:stock_detail_uuid/card', requirePermission(PERMISSIONS.STOCK_READ), StockController.getStockCard)
 router.get('/catalog', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockCatalogQuerySchema), StockController.getStockCatalog)
 router.get('/:stock_uuid', requirePermission(PERMISSIONS.STOCK_READ), StockController.getStock)
 router.patch('/:stock_uuid/price', requirePermission(PERMISSIONS.STOCK_ADJUST), validateBody(updatePriceSchema), StockController.updateSellingPrice)

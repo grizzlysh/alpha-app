@@ -253,3 +253,47 @@ export interface CrossPharmacyStockResponse {
   isCriticalStock: boolean
   details: StockDetailResponse[]
 }
+
+/** One line of a batch's stock card: a movement with its document and balance. */
+export interface StockCardLine {
+  date: Date
+  type: 'IN' | 'OUT'
+  reason: string
+  /** Invoice / sale / return / disposal number; null for adjustments. */
+  documentNumber: string | null
+  /** Distributor, customer or the adjustment note. */
+  party: string | null
+  quantity: number
+  balance: number
+}
+
+/** Everything a printed stock card or batch label needs. */
+export interface StockCardResponse {
+  pharmacy: { name: string; code: string }
+  medicine: {
+    uuid: string
+    name: string
+    unit: string
+    barcode: string | null
+    shape: string
+    type: string
+    isControlled: boolean
+    requiredPrescription: boolean
+    therapeuticClass: string
+  }
+  batch: {
+    uuid: string
+    batchNumber: string
+    barcode: string
+    expiryDate: Date
+    quantityPieces: number
+    quantityPerBox: number
+    distributor: string
+    location: string | null
+  }
+  reorderLevel: number
+  sellingPrice: number
+  /** Balance before the first recorded movement (stock brought in before movements were logged). */
+  openingBalance: number
+  lines: StockCardLine[]
+}

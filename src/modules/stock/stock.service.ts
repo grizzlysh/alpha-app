@@ -15,6 +15,8 @@ import {
   StockAlertResponse,
   StockMovementResponse,
   CrossPharmacyStockResponse,
+  StockCardLine,
+  StockCardResponse,
 } from './stock.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
@@ -717,4 +719,110 @@ export const getCrossPharmacyStock = async (
     isCriticalStock: false, // cross-pharmacy view does not load per-pharmacy threshold
     details: stock.details,
   }))
+}
+
+/** A batch's stock card: header data plus every movement in order with a running balance. */
+export const getStockCard = async (stockDetailUuid: string, pharmacyId: number): Promise<StockCardResponse> => {
+  const d = await prisma.stockDetail.findFirst({
+    where: { uuid: stockDetailUuid, stock: { pharmacyId } },
+    select: {
+      uuid: true,
+      batchNumber: true,
+      barcode: true,
+      expiryDate: true,
+      quantityPieces: true,
+      quantityPerBox: true,
+      distributor: { select: { name: true } },
+      bin: { select: { code: true, shelf: { select: { code: true, cabinet: { select: { name: true } } } } } },
+      stock: {
+        select: {
+          reorderLevel: true,
+          sellingPrice: true,
+          calculatedPrice: true,
+          pharmacy: { select: { name: true, code: true } },
+          medicine: {
+            select: {
+              uuid: true,
+              name: true,
+              unit: true,
+              barcode: true,
+              shape: { select: { name: true } },
+              type: { select: { name: true, isControlled: true, requiredPrescription: true } },
+              medicineClass: { select: { name: true } },
+            },
+          },
+        },
+      },
+      stockMovements: {
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+          createdAt: true,
+          type: true,
+          reason: true,
+          quantity: true,
+          quantityBefore: true,
+          quantityAfter: true,
+          description: true,
+          invoiceDetail: { select: { invoice: { select: { invoiceNumber: true, distributor: { select: { name: true } } } } } },
+          saleDetail: { select: { sale: { select: { saleNumber: true, customer: { select: { name: true } } } } } },
+          stockReturnDetail: { select: { stockReturn: { select: { returnNumber: true, distributor: { select: { name: true } } } } } },
+          stockDisposalDetail: { select: { stockDisposal: { select: { disposalNumber: true } } } },
+        },
+      },
+    },
+  })
+  if (!d) throw new NotFoundException('Stock detail not found')
+
+  // Movements carry per-stock before/after, not per batch, so the batch balance is
+  // rebuilt from the quantities and anchored to today's batch quantity.
+  const net = d.stockMovements.reduce((sum, m) => sum + (m.type === 'IN' ? m.quantity : -m.quantity), 0)
+  const openingBalance = d.quantityPieces - net
+  let balance = openingBalance
+  const lines: StockCardLine[] = d.stockMovements.map((m) => {
+    balance += m.type === 'IN' ? m.quantity : -m.quantity
+    const invoice = m.invoiceDetail?.invoice
+    const sale = m.saleDetail?.sale
+    const ret = m.stockReturnDetail?.stockReturn
+    const disposal = m.stockDisposalDetail?.stockDisposal
+    return {
+      date: m.createdAt,
+      type: m.type,
+      reason: m.reason,
+      documentNumber: invoice?.invoiceNumber ?? sale?.saleNumber ?? ret?.returnNumber ?? disposal?.disposalNumber ?? null,
+      party: invoice?.distributor.name ?? sale?.customer.name ?? ret?.distributor.name ?? m.description ?? null,
+      quantity: m.quantity,
+      balance,
+    }
+  })
+
+  const med = d.stock.medicine
+  const bin = d.bin
+  return {
+    pharmacy: d.stock.pharmacy,
+    medicine: {
+      uuid: med.uuid,
+      name: med.name,
+      unit: med.unit,
+      barcode: med.barcode,
+      shape: med.shape.name,
+      type: med.type.name,
+      isControlled: med.type.isControlled,
+      requiredPrescription: med.type.requiredPrescription,
+      therapeuticClass: med.medicineClass.name,
+    },
+    batch: {
+      uuid: d.uuid,
+      batchNumber: d.batchNumber,
+      barcode: d.barcode,
+      expiryDate: d.expiryDate,
+      quantityPieces: d.quantityPieces,
+      quantityPerBox: d.quantityPerBox,
+      distributor: d.distributor.name,
+      location: bin ? `${bin.shelf.cabinet.name} · ${bin.shelf.code} · ${bin.code}` : null,
+    },
+    reorderLevel: d.stock.reorderLevel,
+    sellingPrice: getEffectiveSellingPrice(d.stock.sellingPrice, d.stock.calculatedPrice),
+    openingBalance,
+    lines,
+  }
 }
