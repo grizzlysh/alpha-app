@@ -98,6 +98,7 @@ export interface MedicineResponse {
   uuid: string
   name: string
   unit: string
+  barcode: string | null
   status: RecordStatus
   medicineShape: MedicineShapeResponse
   medicineType: MedicineTypeResponse

@@ -142,6 +142,8 @@ export interface StockDetailSearchResponse {
     uuid: string
     name: string
     unit: string
+    /** Present on the scan / search endpoint. */
+    barcode?: string | null
     shape: { name: string }
     type: { name: string; requiredPrescription: boolean }
   }

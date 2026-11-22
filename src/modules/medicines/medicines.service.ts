@@ -19,6 +19,7 @@ const medicineSelect = {
   uuid: true,
   name: true,
   unit: true,
+  barcode: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -57,10 +58,27 @@ const checkDuplicate = async (
   }
 }
 
+/**
+ * A medicine barcode must be unique in the pharmacy, among medicines and
+ * among batch barcodes, so a scan always means one thing.
+ */
+const checkBarcode = async (barcode: string, pharmacyId: number, excludeUuid?: string): Promise<void> => {
+  const [medicine, batch] = await Promise.all([
+    prisma.medicine.findFirst({
+      where: { pharmacyId, barcode, ...(excludeUuid && { NOT: { uuid: excludeUuid } }) },
+      select: { name: true },
+    }),
+    prisma.stockDetail.findFirst({ where: { barcode, stock: { pharmacyId } }, select: { batchNumber: true } }),
+  ])
+  if (medicine) throw new ConflictException(`Barcode already used by ${medicine.name}`)
+  if (batch) throw new ConflictException(`Barcode already used by batch ${batch.batchNumber}`)
+}
+
 const formatResponse = (m: Prisma.MedicineGetPayload<{ select: typeof medicineSelect }>): MedicineResponse => ({
   uuid: m.uuid,
   name: m.name,
   unit: m.unit,
+  barcode: m.barcode,
   status: m.status,
   medicineShape: m.shape,
   medicineType: m.type,
@@ -120,6 +138,7 @@ export const getMedicines = async (
     ...(search && {
       OR: [
         { name: { contains: search, mode: 'insensitive' as const } },
+        { barcode: search },
         {
           ingredients: {
             some: {
@@ -175,6 +194,7 @@ export const createMedicine = async (
   userId: number
 ): Promise<MedicineResponse> => {
   await checkDuplicate(data.name, pharmacyId)
+  if (data.barcode) await checkBarcode(data.barcode, pharmacyId)
 
   const { shapeId, typeId, medicineClassId } = await resolveMedicineRefs(
     data.medicineShapeUuid,
@@ -191,6 +211,7 @@ export const createMedicine = async (
       typeId,
       medicineClassId,
       unit: data.unit,
+      barcode: data.barcode ?? null,
       createdById: userId,
       ingredients: {
         create: data.ingredients.map((name) => ({
@@ -223,6 +244,7 @@ export const updateMedicine = async (
   if (data.name) {
     await checkDuplicate(data.name, pharmacyId, uuid)
   }
+  if (data.barcode) await checkBarcode(data.barcode, pharmacyId, uuid)
 
   let shapeId: number | undefined
   let typeId: number | undefined
@@ -258,6 +280,7 @@ export const updateMedicine = async (
       ...(typeId && { typeId }),
       ...(medicineClassId && { medicineClassId }),
       ...(data.unit && { unit: data.unit }),
+      ...(data.barcode !== undefined && { barcode: data.barcode }),
       ...(data.status && { status: data.status }),
       updatedById: userId,
       ...(data.ingredients && {

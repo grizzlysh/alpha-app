@@ -5,6 +5,8 @@ export const stockDetailQuerySchema = z.object({
   search: z.string().trim().optional(),
   /** One medicine's sellable batches, earliest expiry first (FEFO), expired excluded. */
   medicineUuid: z.string().trim().uuid().optional(),
+  /** Exact scan: a batch barcode, or a medicine barcode (its sellable batches, FEFO). */
+  barcode: z.string().trim().min(1).max(64).optional(),
 })
 
 export const stockCatalogQuerySchema = z.object({

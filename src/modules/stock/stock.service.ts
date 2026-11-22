@@ -109,13 +109,15 @@ export const searchStockDetails = async (
   pharmacyId: number,
   query: StockDetailQueryInput
 ): Promise<StockDetailSearchResponse[]> => {
-  const { search, medicineUuid } = query
+  const { search, medicineUuid, barcode } = query
 
   const where: any = {
     stock: { pharmacyId, ...(medicineUuid && { medicine: { uuid: medicineUuid } }) },
     quantityPieces: { gt: 0 },
-    ...(medicineUuid && { expiryDate: { gt: new Date() } }),
-    ...(search && {
+    ...((medicineUuid || barcode) && { expiryDate: { gt: new Date() } }),
+    // A scan: the batch with that code, or every sellable batch of the medicine with that code.
+    ...(barcode && { OR: [{ barcode }, { stock: { medicine: { barcode } } }] }),
+    ...(search && !barcode && {
       OR: [
         { stock: { medicine: { name: { contains: search, mode: 'insensitive' } } } },
         { barcode: { contains: search, mode: 'insensitive' } },
@@ -145,6 +147,7 @@ export const searchStockDetails = async (
               uuid: true,
               name: true,
               unit: true,
+              barcode: true,
               shape: { select: { name: true } },
               type: { select: { name: true, requiredPrescription: true } },
             },
@@ -152,10 +155,9 @@ export const searchStockDetails = async (
         },
       },
     },
-    orderBy: [
-      { stock: { medicine: { name: 'asc' } } },
-      { expiryDate: 'asc' },
-    ],
+    orderBy: barcode
+      ? [{ expiryDate: 'asc' }]
+      : [{ stock: { medicine: { name: 'asc' } } }, { expiryDate: 'asc' }],
     take: 20,
   })
 
