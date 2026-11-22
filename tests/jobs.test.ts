@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { JobTrigger, PrescriptionStatus } from '@prisma/client'
 import { prisma } from '../src/config/db'
-import { findJob } from '../src/jobs/registry'
+import { JOBS, findJob } from '../src/jobs/registry'
+import { dueJobs, loadSettings } from '../src/jobs/settings'
 import { runJob } from '../src/jobs/runner'
 import { ADMIN, NEW_PASSWORD, PharmacyFixture, addStaff, as, createPharmacy, enter, login } from './helpers'
 
@@ -142,3 +143,47 @@ describe('job runner', () => {
   })
 })
 
+describe('job settings', () => {
+  it('validates and saves the time, switch and numbers; the scheduler follows them', async () => {
+    const admin = await login(ADMIN.email, ADMIN.password)
+    try {
+      const bad = await as(admin).put('/api/jobs/purge-expired/settings', { enabled: true, time: '25:00', params: { notificationRetentionDays: 1 } })
+      expect(bad.status).toBe(422)
+      const unknown = await as(admin).put('/api/jobs/purge-expired/settings', { enabled: true, time: '02:15', params: { nope: 3 } })
+      expect(unknown.status).toBe(422)
+
+      const ok = await as(admin).put('/api/jobs/purge-expired/settings', { enabled: true, time: '02:15', params: { notificationRetentionDays: 14 } })
+      expect(ok.status).toBe(200)
+      expect(ok.body.data).toMatchObject({ enabled: true, time: '02:15' })
+      expect(ok.body.data.params.find((p: { key: string }) => p.key === 'notificationRetentionDays').value).toBe(14)
+
+      let settings = await loadSettings(JOBS)
+      expect(dueJobs(JOBS, settings, '02:15').map((j) => j.name)).toEqual(['purge-expired'])
+      expect(dueJobs(JOBS, settings, '01:30').map((j) => j.name)).not.toContain('purge-expired')
+
+      await as(admin).put('/api/jobs/purge-expired/settings', { enabled: false, time: '02:15' })
+      settings = await loadSettings(JOBS)
+      expect(dueJobs(JOBS, settings, '02:15')).toEqual([])
+
+      expect((await as(f.owner).put('/api/jobs/purge-expired/settings', { enabled: true, time: '01:30' })).status).toBe(403)
+    } finally {
+      // Settings are global; leave the defaults for other suites.
+      await prisma.jobSetting.deleteMany({ where: { name: 'purge-expired' } })
+    }
+  })
+
+  it('daily-alerts uses each pharmacy\'s EXPIRY_ALERT_DAYS', async () => {
+    const where = { pharmacyId_key: { pharmacyId, key: 'EXPIRY_ALERT_DAYS' } }
+    expect((await prisma.businessParameter.findUnique({ where }))?.value).toBe('30')
+    const expiringToday = async () =>
+      prisma.notification.findFirst({ where: { pharmacyId, type: 'EXPIRING_BATCHES' }, orderBy: { updatedAt: 'desc' } })
+
+    await prisma.businessParameter.update({ where, data: { value: '5' } }) // the batch expires in 10 days
+    await runJob(job('daily-alerts'), JobTrigger.MANUAL)
+    expect(await expiringToday()).toBeNull()
+
+    await prisma.businessParameter.update({ where, data: { value: '30' } })
+    await runJob(job('daily-alerts'), JobTrigger.MANUAL)
+    expect((await expiringToday())?.count).toBe(1)
+  })
+})

@@ -1320,4 +1320,8 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: "Background job not found",
     id: "Job latar belakang tidak ditemukan",
   },
+  JOB_SETTINGS_UPDATED: {
+    en: "Job settings saved",
+    id: "Pengaturan job disimpan",
+  },
 }

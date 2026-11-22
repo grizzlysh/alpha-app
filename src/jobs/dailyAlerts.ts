@@ -9,13 +9,20 @@ import {
 import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
 import { PERMISSIONS } from '@constants/permissions'
+import { DEFAULT_BUSINESS_PARAMS } from '@constants/defaultCatalog'
 import { JobContext, JobResult } from './types'
 
 const DAY_MS = 86_400_000
-/** Batches expiring within this many days are flagged. */
-export const EXPIRY_WARNING_DAYS = 30
-/** Licenses expiring within this many days are flagged. */
-export const LICENSE_WARNING_DAYS = 30
+/** Per-pharmacy windows (business parameters); the catalog default applies when unset. */
+const EXPIRY_PARAM = 'EXPIRY_ALERT_DAYS'
+const LICENSE_PARAM = 'LICENSE_ALERT_DAYS'
+
+const defaultDays = (key: string): number => Number(DEFAULT_BUSINESS_PARAMS.find((p) => p.key === key)?.value ?? 30)
+
+interface AlertWindows {
+  expiryDays: number
+  licenseDays: number
+}
 
 interface Alert {
   type: NotificationType
@@ -28,9 +35,9 @@ interface Alert {
 
 const toNum = (d: Prisma.Decimal): number => Number(d.toString())
 
-async function collectAlerts(pharmacyId: number, now: Date): Promise<Alert[]> {
-  const expiryHorizon = new Date(now.getTime() + EXPIRY_WARNING_DAYS * DAY_MS)
-  const licenseHorizon = new Date(now.getTime() + LICENSE_WARNING_DAYS * DAY_MS)
+async function collectAlerts(pharmacyId: number, now: Date, windows: AlertWindows): Promise<Alert[]> {
+  const expiryHorizon = new Date(now.getTime() + windows.expiryDays * DAY_MS)
+  const licenseHorizon = new Date(now.getTime() + windows.licenseDays * DAY_MS)
 
   const [expiring, expired, stocks, payables, receivables, businessLicenses, practiceLicenses] = await Promise.all([
     prisma.stockDetail.count({
@@ -85,7 +92,7 @@ async function collectAlerts(pharmacyId: number, now: Date): Promise<Alert[]> {
       count: expiring,
       permission: PERMISSIONS.STOCK_READ,
       link: '/stock',
-      data: { days: EXPIRY_WARNING_DAYS },
+      data: { days: windows.expiryDays },
     },
     { type: NotificationType.LOW_STOCK, severity: NotificationSeverity.WARNING, count: lowStock, permission: PERMISSIONS.STOCK_READ, link: '/stock' },
     {
@@ -110,7 +117,7 @@ async function collectAlerts(pharmacyId: number, now: Date): Promise<Alert[]> {
       count: businessLicenses + practiceLicenses,
       permission: PERMISSIONS.DASHBOARD_READ,
       link: '/dashboard',
-      data: { days: LICENSE_WARNING_DAYS },
+      data: { days: windows.licenseDays },
     },
   ]
   return alerts
@@ -123,11 +130,24 @@ async function collectAlerts(pharmacyId: number, now: Date): Promise<Alert[]> {
  */
 export async function dailyAlerts({ now, timezone }: JobContext): Promise<JobResult> {
   const dateKey = DateTime.fromJSDate(now).setZone(timezone).toFormat('yyyyMMdd')
-  const pharmacies = await prisma.pharmacy.findMany({ where: { deletedAt: null }, select: { id: true } })
+  const [pharmacies, params] = await Promise.all([
+    prisma.pharmacy.findMany({ where: { deletedAt: null }, select: { id: true } }),
+    prisma.businessParameter.findMany({
+      where: { key: { in: [EXPIRY_PARAM, LICENSE_PARAM] } },
+      select: { pharmacyId: true, key: true, value: true },
+    }),
+  ])
+  const windowOf = (pharmacyId: number, key: string): number => {
+    const v = Number(params.find((p) => p.pharmacyId === pharmacyId && p.key === key)?.value)
+    return Number.isInteger(v) && v > 0 ? v : defaultDays(key)
+  }
 
   let affected = 0
   for (const { id: pharmacyId } of pharmacies) {
-    const alerts = await collectAlerts(pharmacyId, now)
+    const alerts = await collectAlerts(pharmacyId, now, {
+      expiryDays: windowOf(pharmacyId, EXPIRY_PARAM),
+      licenseDays: windowOf(pharmacyId, LICENSE_PARAM),
+    })
     for (const alert of alerts) {
       const dedupeKey = `${alert.type}:${dateKey}`
       if (alert.count === 0) {

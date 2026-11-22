@@ -130,7 +130,7 @@ if (process.env.NODE_ENV !== 'test') {
       process.exit(1)
     }
     console.log(`Server running on port ${PORT}`)
-    startScheduler().catch((err: unknown) => console.error('[jobs] scheduler failed to start:', err))
+    startScheduler()
   })
 }
 
