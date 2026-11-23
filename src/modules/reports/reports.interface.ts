@@ -28,6 +28,7 @@ export type GetDisposalExportRequest = Request<ParamsDictionary, {}, {}, Q>
 export type GetReturnSummaryRequest = Request<ParamsDictionary, {}, {}, Q>
 export type GetReturnListRequest = Request<ParamsDictionary, {}, {}, Q>
 export type GetReturnExportRequest = Request<ParamsDictionary, {}, {}, Q>
+export type GetControlledReportRequest = Request<ParamsDictionary, {}, {}, Q>
 
 // ── Response Types ────────────────────────────────────────────
 
@@ -207,4 +208,32 @@ export interface ReturnSummary {
   totalReturns: number
   totalItems: number
   totalQuantityPieces: number
+}
+
+/** One medicine's line on the monthly narcotics/psychotropics (SIPNAP) report; quantities in pieces. */
+export interface ControlledReportRow {
+  medicineUuid: string
+  medicineName: string
+  unit: string
+  shape: string
+  openingBalance: number
+  /** Received from distributors (invoices). */
+  inFromDistributor: number
+  /** Customer returns, transfers in, donations and upward adjustments. */
+  inOther: number
+  /** Sold to patients. */
+  outSales: number
+  /** Returned to distributors, transferred out, donated and downward adjustments. */
+  outOther: number
+  /** Destroyed or damaged. */
+  outDisposal: number
+  closingBalance: number
+}
+
+export interface ControlledReport {
+  kind: string
+  month: string
+  pharmacy: { name: string; code: string; businessLicenseNumber: string | null; address: string | null }
+  headPharmacist: { name: string; practiceLicenseNumber: string | null } | null
+  rows: ControlledReportRow[]
 }

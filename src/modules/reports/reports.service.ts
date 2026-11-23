@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import { getOrSet } from '@utils/cache'
 import { PaginationMeta } from '@interfaces/common.interface'
+import { getTimezone } from '@utils/generateDocNumbers'
+import { NotFoundException } from '@exceptions/NotFoundException'
 import {
   SalesSummaryInput,
   SalesListInput,
@@ -22,6 +24,7 @@ import {
   ReturnSummaryInput,
   ReturnListInput,
   ReturnExportInput,
+  ControlledReportInput,
 } from './reports.validation'
 import {
   SalesSummary,
@@ -40,6 +43,8 @@ import {
   ReturnSummary,
   ReturnByDistributor,
   ReturnDetailRow,
+  ControlledReport,
+  ControlledReportRow,
 } from './reports.interface'
 
 const CACHE_TTL = 300
@@ -1020,4 +1025,122 @@ export const getReturnExport = async (
     orderBy: { stockReturn: { returnedAt: 'desc' } },
   })
   return details.map(formatReturnRow)
+}
+
+// ── Controlled medicines (SIPNAP) ─────────────────────────────
+
+/**
+ * Monthly balance per medicine of one order-letter kind, in the shape of the
+ * SIPNAP report: opening stock, what came in and went out by channel, and the
+ * closing stock. Balances are worked back from today's stock through the
+ * movement log, so they match the stock card.
+ */
+export const getControlledReport = async (pharmacyId: number, query: ControlledReportInput): Promise<ControlledReport> => {
+  const zone = await getTimezone()
+  const monthStart = query.month
+    ? DateTime.fromFormat(query.month, 'yyyy-MM', { zone })
+    : DateTime.now().setZone(zone).startOf('month')
+  const start = monthStart.startOf('month').toUTC().toJSDate()
+  const end = monthStart.endOf('month').toUTC().toJSDate()
+  const kind = query.kind
+
+  const [pharmacy, medicines] = await Promise.all([
+    prisma.pharmacy.findFirst({
+      where: { id: pharmacyId, deletedAt: null },
+      select: {
+        name: true,
+        code: true,
+        address: true,
+        businessLicenses: { where: { status: 'ACTIVE', deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { licenseNumber: true } },
+        placements: {
+          where: { status: 'ACTIVE', deletedAt: null, leftAt: null, isHeadPharmacist: true },
+          take: 1,
+          select: {
+            user: { select: { name: true } },
+            practiceLicenses: { where: { status: 'ACTIVE', deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { licenseNumber: true } },
+          },
+        },
+      },
+    }),
+    prisma.medicine.findMany({
+      where: {
+        pharmacyId,
+        deletedAt: null,
+        OR: [{ orderLetterKind: kind }, { orderLetterKind: null, type: { orderLetterKind: kind } }],
+      },
+      select: {
+        id: true,
+        uuid: true,
+        name: true,
+        unit: true,
+        shape: { select: { name: true } },
+        stocks: { select: { totalPieces: true } },
+      },
+      orderBy: { name: 'asc' },
+    }),
+  ])
+  if (!pharmacy) throw new NotFoundException('Pharmacy not found')
+
+  const ids = medicines.map((m) => m.id)
+  const [inMonth, afterMonth] = ids.length
+    ? await Promise.all([
+        prisma.stockMovement.groupBy({
+          by: ['medicineId', 'type', 'reason'],
+          where: { pharmacyId, medicineId: { in: ids }, createdAt: { gte: start, lte: end } },
+          _sum: { quantity: true },
+        }),
+        prisma.stockMovement.groupBy({
+          by: ['medicineId', 'type'],
+          where: { pharmacyId, medicineId: { in: ids }, createdAt: { gt: end } },
+          _sum: { quantity: true },
+        }),
+      ])
+    : [[], []]
+
+  const rows: ControlledReportRow[] = medicines.map((m) => {
+    const row: ControlledReportRow = {
+      medicineUuid: m.uuid,
+      medicineName: m.name,
+      unit: m.unit,
+      shape: m.shape.name,
+      openingBalance: 0,
+      inFromDistributor: 0,
+      inOther: 0,
+      outSales: 0,
+      outOther: 0,
+      outDisposal: 0,
+      closingBalance: 0,
+    }
+    for (const g of inMonth) {
+      if (g.medicineId !== m.id) continue
+      const qty = g._sum.quantity ?? 0
+      if (g.type === 'IN') {
+        if (g.reason === 'PURCHASE') row.inFromDistributor += qty
+        else row.inOther += qty
+      } else if (g.reason === 'SALE') row.outSales += qty
+      else if (g.reason === 'DISPOSAL' || g.reason === 'DAMAGED') row.outDisposal += qty
+      else row.outOther += qty
+    }
+    const now = m.stocks.reduce((s, x) => s + x.totalPieces, 0)
+    const netAfter = afterMonth
+      .filter((g) => g.medicineId === m.id)
+      .reduce((s, g) => s + (g.type === 'IN' ? 1 : -1) * (g._sum.quantity ?? 0), 0)
+    row.closingBalance = now - netAfter
+    row.openingBalance = row.closingBalance - row.inFromDistributor - row.inOther + row.outSales + row.outOther + row.outDisposal
+    return row
+  })
+
+  const hp = pharmacy.placements[0]
+  return {
+    kind,
+    month: monthStart.toFormat('yyyy-MM'),
+    pharmacy: {
+      name: pharmacy.name,
+      code: pharmacy.code,
+      address: pharmacy.address,
+      businessLicenseNumber: pharmacy.businessLicenses[0]?.licenseNumber ?? null,
+    },
+    headPharmacist: hp ? { name: hp.user.name, practiceLicenseNumber: hp.practiceLicenses[0]?.licenseNumber ?? null } : null,
+    rows,
+  }
 }
