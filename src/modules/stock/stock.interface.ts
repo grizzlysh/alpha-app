@@ -1,3 +1,4 @@
+import { OrderLetterKind } from '@prisma/client'
 import { Request } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
 
@@ -147,7 +148,8 @@ export interface StockDetailSearchResponse {
     /** Present on the scan / search endpoint. */
     barcode?: string | null
     shape: { name: string }
-    type: { name: string; requiredPrescription: boolean }
+    orderLetterKind: OrderLetterKind | null
+    type: { name: string; requiredPrescription: boolean; orderLetterKind: OrderLetterKind }
   }
 }
 
@@ -181,7 +183,8 @@ export interface StockResponse {
     name: string
     unit: string
     shape: { name: string }
-    type: { name: string; requiredPrescription: boolean }
+    orderLetterKind: OrderLetterKind | null
+    type: { name: string; requiredPrescription: boolean; orderLetterKind: OrderLetterKind }
     medicineClass: { name: string }
   }
   details: StockDetailResponse[]
