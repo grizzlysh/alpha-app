@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { AppRole, PlatformRole } from '@prisma/client'
 import { prisma } from '@config/db'
 import { NAME_CASES, NAME_DISPLAY_CASE_KEY, NameCase } from '@constants/defaultCatalog'
+import { getMedicineNameFormat } from '@utils/medicineName'
 import { env } from '@config/env'
 import { LoginInput, SelectPharmacyInput } from './auth.validation'
 import {
@@ -352,6 +353,7 @@ export const selectPharmacy = async (
     role: pharmacyRole,
     permissions: toPermissionMap(permissions),
     nameCase: await getNameCase(pharmacy.id),
+    medicineNameFormat: await getMedicineNameFormat(pharmacy.id),
   }
 
   return {
@@ -521,6 +523,7 @@ export const getMe = async (
     role,
     permissions: toPermissionMap(permissions),
     nameCase: await getNameCase(pharmacyId),
+    medicineNameFormat: await getMedicineNameFormat(pharmacyId),
   }
 
   return { user: userData, currentPharmacy }
