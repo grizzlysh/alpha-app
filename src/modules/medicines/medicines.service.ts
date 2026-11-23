@@ -22,6 +22,7 @@ const medicineSelect = {
   baseName: true,
   variant: true,
   isCustomName: true,
+  orderLetterKind: true,
   unit: true,
   barcode: true,
   status: true,
@@ -31,7 +32,7 @@ const medicineSelect = {
     select: { uuid: true, name: true }
   },
   type: {
-    select: { uuid: true, name: true }
+    select: { uuid: true, name: true, orderLetterKind: true }
   },
   medicineClass: {
     select: { uuid: true, name: true }
@@ -109,6 +110,8 @@ const formatResponse = (m: Prisma.MedicineGetPayload<{ select: typeof medicineSe
   variant: m.variant,
   isCustomName: m.isCustomName,
   strength: combinedStrength(m.ingredients.map((i) => i.strength)),
+  orderLetterKind: m.orderLetterKind,
+  effectiveOrderLetterKind: m.orderLetterKind ?? m.type.orderLetterKind,
   unit: m.unit,
   barcode: m.barcode,
   status: m.status,
@@ -244,6 +247,7 @@ export const createMedicine = async (
       baseName: isCustomName ? null : data.baseName!,
       variant: isCustomName ? null : (data.variant ?? null),
       isCustomName,
+      orderLetterKind: data.orderLetterKind ?? null,
       shapeId,
       typeId,
       medicineClassId,
@@ -332,6 +336,7 @@ export const updateMedicine = async (
       baseName: isCustomName ? null : baseName,
       variant: isCustomName ? null : variant,
       isCustomName,
+      ...(data.orderLetterKind !== undefined && { orderLetterKind: data.orderLetterKind }),
       ...(shapeId && { shapeId }),
       ...(typeId && { typeId }),
       ...(medicineClassId && { medicineClassId }),

@@ -12,12 +12,14 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
+import { resolveOrderLetterKind } from '@utils/orderLetter'
 
 // ── Helpers ───────────────────────────────────────────
 
 const purchaseOrderSelect = {
   uuid: true,
   orderNumber: true,
+  kind: true,
   status: true,
   description: true,
   cancellationReason: true,
@@ -38,7 +40,13 @@ const purchaseOrderSelect = {
       unit: true,
       description: true,
       medicine: {
-        select: { uuid: true, name: true, unit: true },
+        select: {
+          uuid: true,
+          name: true,
+          unit: true,
+          shape: { select: { name: true } },
+          ingredients: { select: { name: true, strength: true }, orderBy: { id: 'asc' as const } },
+        },
       },
     },
   },
@@ -199,6 +207,9 @@ export const createPurchaseOrder = async (
       })
     )
 
+    // ── One kind of medicine per letter ──
+    const kind = await resolveOrderLetterKind(tx, details.map((d) => d.medicineId))
+
     // ── Signer: a licensed pharmacist; the Head Pharmacist for controlled medicines ──
     let signedById: number | undefined
     if (data.signedByUuid) {
@@ -213,6 +224,7 @@ export const createPurchaseOrder = async (
         distributorId: distributor.id,
         signedById,
         orderNumber,
+        kind,
         description: data.description,
         createdById: userId,
         details: {
@@ -271,6 +283,8 @@ export const updatePurchaseOrder = async (
       )
     }
 
+    const kind = detailsCreate ? await resolveOrderLetterKind(tx, detailsCreate.map((d) => d.medicineId as number)) : undefined
+
     // Re-check the signer whenever it or the items change: adding a narcotic
     // to an order signed by a Pharmacist must move it to the Head Pharmacist.
     let signedById: number | undefined
@@ -289,6 +303,7 @@ export const updatePurchaseOrder = async (
       data: {
         ...(distributorId && { distributorId }),
         ...(signedById && { signedById }),
+        ...(kind && { kind }),
         ...(data.description !== undefined && { description: data.description }),
         updatedById: userId,
         ...(detailsCreate && {
@@ -428,12 +443,14 @@ export const getPurchaseOrderPrintData = async (
     select: {
       orderNumber: true,
       orderedAt: true,
-      distributor: { select: { name: true } },
+      kind: true,
+      distributor: { select: { name: true, address: true, phone: true, permitNumber: true } },
       pharmacy: {
         select: {
           name: true,
           address: true,
           location: true,
+          phone: true,
           status: true,
           businessLicenses: {
             where: { status: RecordStatus.ACTIVE, deletedAt: null },
@@ -471,11 +488,13 @@ export const getPurchaseOrderPrintData = async (
   return {
     orderNumber: purchaseOrder.orderNumber,
     orderedAt: purchaseOrder.orderedAt,
-    distributor: { name: purchaseOrder.distributor.name },
+    kind: purchaseOrder.kind,
+    distributor: purchaseOrder.distributor,
     pharmacy: {
       name: purchaseOrder.pharmacy.name,
       address: purchaseOrder.pharmacy.address,
       location: purchaseOrder.pharmacy.location,
+      phone: purchaseOrder.pharmacy.phone,
       businessLicenseNumber: purchaseOrder.pharmacy.businessLicenses[0]?.licenseNumber ?? null,
     },
     headPharmacist: headPharmacistPlacement

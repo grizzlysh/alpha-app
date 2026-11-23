@@ -1,5 +1,5 @@
 import { Request } from 'express'
-import { RecordStatus } from '@prisma/client'
+import { OrderLetterKind, RecordStatus } from '@prisma/client'
 import { ParamsDictionary } from 'express-serve-static-core'
 
 // ── Query/Param/Body Types ────────────────────────────
@@ -31,6 +31,7 @@ export interface CreateMedicineBody {
   baseName?: string
   variant?: string | null
   isCustomName?: boolean
+  orderLetterKind?: OrderLetterKind | null
   medicineShapeUuid: string
   medicineTypeUuid: string
   medicineClassUuid: string
@@ -89,6 +90,7 @@ export interface MedicineShapeResponse {
 export interface MedicineTypeResponse {
   uuid: string
   name: string
+  orderLetterKind: OrderLetterKind
 }
 
 export interface MedicineClassResponse {
@@ -105,6 +107,10 @@ export interface MedicineResponse {
   isCustomName: boolean
   /** The ingredients' strengths as shown in the name ("500/50 mg"). */
   strength: string
+  /** Its own order letter kind, or null when it follows the type. */
+  orderLetterKind: OrderLetterKind | null
+  /** The order letter it actually goes on. */
+  effectiveOrderLetterKind: OrderLetterKind
   unit: string
   barcode: string | null
   status: RecordStatus

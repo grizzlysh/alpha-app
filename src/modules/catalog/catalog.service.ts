@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { OrderLetterKind, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { DEFAULT_MEDICINE_TYPES } from '@constants/defaultCatalog'
@@ -22,7 +22,7 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
   const live = { pharmacyId, deletedAt: null }
   const [shapes, types, classes, medicines] = await Promise.all([
     db.medicineShape.findMany({ where: live, select: { name: true }, orderBy: { name: 'asc' } }),
-    db.medicineType.findMany({ where: live, select: { name: true, requiredPrescription: true, isControlled: true }, orderBy: { name: 'asc' } }),
+    db.medicineType.findMany({ where: live, select: { name: true, requiredPrescription: true, isControlled: true, orderLetterKind: true }, orderBy: { name: 'asc' } }),
     db.medicineClass.findMany({ where: live, select: { name: true }, orderBy: { name: 'asc' } }),
     db.medicine.findMany({
       where: live,
@@ -31,6 +31,7 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
         baseName: true,
         variant: true,
         isCustomName: true,
+        orderLetterKind: true,
         unit: true,
         shape: { select: { name: true } },
         type: { select: { name: true } },
@@ -52,6 +53,7 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
       baseName: m.baseName,
       variant: m.variant,
       isCustomName: m.isCustomName,
+      orderLetterKind: m.orderLetterKind,
       unit: m.unit,
       shape: m.shape.name,
       type: m.type.name,
@@ -63,7 +65,9 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
 
 // ── Import ────────────────────────────────────────────
 
-const DEFAULT_TYPE = new Map(DEFAULT_MEDICINE_TYPES.map((t) => [key(t.name), { rx: t.requiredPrescription, controlled: t.isControlled ?? false }]))
+const DEFAULT_TYPE = new Map(
+  DEFAULT_MEDICINE_TYPES.map((t) => [key(t.name), { rx: t.requiredPrescription, controlled: t.isControlled ?? false, kind: t.orderLetterKind ?? OrderLetterKind.REGULAR }])
+)
 
 /** name (lowercase) → id for a pharmacy's live rows. */
 async function nameIndex(rows: Promise<{ id: number; name: string }[]>): Promise<Map<string, number>> {
@@ -139,16 +143,23 @@ export async function applyCatalog(
   }
   const wantShapes = collect([...input.shapes.map((x) => x.name), ...rows.map((m) => m.shape)])
   const wantClasses = collect([...input.classes.map((x) => x.name), ...rows.map((m) => m.class)])
-  const wantTypes = new Map<string, { name: string; rx: boolean; controlled: boolean }>()
+  const wantTypes = new Map<string, { name: string; rx: boolean; controlled: boolean; kind: OrderLetterKind }>()
   for (const t of input.types) {
     const d = DEFAULT_TYPE.get(key(t.name))
     if (!wantTypes.has(key(t.name))) {
-      wantTypes.set(key(t.name), { name: t.name, rx: t.requiredPrescription ?? d?.rx ?? false, controlled: t.isControlled ?? d?.controlled ?? false })
+      wantTypes.set(key(t.name), {
+        name: t.name,
+        rx: t.requiredPrescription ?? d?.rx ?? false,
+        controlled: t.isControlled ?? d?.controlled ?? false,
+        kind: t.orderLetterKind ?? d?.kind ?? OrderLetterKind.REGULAR,
+      })
     }
   }
   for (const m of rows) {
     const d = DEFAULT_TYPE.get(key(m.type))
-    if (!wantTypes.has(key(m.type))) wantTypes.set(key(m.type), { name: m.type, rx: d?.rx ?? false, controlled: d?.controlled ?? false })
+    if (!wantTypes.has(key(m.type))) {
+      wantTypes.set(key(m.type), { name: m.type, rx: d?.rx ?? false, controlled: d?.controlled ?? false, kind: d?.kind ?? OrderLetterKind.REGULAR })
+    }
   }
 
   const newShapes = [...wantShapes].filter(([k]) => !shapeIds.has(k)).map(([, n]) => n)
@@ -173,7 +184,7 @@ export async function applyCatalog(
   }
   if (newTypes.length) {
     const created = await tx.medicineType.createManyAndReturn({
-      data: newTypes.map((t) => ({ ...by, name: t.name, requiredPrescription: t.rx, isControlled: t.controlled })),
+      data: newTypes.map((t) => ({ ...by, name: t.name, requiredPrescription: t.rx, isControlled: t.controlled, orderLetterKind: t.kind })),
       select: { id: true, name: true },
     })
     for (const r of created) typeIds.set(key(r.name), r.id)
@@ -191,6 +202,7 @@ export async function applyCatalog(
         baseName: m.isCustomName ? null : (m.baseName ?? null),
         variant: m.isCustomName ? null : (m.variant ?? null),
         isCustomName: m.isCustomName,
+        orderLetterKind: m.orderLetterKind ?? null,
         unit: m.unit,
         shapeId: shapeIds.get(key(m.shape))!,
         typeId: typeIds.get(key(m.type))!,

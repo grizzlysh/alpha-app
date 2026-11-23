@@ -1,4 +1,4 @@
-import { DataType } from '@prisma/client'
+import { DataType, OrderLetterKind } from '@prisma/client'
 
 // Starting data every new pharmacy gets. Each pharmacy owns its own copy and
 // may rename, add or remove entries afterwards — nothing here is shared.
@@ -20,13 +20,13 @@ export const DEFAULT_MEDICINE_SHAPES: string[] = [
 ]
 
 /** Regulatory groups. `requiredPrescription` drives the prescription check at the POS. */
-export const DEFAULT_MEDICINE_TYPES: Array<{ name: string; requiredPrescription: boolean; isControlled?: boolean }> = [
+export const DEFAULT_MEDICINE_TYPES: Array<{ name: string; requiredPrescription: boolean; isControlled?: boolean; orderLetterKind?: OrderLetterKind }> = [
   { name: 'Obat Bebas', requiredPrescription: false },
   { name: 'Obat Bebas Terbatas', requiredPrescription: false },
   { name: 'Obat Keras', requiredPrescription: true },
-  { name: 'Psikotropika', requiredPrescription: true, isControlled: true },
-  { name: 'Narkotika', requiredPrescription: true, isControlled: true },
-  { name: 'Prekursor', requiredPrescription: true, isControlled: true },
+  { name: 'Psikotropika', requiredPrescription: true, isControlled: true, orderLetterKind: OrderLetterKind.PSYCHOTROPIC },
+  { name: 'Narkotika', requiredPrescription: true, isControlled: true, orderLetterKind: OrderLetterKind.NARCOTIC },
+  { name: 'Prekursor', requiredPrescription: true, isControlled: true, orderLetterKind: OrderLetterKind.PRECURSOR },
   { name: 'Jamu & Herbal', requiredPrescription: false },
   { name: 'Suplemen', requiredPrescription: false },
   { name: 'Alat Kesehatan', requiredPrescription: false },

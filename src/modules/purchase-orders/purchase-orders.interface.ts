@@ -1,6 +1,6 @@
 import { Request } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
-import { PurchaseOrderStatus } from '@prisma/client'
+import { OrderLetterKind, PurchaseOrderStatus } from '@prisma/client'
 
 // ── Query/Param/Body Types ────────────────────────────
 
@@ -103,6 +103,9 @@ export interface PurchaseOrderDetailResponse {
     uuid: string
     name: string
     unit: string
+    /** For special order letters: active ingredients with strength, and the shape. */
+    shape: { name: string }
+    ingredients: { name: string; strength: string | null }[]
   }
   quantity: number
   unit: string
@@ -112,6 +115,8 @@ export interface PurchaseOrderDetailResponse {
 export interface PurchaseOrderResponse {
   uuid: string
   orderNumber: string
+  /** Which surat pesanan this is (from its items). */
+  kind: OrderLetterKind
   status: PurchaseOrderStatus
   description: string | null
   cancellationReason: string | null
@@ -132,13 +137,18 @@ export interface PurchaseOrderResponse {
 export interface PurchaseOrderPrintResponse {
   orderNumber: string
   orderedAt: Date
+  kind: OrderLetterKind
   distributor: {
     name: string
+    address: string | null
+    phone: string
+    permitNumber: string | null
   }
   pharmacy: {
     name: string
     address: string
     location: string
+    phone: string
     businessLicenseNumber: string | null
   }
   headPharmacist: {
