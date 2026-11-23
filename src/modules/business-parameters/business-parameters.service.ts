@@ -1,6 +1,7 @@
 import { DataType, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
-import { NAME_CASES, NAME_DISPLAY_CASE_KEY } from '@constants/defaultCatalog'
+import { MEDICINE_NAME_FORMAT_KEY, NAME_CASES, NAME_DISPLAY_CASE_KEY } from '@constants/defaultCatalog'
+import { applyNames, duplicateNames, isMedicineNameFormat, plannedNames } from '@utils/medicineName'
 import {
   BusinessParameterQueryInput,
   UpdateBusinessParameterInput,
@@ -102,6 +103,9 @@ export const updateBusinessParameter = async (
   if (existing.key === NAME_DISPLAY_CASE_KEY && !(NAME_CASES as readonly string[]).includes(data.value)) {
     throw new BadRequestException('Value must be one of UPPER, TITLE, LOWER, AS_TYPED')
   }
+  if (existing.key === MEDICINE_NAME_FORMAT_KEY && !isMedicineNameFormat(data.value)) {
+    throw new BadRequestException('Value must be one of NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH, NAME_STRENGTH')
+  }
 
   return prisma.$transaction(async (tx) => {
     const param = await tx.businessParameter.update({
@@ -109,6 +113,20 @@ export const updateBusinessParameter = async (
       data: { ...data, updatedById: userId },
       select: businessParameterSelect,
     })
+
+    // Every structured medicine name follows the new format, unless two would end up the same.
+    if (existing.key === MEDICINE_NAME_FORMAT_KEY && isMedicineNameFormat(param.value)) {
+      const planned = await plannedNames(tx, pharmacyId, param.value)
+      const custom = await tx.medicine.findMany({
+        where: { pharmacyId, deletedAt: null, isCustomName: true },
+        select: { name: true },
+      })
+      const clashes = duplicateNames([...planned.map((p) => p.next), ...custom.map((c) => c.name)])
+      if (clashes.length) {
+        throw new BadRequestException(`This format would give several medicines the same name: ${clashes.slice(0, 3).join(', ')}`)
+      }
+      await applyNames(tx, planned)
+    }
 
     if (existing.key === 'MARGIN_PERCENTAGE') {
       const margin = Number(param.value)

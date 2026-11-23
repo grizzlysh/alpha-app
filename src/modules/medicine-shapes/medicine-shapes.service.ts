@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { applyNames, getMedicineNameFormat, plannedNames } from '@utils/medicineName'
 import {
   CreateMedicineShapeInput,
   UpdateMedicineShapeInput,
@@ -125,10 +126,18 @@ export const updateMedicineShape = async (
   const existing = await findOwn(uuid, pharmacyId)
   if (data.name) await checkDuplicate(data.name, pharmacyId, uuid)
 
-  const row = await prisma.medicineShape.update({
-    where: { id: existing.id },
-    data: { ...data, updatedById: userId },
-    select: medicineShapeSelect,
+  // Structured medicine names carry the shape, so a rename renames them too.
+  const row = await prisma.$transaction(async (tx) => {
+    const updated = await tx.medicineShape.update({
+      where: { id: existing.id },
+      data: { ...data, updatedById: userId },
+      select: medicineShapeSelect,
+    })
+    if (data.name) {
+      const format = await getMedicineNameFormat(pharmacyId, tx)
+      await applyNames(tx, await plannedNames(tx, pharmacyId, format, { shapeId: existing.id }))
+    }
+    return updated
   })
 
   return formatResponse(row)

@@ -835,7 +835,15 @@ model Medicine {
   id              Int          @id @default(autoincrement())
   uuid            String       @unique @default(uuid())
   pharmacyId      Int          @map("pharmacy_id")
+  /// The name shown everywhere. Built from baseName, the ingredients' strength,
+  /// the shape and variant (pharmacy's MEDICINE_NAME_FORMAT), or typed as is
+  /// when isCustomName.
   name            String
+  /// The name part only ("Amlodipin"); null for a custom name.
+  baseName        String?      @map("base_name")
+  /// Optional suffix ("Forte", "60 ml").
+  variant         String?
+  isCustomName    Boolean      @default(true) @map("is_custom_name")
   shapeId         Int          @map("shape_id")
   typeId          Int          @map("type_id")
   medicineClassId Int          @map("medicine_class_id")
@@ -882,6 +890,8 @@ model MedicineIngredient {
   uuid        String   @unique @default(uuid())
   medicineId  Int      @map("medicine_id")
   name        String
+  /// "500 mg", "250 mg/5 ml"; optional.
+  strength    String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   createdById Int?     @map("created_by_id")

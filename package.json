@@ -11,6 +11,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node --transpile-only -P tsconfig.seed.json -r tsconfig-paths/register prisma/scripts/seed.ts",
     "prisma:seed:core": "ts-node --transpile-only -P tsconfig.seed.json -r tsconfig-paths/register prisma/scripts/seed-core.ts",
+    "medicines:structure": "ts-node --transpile-only -P tsconfig.seed.json -r tsconfig-paths/register prisma/scripts/structure-medicine-names.ts",
     "lint": "eslint .",
     "test": "vitest run"
   },
