@@ -267,6 +267,8 @@ interface StockCardMedicine {
   shape: string
   type: string
   isControlled: boolean
+  /** Effective order letter kind; narcotics and psychotropics go in the locked cabinet. */
+  orderLetterKind: OrderLetterKind
   requiredPrescription: boolean
   therapeuticClass: string
 }
