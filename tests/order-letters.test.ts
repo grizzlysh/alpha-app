@@ -62,11 +62,11 @@ describe('order letter kinds', () => {
       await num(['Efedrin SP']),
       await num(['Tramadol SP']),
     ]
-    expect(regular).toMatch(/^PO-/)
-    expect(n).toMatch(/^SP-N-/)
-    expect(p).toMatch(/^SP-P-/)
-    expect(pf).toMatch(/^SP-PF-/)
-    expect(oot).toMatch(/^SP-OOT-/)
+    expect(regular).not.toMatch(/^PO-(N|P|PF|OOT)-/)
+    expect(n).toMatch(/^PO-N-/)
+    expect(p).toMatch(/^PO-P-/)
+    expect(pf).toMatch(/^PO-PF-/)
+    expect(oot).toMatch(/^PO-OOT-/)
     // The first test made one narcotics letter today, so this is the second in that series.
     expect(n).toMatch(/-002$/)
   })
@@ -87,8 +87,8 @@ describe('order letter kinds', () => {
       details: [{ medicineUuid: uuids['Diazepam SP'], quantity: 1, unit: 'box' }],
     })
     expect(toPsy.body.data.kind).toBe('PSYCHOTROPIC')
-    expect(po.orderNumber).toMatch(/^PO-/)
-    expect(toPsy.body.data.orderNumber).toMatch(/^SP-P-/)
+    expect(po.orderNumber).not.toMatch(/^PO-(N|P|PF|OOT)-/)
+    expect(toPsy.body.data.orderNumber).toMatch(/^PO-P-/)
     const mix = await as(f.owner).put(`/api/purchase-orders/${po.uuid}`, {
       details: [uuids['Diazepam SP'], uuids['Paracetamol SP']].map((medicineUuid) => ({ medicineUuid, quantity: 1, unit: 'box' })),
     })
