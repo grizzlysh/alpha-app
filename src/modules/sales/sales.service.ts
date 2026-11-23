@@ -16,6 +16,7 @@ import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
+import { assertRestrictedSaleLimit } from '@utils/orderLetter'
 import { Decimal } from '@prisma/client/runtime/library'
 
 // ── Helpers ───────────────────────────────────────────
@@ -809,6 +810,7 @@ export const createSale = async (
       customerId,
       userId,
     })
+    if (!data.isPending && !prescriptionId) await assertRestrictedSaleLimit(tx, pharmacyId, lines)
 
     const saleType = data.saleType ?? SaleType.CASH
     const isCashCompleted = !data.isPending && saleType === SaleType.CASH
@@ -916,6 +918,7 @@ export const completeSale = async (
       customerId,
       userId,
     })
+    if (!prescriptionId) await assertRestrictedSaleLimit(tx, pharmacyId, lines)
 
     const saleType = data.saleType ?? SaleType.CASH
     const soldAt = new Date()

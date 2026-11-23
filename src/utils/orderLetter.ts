@@ -39,3 +39,42 @@ export const ORDER_NUMBER_PREFIX: Record<OrderLetterKind, string> = {
   PRECURSOR: 'PO-PF',
   CERTAIN_DRUG: 'PO-OOT',
 }
+
+/** Narcotics and psychotropics are only ever dispensed on a prescription. */
+export const PRESCRIPTION_ONLY_KINDS: OrderLetterKind[] = [OrderLetterKind.NARCOTIC, OrderLetterKind.PSYCHOTROPIC]
+
+/** Precursors and obat-obat tertentu sold without a prescription are capped per sale. */
+export const RESTRICTED_SALE_KINDS: OrderLetterKind[] = [OrderLetterKind.PRECURSOR, OrderLetterKind.CERTAIN_DRUG]
+
+export const RESTRICTED_SALE_LIMIT_KEY = 'RESTRICTED_SALE_LIMIT'
+
+/** A medicine set to narcotics or psychotropics must sit in a prescription-only type. */
+export async function assertPrescriptionForKind(db: Db, typeId: number, kind: OrderLetterKind | null | undefined): Promise<void> {
+  const type = await db.medicineType.findUnique({ where: { id: typeId }, select: { requiredPrescription: true, orderLetterKind: true } })
+  if (!type) return
+  const effective = kind ?? type.orderLetterKind
+  if (PRESCRIPTION_ONLY_KINDS.includes(effective) && !type.requiredPrescription) {
+    throw new BadRequestException('Narcotics and psychotropics must belong to a prescription-only medicine type')
+  }
+}
+
+/**
+ * Without a prescription, each precursor / obat-obat tertentu medicine may be
+ * sold up to the pharmacy's RESTRICTED_SALE_LIMIT pieces per sale (0 = no cap).
+ */
+export async function assertRestrictedSaleLimit(db: Db, pharmacyId: number, lines: { medicineId: number; quantityPieces: number }[]): Promise<void> {
+  const param = await db.businessParameter.findUnique({
+    where: { pharmacyId_key: { pharmacyId, key: RESTRICTED_SALE_LIMIT_KEY } },
+    select: { value: true },
+  })
+  const limit = Number(param?.value ?? 0)
+  if (!Number.isFinite(limit) || limit <= 0) return
+
+  const perMedicine = new Map<number, number>()
+  for (const l of lines) perMedicine.set(l.medicineId, (perMedicine.get(l.medicineId) ?? 0) + l.quantityPieces)
+  const kinds = await orderLetterKinds(db, [...perMedicine.keys()])
+  const over = [...perMedicine].filter(([id, qty]) => RESTRICTED_SALE_KINDS.includes(kinds.get(id)!) && qty > limit).map(([id]) => id)
+  if (!over.length) return
+  const names = await db.medicine.findMany({ where: { id: { in: over } }, select: { name: true } })
+  throw new BadRequestException(`Without a prescription at most ${limit} pieces per sale: ${names.map((n) => n.name).join(', ')}`)
+}

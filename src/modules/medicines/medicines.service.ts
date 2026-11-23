@@ -12,6 +12,7 @@ import {
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
+import { assertPrescriptionForKind } from '@utils/orderLetter'
 import { buildMedicineName, combinedStrength, getMedicineNameFormat } from '@utils/medicineName'
 
 // ── Helpers ───────────────────────────────────────────
@@ -236,6 +237,7 @@ export const createMedicine = async (
     data.medicineClassUuid,
     pharmacyId
   )
+  await assertPrescriptionForKind(prisma, typeId, data.orderLetterKind)
   const isCustomName = data.isCustomName ?? !data.baseName
   const name = await resolveName(pharmacyId, { ...data, isCustomName, shapeId })
   await checkDuplicate(name, pharmacyId)
@@ -279,6 +281,8 @@ export const updateMedicine = async (
       variant: true,
       isCustomName: true,
       shapeId: true,
+      typeId: true,
+      orderLetterKind: true,
       ingredients: { select: { name: true, strength: true }, orderBy: { id: 'asc' } },
     },
   })
@@ -313,6 +317,10 @@ export const updateMedicine = async (
     shapeId = shape?.id
     typeId = type?.id
     medicineClassId = medicineClass?.id
+  }
+
+  if (typeId || data.orderLetterKind !== undefined) {
+    await assertPrescriptionForKind(prisma, typeId ?? existing.typeId, data.orderLetterKind !== undefined ? data.orderLetterKind : existing.orderLetterKind)
   }
 
   // Sending only `name` (as older clients do) switches to a custom name.

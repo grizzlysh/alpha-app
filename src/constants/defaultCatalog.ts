@@ -85,5 +85,6 @@ export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
   { key: 'NAME_DISPLAY_CASE',         value: 'UPPER', dataType: DataType.STRING,     description: 'How names are displayed and printed: UPPER, TITLE, LOWER or AS_TYPED' },
   { key: 'MEDICINE_NAME_FORMAT',      value: 'NAME_STRENGTH_SHAPE', dataType: DataType.STRING, description: 'How medicine names are put together: NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH or NAME_STRENGTH' },
+  { key: 'RESTRICTED_SALE_LIMIT',     value: '10',    dataType: DataType.NUMBER,     description: 'Most pieces of one precursor or obat-obat tertentu medicine sold per sale without a prescription (0 = no limit)' },
   { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
 ]
