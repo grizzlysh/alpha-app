@@ -50,6 +50,8 @@ interface GenerateDocNumberOptions {
   type: DocType
   pharmacyId: number
   pharmacyCode: string
+  /** Replaces the type in the number and keeps its own counter, e.g. 'SP-N' for narcotics orders. */
+  prefix?: string
 }
 
 export const getTimezone = async (): Promise<string> => {
@@ -90,10 +92,10 @@ export const nextDailySequence = async (
   return Number(rows[0].last_value)
 }
 
-const countExisting = async (type: DocType, pharmacyId: number, gte: Date, lte: Date): Promise<number> => {
+const countExisting = async (type: DocType, prefix: string, pharmacyId: number, gte: Date, lte: Date): Promise<number> => {
   const where = { pharmacyId, createdAt: { gte, lte } }
   switch (type) {
-    case 'PO': return prisma.purchaseOrder.count({ where })
+    case 'PO': return prisma.purchaseOrder.count({ where: { ...where, orderNumber: { startsWith: `${prefix}-` } } })
     case 'INV': return prisma.invoice.count({ where })
     case 'SL': return prisma.sale.count({ where })
     case 'SR': return prisma.stockReturn.count({ where })
@@ -107,6 +109,7 @@ export const generateDocNumber = async (
   options: GenerateDocNumberOptions
 ): Promise<string> => {
   const { type, pharmacyId, pharmacyCode } = options
+  const prefix = options.prefix ?? type
 
   const timezone = await getTimezone()
   const dt = DateTime.now().setZone(timezone)
@@ -117,11 +120,11 @@ export const generateDocNumber = async (
 
   // Seed value used only the first time a (pharmacy, type, day) row is created,
   // so documents issued before this counter existed are not re-numbered.
-  const existing = await countExisting(type, pharmacyId, startOfDay, endOfDay)
+  const existing = await countExisting(type, prefix, pharmacyId, startOfDay, endOfDay)
 
-  const next = await nextDailySequence(pharmacyId, type, dateStr, existing + 1)
+  const next = await nextDailySequence(pharmacyId, prefix, dateStr, existing + 1)
 
   const seq = String(next).padStart(3, '0')
 
-  return `${type}-${pharmacyCode.toUpperCase()}-${dateStr}-${seq}`
+  return `${prefix}-${pharmacyCode.toUpperCase()}-${dateStr}-${seq}`
 }

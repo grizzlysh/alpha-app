@@ -30,3 +30,12 @@ export async function resolveOrderLetterKind(db: Db, medicineIds: number[]): Pro
   }
   return kind
 }
+
+/** Each kind of order letter is numbered in its own series. */
+export const ORDER_NUMBER_PREFIX: Record<OrderLetterKind, string> = {
+  REGULAR: 'PO',
+  NARCOTIC: 'SP-N',
+  PSYCHOTROPIC: 'SP-P',
+  PRECURSOR: 'SP-PF',
+  CERTAIN_DRUG: 'SP-OOT',
+}

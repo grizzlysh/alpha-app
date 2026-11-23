@@ -12,7 +12,7 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
-import { resolveOrderLetterKind } from '@utils/orderLetter'
+import { ORDER_NUMBER_PREFIX, resolveOrderLetterKind } from '@utils/orderLetter'
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -175,12 +175,6 @@ export const createPurchaseOrder = async (
     })
     if (!pharmacy) throw new NotFoundException('Pharmacy not found')
 
-    const orderNumber = await generateDocNumber({
-      type: 'PO',
-      pharmacyId,
-      pharmacyCode: pharmacy.code,
-    })
-
     // ── Resolve Medicine IDs ──────────────────────
     const details = await Promise.all(
       data.details.map(async (detail) => {
@@ -209,6 +203,12 @@ export const createPurchaseOrder = async (
 
     // ── One kind of medicine per letter ──
     const kind = await resolveOrderLetterKind(tx, details.map((d) => d.medicineId))
+    const orderNumber = await generateDocNumber({
+      type: 'PO',
+      prefix: ORDER_NUMBER_PREFIX[kind],
+      pharmacyId,
+      pharmacyCode: pharmacy.code,
+    })
 
     // ── Signer: a licensed pharmacist; the Head Pharmacist for controlled medicines ──
     let signedById: number | undefined
@@ -244,10 +244,10 @@ export const updatePurchaseOrder = async (
   pharmacyId: number,
   userId: number
 ): Promise<PurchaseOrderResponse> => {
-  const purchaseOrder = await prisma.$transaction(async (tx) => {
+  const purchaseOrder = await withDocNumberRetry('PO', () => prisma.$transaction(async (tx) => {
     const existing = await tx.purchaseOrder.findFirst({
       where: { uuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true, signedById: true },
+      select: { id: true, status: true, signedById: true, kind: true, pharmacy: { select: { code: true } } },
     })
 
     if (!existing) throw new NotFoundException('Purchase order not found')
@@ -284,6 +284,10 @@ export const updatePurchaseOrder = async (
     }
 
     const kind = detailsCreate ? await resolveOrderLetterKind(tx, detailsCreate.map((d) => d.medicineId as number)) : undefined
+    // A draft whose items now make it another kind of letter moves to that kind's number series.
+    const orderNumber = kind && kind !== existing.kind
+      ? await generateDocNumber({ type: 'PO', prefix: ORDER_NUMBER_PREFIX[kind], pharmacyId, pharmacyCode: existing.pharmacy.code })
+      : undefined
 
     // Re-check the signer whenever it or the items change: adding a narcotic
     // to an order signed by a Pharmacist must move it to the Head Pharmacist.
@@ -304,6 +308,7 @@ export const updatePurchaseOrder = async (
         ...(distributorId && { distributorId }),
         ...(signedById && { signedById }),
         ...(kind && { kind }),
+        ...(orderNumber && { orderNumber }),
         ...(data.description !== undefined && { description: data.description }),
         updatedById: userId,
         ...(detailsCreate && {
@@ -318,7 +323,7 @@ export const updatePurchaseOrder = async (
       },
       select: purchaseOrderSelect,
     })
-  }, { timeout: 10000, maxWait: 5000 })
+  }, { timeout: 10000, maxWait: 5000 }))
 
   return purchaseOrder as unknown as PurchaseOrderResponse
 }

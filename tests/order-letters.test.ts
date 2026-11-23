@@ -53,6 +53,24 @@ describe('order letter kinds', () => {
     expect(narcotic.body.data.details[0].medicine).toMatchObject({ shape: { name: 'Tablet' }, ingredients: [{ name: 'x', strength: null }] })
   })
 
+  it('numbers each kind in its own series', async () => {
+    const num = async (names: string[]) => (await order(names)).body.data.orderNumber as string
+    const [regular, n, p, pf, oot] = [
+      await num(['Paracetamol SP']),
+      await num(['Kodein SP']),
+      await num(['Diazepam SP']),
+      await num(['Efedrin SP']),
+      await num(['Tramadol SP']),
+    ]
+    expect(regular).toMatch(/^PO-/)
+    expect(n).toMatch(/^SP-N-/)
+    expect(p).toMatch(/^SP-P-/)
+    expect(pf).toMatch(/^SP-PF-/)
+    expect(oot).toMatch(/^SP-OOT-/)
+    // The first test made one narcotics letter today, so this is the second in that series.
+    expect(n).toMatch(/-002$/)
+  })
+
   it('refuses mixed kinds and more than one narcotic on a letter', async () => {
     const mixed = await order(['Paracetamol SP', 'Diazepam SP'])
     expect(mixed.status).toBe(400)
@@ -69,6 +87,8 @@ describe('order letter kinds', () => {
       details: [{ medicineUuid: uuids['Diazepam SP'], quantity: 1, unit: 'box' }],
     })
     expect(toPsy.body.data.kind).toBe('PSYCHOTROPIC')
+    expect(po.orderNumber).toMatch(/^PO-/)
+    expect(toPsy.body.data.orderNumber).toMatch(/^SP-P-/)
     const mix = await as(f.owner).put(`/api/purchase-orders/${po.uuid}`, {
       details: [uuids['Diazepam SP'], uuids['Paracetamol SP']].map((medicineUuid) => ({ medicineUuid, quantity: 1, unit: 'box' })),
     })
