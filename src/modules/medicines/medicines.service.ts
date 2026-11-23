@@ -384,13 +384,15 @@ export const getMedicinesDropdown = async (
   pharmacyId: number,
   search?: string
 ): Promise<MedicineDropdownItem[]> => {
-  return prisma.medicine.findMany({
+  const rows = await prisma.medicine.findMany({
     where: {
       pharmacyId,
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, unit: true },
+    select: { uuid: true, name: true, unit: true, orderLetterKind: true, type: { select: { orderLetterKind: true } } },
     orderBy: { name: 'asc' },
   })
+  // The order letter kind lets the purchase order form keep each kind on its own letter.
+  return rows.map((m) => ({ uuid: m.uuid, name: m.name, unit: m.unit, orderLetterKind: m.orderLetterKind ?? m.type.orderLetterKind }))
 }

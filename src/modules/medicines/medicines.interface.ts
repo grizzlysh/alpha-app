@@ -126,4 +126,6 @@ export interface MedicineDropdownItem {
   uuid: string
   name: string
   unit: string
+  /** The order letter it goes on (its own, else its type's). */
+  orderLetterKind: OrderLetterKind
 }
