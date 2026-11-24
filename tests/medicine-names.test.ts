@@ -103,4 +103,16 @@ describe('structured medicine names', () => {
     const salep = (await as(f.owner).get('/api/medicines?search=Salep Racik')).body.data[0]
     expect(salep).toMatchObject({ name: 'Salep Racik', isCustomName: true, ingredients: [{ name: 'Asam salisilat', strength: '2 %' }] })
   })
+
+  it('the separate-strength Excel template: two ingredients and a variant', async () => {
+    // What the client sends for Nama "Kombinasi Uji", Kekuatan "500 mg; 65 mg",
+    // Varian "Forte", Zat Aktif "Paracetamol; Kafein".
+    await as(f.owner).post('/api/catalog/import', {
+      medicines: [
+        { name: '', baseName: 'Kombinasi Uji', variant: 'Forte', isCustomName: false, unit: 'Strip', shape: 'Tablet', type: 'Obat Bebas', class: 'Analgesik', ingredients: ['Paracetamol 500 mg', 'Kafein 65 mg'] },
+      ],
+    })
+    const m = (await as(f.owner).get('/api/medicines?search=Kombinasi Uji')).body.data[0]
+    expect(m.name).toMatch(/^Kombinasi Uji 500\/65 mg (Tablet )?Forte$/)
+  })
 })
