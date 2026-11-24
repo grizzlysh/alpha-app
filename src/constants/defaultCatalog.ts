@@ -75,6 +75,8 @@ export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'CREDIT_PAYMENT_DAYS',       value: '30',    dataType: DataType.NUMBER,     description: 'Default credit term in days for non-cash sales' },
   { key: 'RETURN_POLICY_DAYS',        value: '7',     dataType: DataType.NUMBER,     description: 'Number of days after sale within which a return is accepted' },
   { key: 'PRESCRIPTION_VALID_DAYS',   value: '30',    dataType: DataType.NUMBER,     description: 'Days a prescription stays valid for dispensing; older pending ones expire automatically' },
+  { key: 'EXPIRY_ALERT_DAYS',         value: '30',    dataType: DataType.NUMBER,     description: 'Daily alert lists batches expiring within this many days' },
+  { key: 'LICENSE_ALERT_DAYS',        value: '30',    dataType: DataType.NUMBER,     description: 'Daily alert lists business and practice licenses expiring within this many days' },
   { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
   { key: 'NAME_DISPLAY_CASE',         value: 'UPPER', dataType: DataType.STRING,     description: 'How names are displayed and printed: UPPER, TITLE, LOWER or AS_TYPED' },
   { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },

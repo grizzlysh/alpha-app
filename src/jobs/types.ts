@@ -12,14 +12,35 @@ export interface JobContext {
   now: Date
   /** IANA timezone the pharmacies operate in (system parameter DEFAULT_TIMEZONE). */
   timezone: string
+  /** The job's global numbers (see JobDefinition.params), defaults merged with saved values. */
+  params: Record<string, number>
+}
+
+/** A number the platform admin may change for one job (applies to every pharmacy). */
+export interface JobParamDefinition {
+  key: string
+  default: number
+  min: number
+  max: number
 }
 
 export interface JobDefinition {
   name: string
   description: string
-  /** Cron expression, evaluated in the system timezone. */
-  schedule: string
+  /** Time of day it runs by default, HH:mm in the system timezone. */
+  defaultTime: string
   /** Postgres advisory-lock key; unique per job. */
   lockKey: number
+  /** Global numbers this job reads; editable on the jobs page. */
+  params: JobParamDefinition[]
+  /** Business parameters (per pharmacy) this job reads; edited by each pharmacy. */
+  pharmacyParams: string[]
   run: (ctx: JobContext) => Promise<JobResult>
+}
+
+/** A job's effective settings: saved overrides on top of the registry defaults. */
+export interface JobSettings {
+  enabled: boolean
+  time: string
+  params: Record<string, number>
 }

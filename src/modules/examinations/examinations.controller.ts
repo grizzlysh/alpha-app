@@ -35,7 +35,7 @@ const can = (req: ExaminationRequest, permission: string): boolean =>
 
 export const getQueueController = async (req: ExaminationRequest, res: Response) => {
   const query = queueQuerySchema.parse(req.query)
-  const queue = await ExaminationService.getQueue(pharmacyOf(req), query)
+  const queue = await ExaminationService.getQueue(pharmacyOf(req), query, req.user!.id)
   sendSuccess(res, MESSAGE_CODES.EXAMINATION_QUEUE_FETCHED, queue)
 }
 

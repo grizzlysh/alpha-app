@@ -566,6 +566,7 @@ model User {
 
   // ── Background jobs & notifications ───────────────────
   jobRunsTriggered  JobRun[]           @relation("JobRunTriggeredBy")
+  jobSettingsEdited JobSetting[]       @relation("JobSettingUpdatedBy")
   notificationReads NotificationRead[]
 
   @@map("mst_users")
@@ -1783,6 +1784,25 @@ model JobRun {
 
   @@index([name, startedAt])
   @@map("sys_job_runs")
+}
+
+// ── SYS JOB SETTINGS ─────────────────────────────────────
+// Per-job overrides of the defaults in src/jobs/registry.ts. A job with no row
+// runs with its defaults.
+
+model JobSetting {
+  name        String   @id
+  enabled     Boolean  @default(true)
+  /// Time of day it runs, HH:mm in the system timezone.
+  time        String
+  /// Job-specific numbers (e.g. retention days), validated against the registry.
+  params      Json?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById Int?     @map("updated_by_id")
+
+  updatedBy User? @relation("JobSettingUpdatedBy", fields: [updatedById], references: [id])
+
+  @@map("sys_job_settings")
 }
 
 // ── TRX NOTIFICATIONS ────────────────────────────────────

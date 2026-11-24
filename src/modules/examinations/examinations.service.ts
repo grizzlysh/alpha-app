@@ -15,13 +15,14 @@ import {
   CompleteExamInput,
   CancelExamInput,
 } from './examinations.validation'
-import { ExaminationResponse, ExaminationQueueResponse, AllergyConflict } from './examinations.interface'
+import { ExaminationResponse, ExaminationQueueResponse, AllergyConflict, QueueDoctor } from './examinations.interface'
 import { checkPrescriptionAllergies } from '@utils/allergyCheck'
 
 // ── Select & format ───────────────────────────────────
 
 const examSelect = {
   uuid: true,
+  doctorId: true,
   queueNumber: true,
   status: true,
   visitDate: true,
@@ -199,7 +200,25 @@ const examFieldData = (data: SaveExamInput) => ({
 
 // ── Services ──────────────────────────────────────────
 
-export const getQueue = async (pharmacyId: number, query: QueueQueryInput): Promise<ExaminationQueueResponse> => {
+/**
+ * The doctors a queue is split by: everyone with a user account at this
+ * pharmacy (in-house doctors) plus any doctor patients were assigned to.
+ * Visiting doctors who only write prescriptions are left out.
+ */
+const queueDoctors = async (pharmacyId: number, assignedIds: number[], userId: number): Promise<QueueDoctor[]> => {
+  const doctors = await prisma.doctor.findMany({
+    where: {
+      pharmacyId,
+      deletedAt: null,
+      OR: [{ status: 'ACTIVE', userId: { not: null } }, { id: { in: assignedIds } }],
+    },
+    select: { uuid: true, name: true, userId: true },
+    orderBy: { name: 'asc' },
+  })
+  return doctors.map((d) => ({ uuid: d.uuid, name: d.name, isMe: d.userId === userId }))
+}
+
+export const getQueue = async (pharmacyId: number, query: QueueQueryInput, userId: number): Promise<ExaminationQueueResponse> => {
   let range: { startOfDay: Date; endOfDay: Date; dateKey: string }
   let isToday = !query.date
   if (query.date) {
@@ -239,10 +258,14 @@ export const getQueue = async (pharmacyId: number, query: QueueQueryInput): Prom
   const counts = { WAITING: 0, IN_PROGRESS: 0, COMPLETED: 0, CANCELLED: 0 } as Record<VisitStatus, number>
   for (const g of grouped) counts[g.status] = g._count._all
 
+  const assignedIds = [...new Set(rows.map((r) => r.doctorId).filter((id): id is number => id !== null))]
+  const doctors = await queueDoctors(pharmacyId, assignedIds, userId)
+
   return {
     date: `${range.dateKey.slice(0, 4)}-${range.dateKey.slice(4, 6)}-${range.dateKey.slice(6, 8)}`,
     counts,
     triaged,
+    doctors,
     items: rows.map(format),
   }
 }

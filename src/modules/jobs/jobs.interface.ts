@@ -28,10 +28,26 @@ export interface JobRunResponse {
   triggeredBy: { uuid: string; name: string } | null
 }
 
+export interface JobParamResponse {
+  key: string
+  value: number
+  default: number
+  min: number
+  max: number
+}
+
 export interface JobResponse {
   name: string
   description: string
-  schedule: string
+  enabled: boolean
+  /** HH:mm in the system timezone. */
+  time: string
+  defaultTime: string
+  timezone: string
+  /** Global numbers, editable here. */
+  params: JobParamResponse[]
+  /** Business parameters each pharmacy sets for itself. */
+  pharmacyParams: string[]
   lastRun: JobRunResponse | null
 }
 
@@ -39,3 +55,4 @@ export interface JobResponse {
 
 export type GetJobRunsRequest = Request<{}, {}, {}, JobRunQueryParams>
 export type RunJobRequest = Request<JobNameParam>
+export type UpdateJobSettingsRequest = Request<JobNameParam>
