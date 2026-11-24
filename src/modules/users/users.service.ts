@@ -1,4 +1,5 @@
 import { RecordStatus, AppRole, PlatformRole, User } from '@prisma/client';
+import { audit, diffFields } from '@utils/audit';
 import bcrypt from 'bcryptjs';
 import { generateTemporaryPassword } from '@utils/tempPassword';
 import { signerPlacementWhere, SignerLevel } from '@utils/signer';
@@ -535,6 +536,7 @@ export async function createUser(
       },
       select: { ...userBaseSelect, updatedAt: true },
     });
+    await audit(prisma, { action: 'users.create', entityType: 'user', entityUuid: user.uuid, entityLabel: `${user.name} <${user.email}>` });
     return { ...user, placementCount: 0, placements: [], temporaryPassword };
   }
 
@@ -589,6 +591,15 @@ export async function createUser(
       select: { id: true },
     });
 
+    await audit(tx, {
+      action: 'users.create',
+      entityType: 'user',
+      entityUuid: user.uuid,
+      entityLabel: `${body.name} <${body.email}>`,
+      pharmacyId: pharmacy.id,
+      metadata: { role: role.type, isHeadPharmacist },
+    });
+
     if (body.placement!.license) {
       const lic = body.placement!.license;
       await tx.practiceLicense.create({
@@ -636,16 +647,25 @@ export async function updateUser(
     if (duplicate) throw new ConflictException(duplicate.deletedAt ? 'EMAIL_BELONGS_TO_DELETED_USER' : 'EMAIL_ALREADY_EXISTS');
   }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      ...(body.name && { name: body.name }),
-      ...(body.email && { email: body.email }),
-      ...(body.phone !== undefined && { phone: body.phone }),
-      ...(body.address !== undefined && { address: body.address }),
-      ...(body.status && { status: body.status }),
-      updatedById,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        ...(body.name && { name: body.name }),
+        ...(body.email && { email: body.email }),
+        ...(body.phone !== undefined && { phone: body.phone }),
+        ...(body.address !== undefined && { address: body.address }),
+        ...(body.status && { status: body.status }),
+        updatedById,
+      },
+    });
+    const changes = diffFields(
+      { name: user.name, email: user.email, phone: user.phone, address: user.address, status: user.status },
+      { name: body.name || undefined, email: body.email || undefined, phone: body.phone, address: body.address, status: body.status || undefined }
+    );
+    if (Object.keys(changes).length > 0) {
+      await audit(tx, { action: 'users.update', entityType: 'user', entityUuid: user.uuid, entityLabel: user.name, changes });
+    }
   });
 
   return getUser(actor, userUuid);
@@ -682,6 +702,7 @@ export async function deleteUser(
       },
     });
     await tx.userToken.deleteMany({ where: { userId: user.id } });
+    await audit(tx, { action: 'users.delete', entityType: 'user', entityUuid: user.uuid, entityLabel: `${user.name} <${user.email}>` });
   });
 }
 
@@ -712,6 +733,7 @@ export async function resetPassword(
       },
     });
     await tx.userToken.deleteMany({ where: { userId: user.id } });
+    await audit(tx, { action: 'users.reset_password', entityType: 'user', entityUuid: user.uuid, entityLabel: user.name });
   });
 
   return { temporaryPassword };
@@ -862,6 +884,14 @@ export async function createPlacement(
       },
       select: { id: true, uuid: true },
     });
+    await audit(tx, {
+      action: 'placements.create',
+      entityType: 'user',
+      entityUuid: user.uuid,
+      entityLabel: user.name,
+      pharmacyId: pharmacy.id,
+      metadata: { placementUuid: placement.uuid, role: role.type, isHeadPharmacist },
+    });
 
     if (body.license) {
       await tx.practiceLicense.create({
@@ -945,17 +975,41 @@ export async function updatePlacement(
     await checkPlacementOverlap(user.id, placement.pharmacyId, newJoinedAt, newLeftAt, placement.id);
   }
 
-  const updated = await prisma.placement.update({
-    where: { id: placement.id },
-    data: {
-      ...(roleId && { roleId }),
-      isHeadPharmacist,
-      ...(body.joinedAt && { joinedAt: new Date(body.joinedAt) }),
-      ...(body.leftAt !== undefined && { leftAt: body.leftAt ? new Date(body.leftAt) : null }),
-      ...(body.status && { status: body.status }),
-      updatedById,
-    },
-    select: placementSelect,
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.placement.update({
+      where: { id: placement.id },
+      data: {
+        ...(roleId && { roleId }),
+        isHeadPharmacist,
+        ...(body.joinedAt && { joinedAt: new Date(body.joinedAt) }),
+        ...(body.leftAt !== undefined && { leftAt: body.leftAt ? new Date(body.leftAt) : null }),
+        ...(body.status && { status: body.status }),
+        updatedById,
+      },
+      select: placementSelect,
+    });
+    const changes = diffFields(
+      { role: currentRole!.type, isHeadPharmacist: placement.isHeadPharmacist, joinedAt: placement.joinedAt, leftAt: placement.leftAt, status: placement.status },
+      {
+        role: newRoleType,
+        isHeadPharmacist,
+        joinedAt: body.joinedAt ? new Date(body.joinedAt) : undefined,
+        leftAt: body.leftAt !== undefined ? (body.leftAt ? new Date(body.leftAt) : null) : undefined,
+        status: body.status || undefined,
+      }
+    );
+    if (Object.keys(changes).length > 0) {
+      await audit(tx, {
+        action: 'placements.update',
+        entityType: 'user',
+        entityUuid: user.uuid,
+        entityLabel: user.name,
+        pharmacyId: placement.pharmacyId,
+        changes,
+        metadata: { placementUuid: placement.uuid },
+      });
+    }
+    return row;
   });
 
   return formatPlacement(updated);
@@ -979,12 +1033,22 @@ export async function deletePlacement(
   });
   if (!placement) throw new NotFoundException('PLACEMENT_NOT_FOUND');
 
-  await prisma.placement.update({
-    where: { id: placement.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.placement.update({
+      where: { id: placement.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById,
+      },
+    });
+    await audit(tx, {
+      action: 'placements.delete',
+      entityType: 'user',
+      entityUuid: user.uuid,
+      entityLabel: user.name,
+      pharmacyId: placement.pharmacyId,
+      metadata: { placementUuid: placement.uuid },
+    });
   });
 }
 

@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
+import { audit, diffFields } from '@utils/audit'
 import { getTimezone } from '@utils/generateDocNumbers'
 import { resolveSigner } from '@utils/signer'
 import {
@@ -552,21 +553,31 @@ export const updateSellingPrice = async (
 ): Promise<StockResponse> => {
   const existing = await prisma.stock.findFirst({
     where: { uuid, pharmacyId },
-    select: { id: true },
+    select: { id: true, sellingPrice: true, isManualPrice: true, medicine: { select: { name: true } } },
   })
 
   if (!existing) throw new NotFoundException('Stock not found')
 
-  const stock = await prisma.stock.update({
-    where: { id: existing.id },
-    data: {
-      sellingPrice: data.sellingPrice
-        ? new Decimal(data.sellingPrice)
-        : null,
-      isManualPrice: data.sellingPrice !== null,
-      updatedById: userId,
-    },
-    select: stockSelect,
+  const stock = await prisma.$transaction(async (tx) => {
+    const updated = await tx.stock.update({
+      where: { id: existing.id },
+      data: {
+        sellingPrice: data.sellingPrice
+          ? new Decimal(data.sellingPrice)
+          : null,
+        isManualPrice: data.sellingPrice !== null,
+        updatedById: userId,
+      },
+      select: stockSelect,
+    })
+    const changes = diffFields(
+      { sellingPrice: existing.isManualPrice ? existing.sellingPrice : null },
+      { sellingPrice: data.sellingPrice ? new Decimal(data.sellingPrice) : null }
+    )
+    if (Object.keys(changes).length > 0) {
+      await audit(tx, { action: 'stock.update_price', entityType: 'stock', entityUuid: uuid, entityLabel: existing.medicine.name, changes })
+    }
+    return updated
   })
 
   return formatStock(stock)
@@ -616,11 +627,13 @@ export const adjustStock = async (
         quantityPieces: true,
         quantityPerBox: true,
         stockId: true,
+        batchNumber: true,
         stock: {
           select: {
             id: true,
             totalPieces: true,
             medicineId: true,
+            medicine: { select: { name: true } },
           },
         },
       },
@@ -682,6 +695,15 @@ export const adjustStock = async (
         description: data.description,
         createdById: userId,
       },
+    })
+
+    await audit(tx, {
+      action: 'stock.adjust',
+      entityType: 'stock_detail',
+      entityUuid: stockDetailUuid,
+      entityLabel: `${stockDetail.stock.medicine.name} · ${stockDetail.batchNumber}`,
+      changes: { quantityPieces: { from: quantityBefore, to: quantityAfter } },
+      metadata: { reason: data.description ?? null },
     })
 
     return stockDetail.stockId

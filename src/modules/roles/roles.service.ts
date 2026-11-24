@@ -1,5 +1,6 @@
 import { AppRole, PlatformRole, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { audit, diffFields } from '@utils/audit'
 import {
   RoleQueryInput,
   CreateRoleInput,
@@ -204,16 +205,20 @@ export const createRole = async (
 
   await checkDuplicate(data.name, resolvedPharmacyId)
 
-  const role = await prisma.role.create({
-    data: {
-      name: data.name,
-      type: data.type,
-      requiresLicense: data.requiresLicense ?? false,
-      pharmacyId: resolvedPharmacyId,
-      createdById: userId,
-      updatedById: userId,
-    },
-    select: roleSelect,
+  const role = await prisma.$transaction(async (tx) => {
+    const created = await tx.role.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        requiresLicense: data.requiresLicense ?? false,
+        pharmacyId: resolvedPharmacyId,
+        createdById: userId,
+        updatedById: userId,
+      },
+      select: roleSelect,
+    })
+    await audit(tx, { action: 'roles.create', entityType: 'role', entityUuid: created.uuid, entityLabel: created.name, pharmacyId: resolvedPharmacyId, metadata: { type: data.type } })
+    return created
   })
 
   return formatResponse(role)
@@ -228,7 +233,7 @@ export const updateRole = async (
 ): Promise<RoleResponse> => {
   const existing = await prisma.role.findFirst({
     where: { uuid, deletedAt: null },
-    select: { id: true, pharmacyId: true },
+    select: { id: true, pharmacyId: true, name: true, requiresLicense: true, status: true },
   })
 
   if (!existing) throw new NotFoundException('Role not found')
@@ -248,15 +253,25 @@ export const updateRole = async (
     await checkDuplicate(data.name, existing.pharmacyId, uuid)
   }
 
-  const role = await prisma.role.update({
-    where: { id: existing.id },
-    data: {
-      ...(data.name && { name: data.name }),
-      ...(data.requiresLicense !== undefined && { requiresLicense: data.requiresLicense }),
-      ...(data.status && { status: data.status }),
-      updatedById: userId,
-    },
-    select: roleSelect,
+  const role = await prisma.$transaction(async (tx) => {
+    const updated = await tx.role.update({
+      where: { id: existing.id },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.requiresLicense !== undefined && { requiresLicense: data.requiresLicense }),
+        ...(data.status && { status: data.status }),
+        updatedById: userId,
+      },
+      select: roleSelect,
+    })
+    const changes = diffFields(
+      { name: existing.name, requiresLicense: existing.requiresLicense, status: existing.status },
+      { name: data.name || undefined, requiresLicense: data.requiresLicense, status: data.status || undefined }
+    )
+    if (Object.keys(changes).length > 0) {
+      await audit(tx, { action: 'roles.update', entityType: 'role', entityUuid: uuid, entityLabel: existing.name, pharmacyId: existing.pharmacyId ?? pharmacyId, changes })
+    }
+    return updated
   })
 
   return formatResponse(role)
@@ -290,12 +305,16 @@ export const deleteRole = async (
   })
   if (inUse > 0) throw new ConflictException('Role is still assigned to active users')
 
-  await prisma.role.update({
-    where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    },
+  await prisma.$transaction(async (tx) => {
+    const deleted = await tx.role.update({
+      where: { id: existing.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: userId,
+      },
+      select: { name: true },
+    })
+    await audit(tx, { action: 'roles.delete', entityType: 'role', entityUuid: uuid, entityLabel: deleted.name, pharmacyId: existing.pharmacyId ?? pharmacyId })
   })
 }
 
@@ -309,7 +328,7 @@ export const setRolePermissions = async (
 ): Promise<RoleDetailResponse> => {
   const existing = await prisma.role.findFirst({
     where: { uuid, deletedAt: null },
-    select: { id: true, pharmacyId: true },
+    select: { id: true, pharmacyId: true, name: true },
   })
 
   if (!existing) throw new NotFoundException('Role not found')
@@ -352,6 +371,24 @@ export const setRolePermissions = async (
 
   // replace all — delete existing, insert new
   await prisma.$transaction(async (tx) => {
+    const before = await tx.rolePermission.findMany({
+      where: { roleId: existing.id },
+      select: { permission: { select: { module: true, action: true } } },
+    })
+    const beforeKeys = new Set(before.map((b) => `${b.permission.module}.${b.permission.action}`))
+    const afterKeys = new Set(permissions.map((p) => `${p.module}.${p.action}`))
+    const added = [...afterKeys].filter((k) => !beforeKeys.has(k)).sort()
+    const removed = [...beforeKeys].filter((k) => !afterKeys.has(k)).sort()
+    if (added.length || removed.length) {
+      await audit(tx, {
+        action: 'roles.set_permissions',
+        entityType: 'role',
+        entityUuid: uuid,
+        entityLabel: existing.name,
+        pharmacyId: existing.pharmacyId ?? pharmacyId,
+        metadata: { added, removed },
+      })
+    }
     await tx.rolePermission.deleteMany({ where: { roleId: existing.id } })
 
     if (permissions.length > 0) {

@@ -2,6 +2,7 @@ import { PaymentMethod, Prisma, ShiftStatus } from '@prisma/client'
 import { Decimal, PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
+import { audit } from '@utils/audit'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { ForbiddenException } from '@exceptions/ForbiddenException'
@@ -163,7 +164,7 @@ export const openShift = async (pharmacyId: number, viewer: ShiftViewer, data: O
         const pharmacy = await tx.pharmacy.findUnique({ where: { id: pharmacyId }, select: { code: true } })
         if (!pharmacy) throw new NotFoundException('Pharmacy not found')
         const shiftNumber = await generateDocNumber({ type: 'SH', pharmacyId, pharmacyCode: pharmacy.code })
-        return tx.cashierShift.create({
+        const created = await tx.cashierShift.create({
           data: {
             pharmacyId,
             userId: viewer.userId,
@@ -173,6 +174,8 @@ export const openShift = async (pharmacyId: number, viewer: ShiftViewer, data: O
           },
           select: shiftSelect,
         })
+        await audit(tx, { action: 'shifts.open', entityType: 'shift', entityUuid: created.uuid, entityLabel: shiftNumber, pharmacyId, metadata: { openingCash: data.openingCash } })
+        return created
       })
     )
     return formatShift(prisma, row, viewer, settings)
@@ -201,6 +204,14 @@ export const addCashMovement = async (
     }
     await tx.shiftCashMovement.create({
       data: { shiftId: row.id, type: data.type, amount, note: data.note, createdById: viewer.userId },
+    })
+    await audit(tx, {
+      action: data.type === 'IN' ? 'shifts.cash_in' : 'shifts.cash_out',
+      entityType: 'shift',
+      entityUuid: row.uuid,
+      entityLabel: row.shiftNumber,
+      pharmacyId,
+      metadata: { amount: data.amount, note: data.note },
     })
   })
   return getShift(uuid, pharmacyId, viewer)
@@ -245,6 +256,20 @@ export const closeShift = async (
       },
     })
     if (closed.count === 0) throw new BadRequestException('SHIFT_ALREADY_CLOSED')
+    await audit(tx, {
+      action: 'shifts.close',
+      entityType: 'shift',
+      entityUuid: row.uuid,
+      entityLabel: row.shiftNumber,
+      pharmacyId,
+      metadata: {
+        cashier: row.user.name,
+        expectedCash: summary.expectedCash.toString(),
+        countedCash: countedCash.toString(),
+        difference: difference.toString(),
+        note,
+      },
+    })
   })
   return getShift(uuid, pharmacyId, viewer)
 }

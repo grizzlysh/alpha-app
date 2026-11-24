@@ -1,5 +1,6 @@
 import { DataType, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { audit } from '@utils/audit'
 import { MEDICINE_NAME_FORMAT_KEY, NAME_CASES, NAME_DISPLAY_CASE_KEY } from '@constants/defaultCatalog'
 import { applyNames, duplicateNames, isMedicineNameFormat, plannedNames } from '@utils/medicineName'
 import {
@@ -95,7 +96,7 @@ export const updateBusinessParameter = async (
 ): Promise<BusinessParameterResponse> => {
   const existing = await prisma.businessParameter.findFirst({
     where: { uuid, pharmacyId },
-    select: { id: true, key: true, dataType: true },
+    select: { id: true, key: true, dataType: true, value: true },
   })
   if (!existing) throw new NotFoundException('Business parameter not found')
 
@@ -113,6 +114,16 @@ export const updateBusinessParameter = async (
       data: { ...data, updatedById: userId },
       select: businessParameterSelect,
     })
+    if (existing.value !== param.value) {
+      await audit(tx, {
+        action: 'business_parameters.update',
+        entityType: 'business_parameter',
+        entityUuid: param.uuid,
+        entityLabel: param.key,
+        pharmacyId,
+        changes: { value: { from: existing.value, to: param.value } },
+      })
+    }
 
     // Every structured medicine name follows the new format, unless two would end up the same.
     if (existing.key === MEDICINE_NAME_FORMAT_KEY && isMedicineNameFormat(param.value)) {

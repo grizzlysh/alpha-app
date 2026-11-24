@@ -2,6 +2,7 @@ import { AppRole, PlatformRole, Prisma, RecordStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 import { prisma } from '@config/db'
+import { audit, diffFields } from '@utils/audit'
 import {
   PharmacyQueryInput,
   CreatePharmacyInput,
@@ -322,7 +323,6 @@ export const updatePharmacy = async (
 ): Promise<PharmacyResponse> => {
   const existing = await prisma.pharmacy.findFirst({
     where: { uuid, deletedAt: null },
-    select: { id: true },
   })
   if (!existing) throw new NotFoundException('Pharmacy not found')
 
@@ -344,10 +344,17 @@ export const updatePharmacy = async (
   }
 
   try {
-    const pharmacy = await prisma.pharmacy.update({
-      where: { id: existing.id },
-      data: { ...data, updatedById: userId },
-      select: pharmacySelect,
+    const pharmacy = await prisma.$transaction(async (tx) => {
+      const updated = await tx.pharmacy.update({
+        where: { id: existing.id },
+        data: { ...data, updatedById: userId },
+        select: pharmacySelect,
+      })
+      const changes = diffFields(existing as unknown as Record<string, unknown>, data as Record<string, unknown>)
+      if (Object.keys(changes).length > 0) {
+        await audit(tx, { action: 'pharmacies.update', entityType: 'pharmacy', entityUuid: uuid, entityLabel: existing.name, pharmacyId: existing.id, changes })
+      }
+      return updated
     })
     return formatResponse(pharmacy)
   } catch (e) {

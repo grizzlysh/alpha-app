@@ -325,6 +325,7 @@ model Pharmacy {
   medicalVisits       MedicalVisit[]
   notifications       Notification[]
   cashierShifts       CashierShift[]
+  auditLogs           AuditLog[]
 
   @@map("mst_pharmacies")
 }
@@ -585,6 +586,9 @@ model User {
   cashierShifts       CashierShift[]      @relation("CashierShiftCashier")
   cashierShiftsClosed CashierShift[]      @relation("CashierShiftClosedBy")
   shiftCashMovements  ShiftCashMovement[] @relation("ShiftCashMovementCreatedBy")
+
+  // ── Audit log ─────────────────────────────────────────
+  auditLogs AuditLog[] @relation("AuditLogActor")
 
   @@map("mst_users")
 }
@@ -1979,4 +1983,35 @@ model ShiftCashMovement {
 
   @@index([shiftId])
   @@map("trx_shift_cash_movements")
+}
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+// Who changed what, append-only. `changes` holds { field: { from, to } } for
+// edits; `metadata` holds anything else worth keeping (e.g. permissions added).
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  uuid        String   @unique @default(uuid())
+  pharmacyId  Int?     @map("pharmacy_id")
+  userId      Int?     @map("user_id")
+  /// "<module>.<verb>", e.g. "users.reset_password", "business_parameters.update".
+  action      String
+  entityType  String   @map("entity_type")
+  entityUuid  String?  @map("entity_uuid")
+  /// A readable name of the record at the time (it may be renamed or deleted later).
+  entityLabel String?  @map("entity_label")
+  changes     Json?
+  metadata    Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id])
+  user     User?     @relation("AuditLogActor", fields: [userId], references: [id])
+
+  @@index([pharmacyId, createdAt])
+  @@index([pharmacyId, action, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityUuid])
+  @@map("sys_audit_logs")
 }

@@ -43,6 +43,8 @@ import dataTransferRoutes from '@modules/data-transfer/data-transfer.routes'
 import notificationRoutes from '@modules/notifications/notifications.routes'
 import jobRoutes from '@modules/jobs/jobs.routes'
 import shiftRoutes from '@modules/shifts/shifts.routes'
+import auditLogRoutes from '@modules/audit-logs/audit-logs.routes'
+import { auditContext } from '@utils/audit'
 
 
 
@@ -71,6 +73,9 @@ app.use('/api/catalog', express.json({ limit: '5mb' }))
 app.use('/api/data-transfer', express.json({ limit: '5mb' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+
+// ── Request context for the audit log ────────
+app.use(auditContext)
 
 // ── Maintenance Mode ─────────────────────────
 app.use(maintenanceMode)
@@ -103,6 +108,7 @@ app.use('/api/stock-returns', stockReturnRoutes)
 app.use('/api/stock-disposals', stockDisposalRoutes)
 app.use('/api/sales', salesRoutes)
 app.use('/api/shifts', shiftRoutes)
+app.use('/api/audit-logs', auditLogRoutes)
 app.use('/api/stock-movements', stockMovementRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/dashboard', dashboardRoutes)

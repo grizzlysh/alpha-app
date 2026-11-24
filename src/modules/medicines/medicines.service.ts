@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { audit } from '@utils/audit'
 import {
   CreateMedicineInput,
   UpdateMedicineInput,
@@ -372,19 +373,22 @@ export const deleteMedicine = async (
 ): Promise<void> => {
   const existing = await prisma.medicine.findFirst({
     where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true }
+    select: { id: true, name: true }
   })
 
   if (!existing) {
     throw new NotFoundException('Medicine not found')
   }
 
-  await prisma.medicine.update({
-    where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    }
+  await prisma.$transaction(async (tx) => {
+    await tx.medicine.update({
+      where: { id: existing.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: userId,
+      }
+    })
+    await audit(tx, { action: 'medicines.delete', entityType: 'medicine', entityUuid: uuid, entityLabel: existing.name, pharmacyId })
   })
 }
 

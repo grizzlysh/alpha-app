@@ -1,5 +1,6 @@
 import { SaleStatus, SaleType, PaymentStatus, PrescriptionStatus, PrescriptionDetailStatus, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { audit } from '@utils/audit'
 import {
   CreateSaleInput,
   UpdateSaleInput,
@@ -1021,6 +1022,8 @@ export const cancelOrRefundSale = async (
           },
         },
         paidAmount: true,
+        saleNumber: true,
+        grandTotal: true,
         payment: {
           select: { id: true, paymentStatus: true },
         },
@@ -1124,6 +1127,16 @@ export const cancelOrRefundSale = async (
         ...(refundShiftId && { refundShiftId }),
         updatedById: userId,
       },
+    })
+
+    await audit(tx, {
+      action: status === SaleStatus.REFUNDED ? 'sales.refund' : 'sales.cancel',
+      entityType: 'sale',
+      entityUuid: uuid,
+      entityLabel: sale.saleNumber,
+      pharmacyId,
+      changes: { status: { from: sale.status, to: status } },
+      metadata: { reason: data.description, grandTotal: sale.grandTotal.toString(), paidBack: sale.paidAmount.toString() },
     })
 
     // ── Update Payment Status ─────────────────────

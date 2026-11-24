@@ -1343,5 +1343,6 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   SHIFT_ALREADY_CLOSED: { en: 'This shift is already closed', id: 'Shift ini sudah ditutup' },
   SHIFT_CASH_OUT_EXCEEDS: { en: 'The drawer does not hold that much cash', id: 'Uang di laci tidak mencukupi untuk jumlah ini' },
   SHIFT_DIFFERENCE_NOTE_REQUIRED: { en: 'The counted cash differs from the expected amount: add a note', id: 'Uang terhitung berbeda dengan yang seharusnya: isi catatan penjelasan' },
+  AUDIT_LOGS_FETCHED: { en: 'Activity log fetched', id: 'Log aktivitas berhasil diambil' },
   SHIFT_CLOSED_PAYMENT_LOCKED: { en: 'This payment belongs to a closed shift and can no longer be changed', id: 'Pembayaran ini masuk shift yang sudah ditutup dan tidak bisa diubah lagi' },
 }

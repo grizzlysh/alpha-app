@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { AppRole, PlatformRole } from '@prisma/client'
 import { prisma } from '@config/db'
+import { audit } from '@utils/audit'
 import { NAME_CASES, NAME_DISPLAY_CASE_KEY, NameCase } from '@constants/defaultCatalog'
 import { getMedicineNameFormat } from '@utils/medicineName'
 import { env } from '@config/env'
@@ -197,6 +198,14 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
           lockedUntil: new Date(Date.now() + 30 * 60 * 1000),
         },
       })
+      // Recorded in every pharmacy the person works at, so their owners can see it.
+      const placements = await prisma.placement.findMany({
+        where: { userId: user.id, deletedAt: null, status: 'ACTIVE' },
+        select: { pharmacyId: true },
+      })
+      for (const pl of placements) {
+        await audit(prisma, { action: 'auth.account_locked', entityType: 'user', entityUuid: user.uuid, entityLabel: user.email, pharmacyId: pl.pharmacyId, userId: user.id, metadata: { failedAttempts: newCount } })
+      }
       throw new UnauthorizedException('Too many failed attempts. Account locked for 30 minutes.')
     }
     await prisma.user.update({
@@ -325,6 +334,7 @@ export const selectPharmacy = async (
     where: { id: userId },
     data: { lastSelectedPharmacyId: pharmacy.id },
   })
+  await audit(prisma, { action: 'auth.enter_pharmacy', entityType: 'pharmacy', entityUuid: pharmacy.uuid, entityLabel: pharmacy.name, pharmacyId: pharmacy.id, userId })
 
   const accessTokenPayload: JwtPayload = {
     id: userId,

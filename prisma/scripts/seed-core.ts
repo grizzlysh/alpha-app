@@ -100,6 +100,7 @@ const PERMISSIONS = [
   { module: 'settings',           action: 'update' },
   { module: 'shifts',             action: 'read' },
   { module: 'shifts',             action: 'manage' },
+  { module: 'audit_logs',         action: 'read' },
   { module: 'dashboard',          action: 'read' },
   { module: 'dashboard',          action: 'advanced' },
 ]
@@ -141,7 +142,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
 
   // Pharmacists run the queue but don't examine patients (that's the doctor's job).
-  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters').filter((k) => k !== 'examinations.perform' && k !== 'shifts.manage'),
+  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters').filter((k) => k !== 'examinations.perform' && k !== 'shifts.manage' && k !== 'audit_logs.read'),
 
   CASHIER: only(
     'customers.read', 'customers.create', 'customers.update',

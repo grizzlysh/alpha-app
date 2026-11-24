@@ -149,6 +149,9 @@ export const PERMISSIONS = {
   SHIFTS_READ: 'shifts.read',
   SHIFTS_MANAGE: 'shifts.manage',
 
+  // audit log
+  AUDIT_LOGS_READ: 'audit_logs.read',
+
   // dashboard
   DASHBOARD_READ: 'dashboard.read',
   DASHBOARD_ADVANCED: 'dashboard.advanced',
