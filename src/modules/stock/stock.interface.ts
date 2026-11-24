@@ -143,7 +143,7 @@ export interface StockDetailSearchResponse {
     name: string
     unit: string
     shape: { name: string }
-    type: { name: string }
+    type: { name: string; requiredPrescription: boolean }
   }
 }
 
@@ -177,7 +177,7 @@ export interface StockResponse {
     name: string
     unit: string
     shape: { name: string }
-    type: { name: string }
+    type: { name: string; requiredPrescription: boolean }
     medicineClass: { name: string }
   }
   details: StockDetailResponse[]

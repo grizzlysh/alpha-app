@@ -33,6 +33,8 @@ export const createUserSchema = z.object({
     roleUuid: z.string().uuid('Invalid role UUID'),
     joinedAt: z.string().datetime({ message: 'Invalid joinedAt date' }),
     license: licenseInputSchema.optional(),
+    /** Responsible Head Pharmacist of the pharmacy (any licensed role, incl. owner). */
+    isHeadPharmacist: z.boolean().optional(),
   }).optional(),
 });
 
@@ -73,10 +75,12 @@ export const createPlacementSchema = z.object({
   roleUuid: z.string().uuid('Invalid role UUID'),
   joinedAt: z.string().datetime({ message: 'Invalid joinedAt date' }),
   license: licenseInputSchema.optional(),
+  isHeadPharmacist: z.boolean().optional(),
 });
 
 export const updatePlacementSchema = z.object({
   roleUuid: z.string().uuid('Invalid role UUID').optional(),
+  isHeadPharmacist: z.boolean().optional(),
   joinedAt: z.string().datetime().optional(),
   leftAt: z.string().datetime().nullable().optional(),
   status: z.enum(RecordStatus).optional(),

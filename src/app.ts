@@ -50,6 +50,8 @@ const corsOptions: CorsOptions = {
 }
 
 // ── Security Middlewares ─────────────────────
+// Behind a reverse proxy, trust its X-Forwarded-For so req.ip is the client.
+if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY)
 app.use(cors(corsOptions))
 app.options('/{*path}', cors(corsOptions))
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
@@ -106,7 +108,11 @@ app.get('/', (req: Request, res: Response): void => {
 app.use(errorHandler)
 
 // ── Server ──────────────────────
-app.listen(PORT, (): void => {
+app.listen(PORT, (error?: Error): void => {
+  if (error) {
+    console.error(`Failed to start server on port ${PORT}:`, error.message)
+    process.exit(1)
+  }
   console.log(`Server running on port ${PORT}`)
 })
 

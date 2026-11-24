@@ -104,8 +104,13 @@ export const createDoctor = async (
 
   let linkedUserId: number | undefined
   if (data.userUuid) {
+    // Only accounts placed at this pharmacy can be linked to its doctor profiles.
     const user = await prisma.user.findFirst({
-      where: { uuid: data.userUuid, deletedAt: null },
+      where: {
+        uuid: data.userUuid,
+        deletedAt: null,
+        placements: { some: { pharmacyId, status: 'ACTIVE', deletedAt: null } },
+      },
       select: { id: true },
     })
     if (!user) throw new NotFoundException('User not found')

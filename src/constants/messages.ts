@@ -677,12 +677,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
   },
   PHARMACY_ALREADY_HAS_HEAD_PHARMACIST: {
-    en: 'Pharmacy already has a pharmacist in charge',
-    id: 'Apotek sudah memiliki apoteker penanggung jawab',
+    en: 'This pharmacy already has a Head Pharmacist. Unmark the current one first.',
+    id: 'Apotek ini sudah memiliki Head Pharmacist. Lepaskan penanda Head Pharmacist yang lama terlebih dahulu.',
   },
   PHARMACY_NO_HEAD_PHARMACIST: {
-    en: 'This pharmacy does not have a pharmacist in charge yet. Please contact the pharmacy owner.',
-    id: 'Apotek ini belum memiliki apoteker penanggung jawab. Silakan hubungi pemilik apotek.',
+    en: 'This pharmacy does not have a Head Pharmacist yet. Please contact the pharmacy owner.',
+    id: 'Apotek ini belum memiliki Head Pharmacist. Silakan hubungi pemilik apotek.',
   },
   PLACEMENT_DATE_OVERLAP: {
     en: 'Placement dates overlap with an existing tenure at this pharmacy',
@@ -1054,6 +1054,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Allergy record removed successfully',
     id: 'Data alergi berhasil dihapus',
   },
+  MEDICAL_ALLERGY_UPDATED: {
+    en: 'Allergy record updated successfully',
+    id: 'Data alergi berhasil diperbarui',
+  },
   MEDICAL_ALLERGY_NOT_FOUND: {
     en: 'Allergy record not found',
     id: 'Data alergi tidak ditemukan',
@@ -1120,4 +1124,88 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Posisi lemari berhasil diperbarui',
   },
 
+  PLACEMENT_REQUIRED: {
+    en: 'A placement in your pharmacy is required to create a user',
+    id: 'Penempatan di apotek Anda wajib diisi untuk membuat pengguna',
+  },
+  PLACEMENT_OUTSIDE_PHARMACY: {
+    en: 'You can only manage placements in your own pharmacy',
+    id: 'Anda hanya dapat mengelola penempatan di apotek Anda sendiri',
+  },
+  ROLE_NOT_IN_PHARMACY: {
+    en: 'This role does not belong to the selected pharmacy',
+    id: 'Peran ini bukan milik apotek yang dipilih',
+  },
+  CANNOT_MANAGE_PLATFORM_USER: {
+    en: 'Only a platform admin can modify platform accounts',
+    id: 'Hanya platform admin yang dapat mengubah akun platform',
+  },
+  CANNOT_MANAGE_OWNER: {
+    en: "Only the pharmacy owner can modify the owner's account",
+    id: 'Hanya pemilik apotek yang dapat mengubah akun pemilik',
+  },
+  CANNOT_MODIFY_OWN_PLACEMENT: {
+    en: 'You cannot change your own role, status, or placement',
+    id: 'Anda tidak dapat mengubah peran, status, atau penempatan Anda sendiri',
+  },
+  CANNOT_CHANGE_OWN_STATUS: {
+    en: 'You cannot change your own account status',
+    id: 'Anda tidak dapat mengubah status akun Anda sendiri',
+  },
+  USER_HAS_OTHER_PHARMACIES: {
+    en: 'This user also works at other pharmacies. End their placement here instead.',
+    id: 'Pengguna ini juga bekerja di apotek lain. Akhiri penempatannya di apotek ini saja.',
+  },
+  CANNOT_RESET_OWN_PASSWORD: {
+    en: 'Use "Change password" in your profile to change your own password',
+    id: 'Gunakan "Ubah kata sandi" di profil untuk mengganti kata sandi Anda sendiri',
+  },
+  CANNOT_GRANT_UNHELD_PERMISSION: {
+    en: 'You cannot grant permissions that you do not have yourself',
+    id: 'Anda tidak dapat memberikan izin yang tidak Anda miliki sendiri',
+  },
+  INVALID_JSON: {
+    en: 'The request data is malformed. Please refresh the page and try again.',
+    id: 'Format data yang dikirim tidak valid. Muat ulang halaman lalu coba lagi.',
+  },
+  PAYLOAD_TOO_LARGE: {
+    en: 'The data sent is too large',
+    id: 'Data yang dikirim terlalu besar',
+  },
+  INVALID_REQUEST: {
+    en: 'The request could not be processed. Please check the input and try again.',
+    id: 'Permintaan tidak dapat diproses. Periksa kembali isian lalu coba lagi.',
+  },
+  DUPLICATE_ENTRY: {
+    en: 'This data already exists',
+    id: 'Data ini sudah ada',
+  },
+  RECORD_IN_USE: {
+    en: 'This data is still used by other records and cannot be changed or deleted',
+    id: 'Data ini masih dipakai oleh data lain sehingga tidak dapat diubah atau dihapus',
+  },
+  CONCURRENT_UPDATE: {
+    en: 'This data was changed by someone else at the same time. Please try again.',
+    id: 'Data ini sedang diubah oleh pengguna lain pada saat yang sama. Silakan coba lagi.',
+  },
+  SERVER_BUSY: {
+    en: 'The server is busy. Please wait a moment and try again.',
+    id: 'Server sedang sibuk. Tunggu sebentar lalu coba lagi.',
+  },
+  DATABASE_UNAVAILABLE: {
+    en: 'Cannot connect to the database. Please try again shortly.',
+    id: 'Tidak dapat terhubung ke database. Silakan coba beberapa saat lagi.',
+  },
+  PRICE_OVERRIDE_NOT_ALLOWED: {
+    en: "You don't have permission to change the price. Ask a pharmacist or the owner.",
+    id: "Anda tidak memiliki izin mengubah harga. Minta bantuan apoteker atau pemilik.",
+  },
+  GRAND_TOTAL_MUST_BE_POSITIVE: {
+    en: "The total must be greater than 0",
+    id: "Total harus lebih dari 0",
+  },
+  REQUEST_IN_PROGRESS: {
+    en: "This request is still being processed. Please wait a moment.",
+    id: "Permintaan ini masih diproses. Mohon tunggu sebentar.",
+  },
 }

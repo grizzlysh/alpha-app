@@ -486,7 +486,7 @@ export const getPurchaseOrderPrintData = async (
               status: RecordStatus.ACTIVE,
               deletedAt: null,
               leftAt: null,
-              role: { type: AppRole.HEAD_PHARMACIST },
+              isHeadPharmacist: true,
             },
             take: 1,
             select: {

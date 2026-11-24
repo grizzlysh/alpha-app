@@ -14,7 +14,6 @@ logfile.log
 uncaughtExceptions.log
 
 # Prisma
-prisma/migrations/
 
 # Generated report files
 /storage/

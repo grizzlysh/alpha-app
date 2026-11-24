@@ -19,7 +19,7 @@ export const stockQuerySchema = z.object({
   sortBy: z.enum(['name', 'totalPieces', 'updatedAt']).optional().default('name'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('asc'),
   page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(100).optional().default(10),
+  limit: z.coerce.number().int().positive().max(1000).optional().default(10),
 })
 
 export const stockMovementQuerySchema = z.object({

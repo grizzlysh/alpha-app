@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "mst_storage_cabinets" ADD COLUMN     "height" DOUBLE PRECISION,
+ADD COLUMN     "pos_x" DOUBLE PRECISION,
+ADD COLUMN     "pos_y" DOUBLE PRECISION,
+ADD COLUMN     "rotation" DOUBLE PRECISION DEFAULT 0,
+ADD COLUMN     "width" DOUBLE PRECISION;

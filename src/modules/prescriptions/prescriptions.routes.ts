@@ -23,7 +23,7 @@ router.get('/:prescription_uuid', requirePermission(PERMISSIONS.PRESCRIPTIONS_RE
 router.post('/', requirePermission(PERMISSIONS.PRESCRIPTIONS_CREATE), validateBody(createPrescriptionSchema), PrescriptionController.createPrescription)
 router.put('/:prescription_uuid', requirePermission(PERMISSIONS.PRESCRIPTIONS_UPDATE), validateBody(updatePrescriptionSchema), PrescriptionController.updatePrescription)
 router.delete('/:prescription_uuid', requirePermission(PERMISSIONS.PRESCRIPTIONS_DELETE), PrescriptionController.deletePrescription)
-router.post('/:prescription_uuid/dispense', requirePermission(PERMISSIONS.PRESCRIPTIONS_CREATE), validateBody(dispensePrescriptionSchema), PrescriptionController.dispensePrescription)
+router.post('/:prescription_uuid/dispense', requirePermission(PERMISSIONS.PRESCRIPTIONS_CREATE), requirePermission(PERMISSIONS.SALES_CREATE), validateBody(dispensePrescriptionSchema), PrescriptionController.dispensePrescription)
 router.post('/:prescription_uuid/cancel', requirePermission(PERMISSIONS.PRESCRIPTIONS_UPDATE), PrescriptionController.cancelPrescription)
 
 export default router

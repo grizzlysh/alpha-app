@@ -105,7 +105,8 @@ export const setRolePermissions = async (
       req.body as any,
       req.user!.pharmacyId,
       req.user!.platformRole,
-      req.user!.id
+      req.user!.id,
+      req.user!.permissions
     )
 
     sendSuccess(res, MESSAGE_CODES.ROLE_PERMISSIONS_UPDATED, role)

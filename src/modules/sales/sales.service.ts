@@ -13,6 +13,7 @@ import { SalePaymentResponse, SaleResponse } from './sales.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { ConflictException } from '@exceptions/ConflictException'
+import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -84,27 +85,6 @@ const saleSelect = {
       doctor: { select: { uuid: true, name: true } },
     },
   },
-}
-
-type SaleDetailDraft = {
-  stockDetailId: number
-  medicineId: number
-  quantityPieces: number
-  quantityBox: number
-  sellingPrice: Decimal
-  originalPrice: Decimal
-  discountPercentage: Decimal
-  discountAmount: Decimal
-  totalAmount: Decimal
-  isFefoOverride: boolean
-  requiresPrescription: boolean
-  createdById: number
-  _stockDetailId: number
-  _stockId: number
-  _quantityPieces: number
-  _quantityBefore: number
-  _stockDetailQuantityBefore: number
-  _stockDetailQuantityPerBox: number
 }
 
 const formatSale = (sale: Prisma.SaleGetPayload<{ select: typeof saleSelect }>): SaleResponse => ({
@@ -193,9 +173,12 @@ const resolvePrescriptionId = async (
   if (prescriptionUuid) {
     const rx = await tx.prescription.findFirst({
       where: { uuid: prescriptionUuid, pharmacyId, deletedAt: null },
-      select: { id: true, status: true },
+      select: { id: true, status: true, customerId: true },
     })
     if (!rx) throw new NotFoundException('Prescription not found')
+    if (rx.customerId !== customerId) {
+      throw new BadRequestException('The prescription belongs to a different patient')
+    }
     if (rx.status === PrescriptionStatus.DISPENSED || rx.status === PrescriptionStatus.CANCELLED || rx.status === PrescriptionStatus.EXPIRED) {
       throw new BadRequestException('Prescription is not available for use')
     }
@@ -258,6 +241,434 @@ const resolvePrescriptionId = async (
     throw new BadRequestException(names ? `Prescription required for: ${names}` : 'Prescription is required for this sale')
   }
   return undefined
+}
+
+// ── Prescription dispensing sync ──────────────────────
+//
+// A completed sale that references a prescription is what dispenses it: each
+// sold medicine is matched to the prescription line for that medicine and
+// dispensedQty / statuses are recomputed. A refund or cancellation of that
+// sale reverses it. Lines written as free text (no medicineId) are left alone.
+
+const syncPrescriptionDispensing = async (
+  tx: Prisma.TransactionClient,
+  prescriptionId: number,
+  saleId: number,
+  soldLines: { medicineId: number; quantityPieces: number }[],
+  direction: 1 | -1,
+  userId: number
+): Promise<void> => {
+  const rx = await tx.prescription.findUnique({
+    where: { id: prescriptionId },
+    select: {
+      id: true,
+      status: true,
+      saleId: true,
+      details: {
+        where: { deletedAt: null },
+        select: { id: true, medicineId: true, medicineName: true, qty: true, dispensedQty: true, status: true },
+        orderBy: { id: 'asc' },
+      },
+    },
+  })
+  if (!rx || rx.status === PrescriptionStatus.CANCELLED) return
+
+  const soldByMedicine = new Map<number, number>()
+  for (const l of soldLines) soldByMedicine.set(l.medicineId, (soldByMedicine.get(l.medicineId) ?? 0) + l.quantityPieces)
+
+  // Older lines written as free text: match them to the sold medicine by name.
+  const soldMedicines = await tx.medicine.findMany({
+    where: { id: { in: [...soldByMedicine.keys()] } },
+    select: { id: true, name: true },
+  })
+  const idByName = new Map(soldMedicines.map((m) => [m.name.trim().toLowerCase(), m.id]))
+
+  const updated = rx.details.map((d) => ({ ...d, medicineId: d.medicineId ?? idByName.get(d.medicineName.trim().toLowerCase()) ?? null }))
+  for (const d of updated) {
+    if (d.medicineId == null || d.status === PrescriptionDetailStatus.CANCELLED) continue
+    let remaining = soldByMedicine.get(d.medicineId) ?? 0
+    if (remaining <= 0) continue
+    if (direction === 1) {
+      const take = Math.min(remaining, Math.max(d.qty - d.dispensedQty, 0))
+      d.dispensedQty += take
+      remaining -= take
+    } else {
+      const give = Math.min(remaining, d.dispensedQty)
+      d.dispensedQty -= give
+      remaining -= give
+    }
+    soldByMedicine.set(d.medicineId, remaining)
+  }
+
+  for (const d of updated) {
+    const before = rx.details.find((x) => x.id === d.id)!
+    if (before.dispensedQty === d.dispensedQty || d.status === PrescriptionDetailStatus.CANCELLED) continue
+    await tx.prescriptionDetail.update({
+      where: { id: d.id },
+      data: {
+        dispensedQty: d.dispensedQty,
+        status:
+          d.dispensedQty >= d.qty
+            ? PrescriptionDetailStatus.DISPENSED
+            : d.dispensedQty > 0
+              ? PrescriptionDetailStatus.PARTIAL
+              : PrescriptionDetailStatus.PENDING,
+        updatedById: userId,
+      },
+    })
+  }
+
+  const active = updated.filter((d) => d.status !== PrescriptionDetailStatus.CANCELLED)
+  const allDone = active.length > 0 && active.every((d) => d.dispensedQty >= d.qty)
+  const anyDone = active.some((d) => d.dispensedQty > 0)
+  const status = allDone ? PrescriptionStatus.DISPENSED : anyDone ? PrescriptionStatus.PARTIAL : PrescriptionStatus.PENDING
+
+  await tx.prescription.update({
+    where: { id: rx.id },
+    data: {
+      status,
+      // saleId records the first sale that dispensed it (one-to-one column).
+      ...(direction === 1 && rx.saleId == null && { saleId }),
+      ...(direction === -1 && rx.saleId === saleId && { saleId: null }),
+      updatedById: userId,
+    },
+  })
+}
+
+// ── Sale Pricing & Stock Helpers ──────────────────────
+//
+// The server is the authority on money: unit prices come from Stock, line and
+// header totals are computed here, PPN comes from the pharmacy's parameters.
+// Client-sent totals are ignored. A client-sent unit price or discount is only
+// honoured when it matches the list price / stays within MAX_DISCOUNT_PERCENTAGE,
+// unless the caller holds sales.override_price.
+
+export interface SaleActor {
+  userId: number
+  canOverridePrice: boolean
+}
+
+interface SaleContext {
+  allowFefoOverride: boolean
+  creditPaymentDays: number
+  ppnPercentage: Decimal
+  maxDiscountPercentage: Decimal
+}
+
+const HUNDRED = new Decimal(100)
+const money = (d: Decimal): Decimal => d.toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+const toDecimal = (v: number | undefined | null): Decimal => new Decimal(v ?? 0)
+
+const loadSaleContext = async (pharmacyId: number): Promise<SaleContext> => {
+  const param = (key: string) =>
+    prisma.businessParameter.findUnique({ where: { pharmacyId_key: { pharmacyId, key } }, select: { value: true } })
+
+  const [allowFefoParam, creditDaysParam, ppnParam, maxDiscountParam] = await Promise.all([
+    param('ALLOW_FEFO_OVERRIDE'),
+    param('CREDIT_PAYMENT_DAYS'),
+    param('PPN_PERCENTAGE_SELL'),
+    param('MAX_DISCOUNT_PERCENTAGE'),
+  ])
+
+  const decimalOr = (raw: string | undefined, fallback: number): Decimal => {
+    const n = Number(raw)
+    return Number.isFinite(n) && n >= 0 ? new Decimal(n) : new Decimal(fallback)
+  }
+
+  return {
+    allowFefoOverride: allowFefoParam?.value !== 'false',
+    creditPaymentDays: parseInt(creditDaysParam?.value ?? '30', 10),
+    ppnPercentage: decimalOr(ppnParam?.value, 0),
+    // Missing parameter = no discount without override permission.
+    maxDiscountPercentage: decimalOr(maxDiscountParam?.value, 0),
+  }
+}
+
+type SaleLineInput = CreateSaleInput['details'][number]
+
+type SaleDetailDraft = {
+  stockDetailId: number
+  medicineId: number
+  quantityPieces: number
+  quantityBox: number
+  sellingPrice: Decimal
+  originalPrice: Decimal
+  discountPercentage: Decimal
+  discountAmount: Decimal
+  totalAmount: Decimal
+  isFefoOverride: boolean
+  requiresPrescription: boolean
+  createdById: number
+  _stockId: number
+  _medicineLabel: string
+}
+
+const stripDraft = ({ _stockId, _medicineLabel, ...d }: SaleDetailDraft) => d
+
+/**
+ * Validates each requested line against live stock (pharmacy scope, FEFO,
+ * expiry, availability net of reservations) and prices it server-side.
+ * Callers updating an existing sale must release that sale's reservations first.
+ */
+const buildSaleLines = async (
+  tx: Prisma.TransactionClient,
+  details: SaleLineInput[],
+  pharmacyId: number,
+  ctx: SaleContext,
+  actor: SaleActor
+): Promise<SaleDetailDraft[]> => {
+  const lines: SaleDetailDraft[] = []
+  // The same batch may appear on several lines — check availability cumulatively.
+  const requestedByBatch = new Map<number, number>()
+
+  for (const detail of details) {
+    const stockDetail = await tx.stockDetail.findFirst({
+      where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
+      select: {
+        id: true,
+        batchNumber: true,
+        quantityPieces: true,
+        quantityPerBox: true,
+        expiryDate: true,
+        stockId: true,
+        stock: {
+          select: {
+            medicineId: true,
+            sellingPrice: true,
+            calculatedPrice: true,
+            medicine: { select: { name: true, type: { select: { requiredPrescription: true } } } },
+          },
+        },
+      },
+    })
+    if (!stockDetail) throw new NotFoundException('Stock detail not found')
+
+    const label = `${stockDetail.stock.medicine.name} (batch ${stockDetail.batchNumber})`
+
+    if (detail.isFefoOverride && !ctx.allowFefoOverride) {
+      throw new BadRequestException('FEFO override is not allowed. Items must be sold in expiry order.')
+    }
+    // Selling expired medicine is never allowed (no parameter can enable it).
+    if (stockDetail.expiryDate < new Date()) {
+      throw new BadRequestException(`Medicine batch is expired: ${label}`)
+    }
+
+    const reservedAgg = await tx.stockReservation.aggregate({
+      where: { stockDetailId: stockDetail.id },
+      _sum: { quantityPieces: true },
+    })
+    const available = stockDetail.quantityPieces - (reservedAgg._sum.quantityPieces ?? 0)
+    const requested = (requestedByBatch.get(stockDetail.id) ?? 0) + detail.quantityPieces
+    if (requested > available) {
+      throw new BadRequestException(`Insufficient stock for ${label}: ${Math.max(available, 0)} available`)
+    }
+    requestedByBatch.set(stockDetail.id, requested)
+
+    // ── Price ───────────────────────────────────────
+    const listPrice = money(new Decimal((stockDetail.stock.sellingPrice ?? stockDetail.stock.calculatedPrice).toString()))
+    const unitPrice = detail.sellingPrice !== undefined ? money(toDecimal(detail.sellingPrice)) : listPrice
+    if (!unitPrice.eq(listPrice) && !actor.canOverridePrice) {
+      throw new ForbiddenException('PRICE_OVERRIDE_NOT_ALLOWED')
+    }
+    if (unitPrice.lte(0)) throw new BadRequestException('Selling price must be positive')
+
+    const discountPct = toDecimal(detail.discountPercentage)
+    if (discountPct.gt(ctx.maxDiscountPercentage) && !actor.canOverridePrice) {
+      throw new ForbiddenException(`Discount exceeds the ${ctx.maxDiscountPercentage.toString()}% limit for your role`)
+    }
+
+    const gross = unitPrice.mul(detail.quantityPieces)
+    const lineDiscount = money(gross.mul(discountPct).div(HUNDRED))
+
+    lines.push({
+      stockDetailId: stockDetail.id,
+      medicineId: stockDetail.stock.medicineId,
+      quantityPieces: detail.quantityPieces,
+      quantityBox: Math.floor(detail.quantityPieces / Math.max(stockDetail.quantityPerBox, 1)),
+      sellingPrice: unitPrice,
+      originalPrice: listPrice,
+      discountPercentage: money(discountPct),
+      discountAmount: lineDiscount,
+      totalAmount: money(gross.sub(lineDiscount)),
+      isFefoOverride: detail.isFefoOverride ?? false,
+      // Derived from the medicine type, never from the client.
+      requiresPrescription: stockDetail.stock.medicine.type?.requiredPrescription ?? false,
+      createdById: actor.userId,
+      _stockId: stockDetail.stockId,
+      _medicineLabel: label,
+    })
+  }
+
+  return lines
+}
+
+interface SaleTotals {
+  totalAmount: Decimal
+  discountPercentage: Decimal
+  discountAmount: Decimal
+  ppnPercentage: Decimal
+  ppnAmount: Decimal
+  grandTotal: Decimal
+}
+
+/** subtotal − header discount = DPP; PPN is charged on the DPP. */
+const computeSaleTotals = (
+  lines: SaleDetailDraft[],
+  header: { discountPercentage?: number; discountAmount?: number },
+  ctx: SaleContext,
+  actor: SaleActor
+): SaleTotals => {
+  const subtotal = lines.reduce((sum, l) => sum.add(l.totalAmount), new Decimal(0))
+  const headerPct = toDecimal(header.discountPercentage)
+  let discount = money(toDecimal(header.discountAmount).add(subtotal.mul(headerPct).div(HUNDRED)))
+  if (discount.gt(subtotal)) discount = subtotal
+
+  if (discount.gt(0) && !actor.canOverridePrice && subtotal.gt(0)) {
+    const effectivePct = discount.mul(HUNDRED).div(subtotal)
+    if (effectivePct.gt(ctx.maxDiscountPercentage)) {
+      throw new ForbiddenException(`Discount exceeds the ${ctx.maxDiscountPercentage.toString()}% limit for your role`)
+    }
+  }
+
+  const dpp = subtotal.sub(discount)
+  const ppnAmount = money(dpp.mul(ctx.ppnPercentage).div(HUNDRED))
+  const grandTotal = money(dpp.add(ppnAmount))
+  if (grandTotal.lte(0)) throw new BadRequestException('GRAND_TOTAL_MUST_BE_POSITIVE')
+
+  return {
+    totalAmount: money(subtotal),
+    discountPercentage: money(headerPct),
+    discountAmount: discount,
+    ppnPercentage: ctx.ppnPercentage,
+    ppnAmount,
+    grandTotal,
+  }
+}
+
+/**
+ * Deducts stock atomically: the UPDATE only succeeds while enough pieces remain,
+ * so two concurrent sales can never drive a batch negative. The movement log
+ * records the quantities actually read back after the locked update, which keeps
+ * quantityBefore/After correct for multi-line carts and concurrent sales alike.
+ */
+const deductStockForSale = async (
+  tx: Prisma.TransactionClient,
+  lines: SaleDetailDraft[],
+  saleDetailIds: number[],
+  pharmacyId: number,
+  userId: number
+): Promise<void> => {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const qty = line.quantityPieces
+
+    const detailRes = await tx.stockDetail.updateMany({
+      where: { id: line.stockDetailId, quantityPieces: { gte: qty } },
+      data: { quantityPieces: { decrement: qty }, updatedById: userId },
+    })
+    if (detailRes.count === 0) {
+      throw new BadRequestException(`Insufficient stock for ${line._medicineLabel}: stock changed, please refresh`)
+    }
+    const detailAfter = await tx.stockDetail.findUniqueOrThrow({
+      where: { id: line.stockDetailId },
+      select: { quantityPieces: true, quantityPerBox: true },
+    })
+    await tx.stockDetail.update({
+      where: { id: line.stockDetailId },
+      data: { quantityBox: Math.floor(detailAfter.quantityPieces / Math.max(detailAfter.quantityPerBox, 1)) },
+    })
+
+    const stockRes = await tx.stock.updateMany({
+      where: { id: line._stockId, totalPieces: { gte: qty } },
+      data: { totalPieces: { decrement: qty }, updatedById: userId },
+    })
+    if (stockRes.count === 0) {
+      throw new BadRequestException(`Insufficient stock for ${line._medicineLabel}: stock changed, please refresh`)
+    }
+    const stockAfter = await tx.stock.findUniqueOrThrow({
+      where: { id: line._stockId },
+      select: { totalPieces: true },
+    })
+
+    await tx.stockMovement.create({
+      data: {
+        pharmacyId,
+        medicineId: line.medicineId,
+        stockId: line._stockId,
+        stockDetailId: line.stockDetailId,
+        saleDetailId: saleDetailIds[i],
+        type: 'OUT',
+        reason: 'SALE',
+        quantity: qty,
+        quantityBefore: stockAfter.totalPieces + qty,
+        quantityAfter: stockAfter.totalPieces,
+        createdById: userId,
+      },
+    })
+  }
+}
+
+const createSalePaymentRecord = async (
+  tx: Prisma.TransactionClient,
+  saleId: number,
+  saleType: SaleType,
+  grandTotal: Decimal,
+  payment: CreateSaleInput['payment'],
+  soldAt: Date,
+  userId: number
+): Promise<void> => {
+  if (saleType === SaleType.CASH) {
+    await tx.salePayment.create({
+      data: {
+        saleId,
+        totalAmount: grandTotal,
+        paidAmount: grandTotal,
+        paymentStatus: PaymentStatus.PAID,
+        createdById: userId,
+        history: {
+          create: {
+            amount: grandTotal,
+            paymentMethod: payment!.paymentMethod,
+            paymentDate: soldAt,
+            description: payment?.description,
+            createdById: userId,
+          },
+        },
+      },
+    })
+  } else {
+    await tx.salePayment.create({
+      data: {
+        saleId,
+        totalAmount: grandTotal,
+        paidAmount: new Decimal(0),
+        paymentStatus: PaymentStatus.UNPAID,
+        createdById: userId,
+      },
+    })
+  }
+}
+
+const resolveSaleCustomer = async (
+  tx: Prisma.TransactionClient,
+  customerUuid: string | undefined,
+  pharmacyId: number
+): Promise<number | undefined> => {
+  if (!customerUuid) return undefined
+  const party = await tx.customer.findFirst({
+    where: { uuid: customerUuid, pharmacyId, status: 'ACTIVE' },
+    select: { id: true, isWalkIn: true },
+  })
+  if (!party) throw new NotFoundException('Party not found')
+  if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
+  return party.id
+}
+
+const dueDateFor = (saleType: SaleType, soldAt: Date, creditDays: number): Date | undefined => {
+  if (saleType !== SaleType.CREDIT) return undefined
+  const due = new Date(soldAt)
+  due.setDate(due.getDate() + creditDays)
+  return due
 }
 
 // ── Services ──────────────────────────────────────────
@@ -352,41 +763,16 @@ export const getSaleByUuid = async (
 export const createSale = async (
   data: CreateSaleInput,
   pharmacyId: number,
-  userId: number
+  actor: SaleActor
 ): Promise<SaleResponse> => {
-  // ── Read Parameters ───────────────────────────────────
-  const [allowExpiredParam, allowFefoParam, creditDaysParam] = await Promise.all([
-    prisma.systemParameter.findUnique({
-      where: { key: 'ALLOW_EXPIRED_MEDICINE_SALE' },
-      select: { value: true },
-    }),
-    prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'ALLOW_FEFO_OVERRIDE' } },
-      select: { value: true },
-    }),
-    prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'CREDIT_PAYMENT_DAYS' } },
-      select: { value: true },
-    }),
-  ])
-  const allowExpiredSale = allowExpiredParam?.value === 'true'
-  const allowFefoOverride = allowFefoParam?.value !== 'false'
-  const creditPaymentDays = parseInt(creditDaysParam?.value ?? '30', 10)
+  const userId = actor.userId
+  const ctx = await loadSaleContext(pharmacyId)
 
   const createdSale = await withDocNumberRetry('SL', () => prisma.$transaction(async (tx) => {
 
     // ── Resolve Party ────────────────────────────
-    let customerId: number
-
-    if (data.customerUuid) {
-      const party = await tx.customer.findFirst({
-        where: { uuid: data.customerUuid, pharmacyId, status: 'ACTIVE' },
-        select: { id: true, isWalkIn: true },
-      })
-      if (!party) throw new NotFoundException('Party not found')
-      if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
-      customerId = party.id
-    } else {
+    let customerId = await resolveSaleCustomer(tx, data.customerUuid, pharmacyId)
+    if (customerId === undefined) {
       const walkIn = await tx.customer.findFirst({
         where: { pharmacyId, isWalkIn: true },
         select: { id: true },
@@ -408,81 +794,9 @@ export const createSale = async (
       pharmacyCode: pharmacy.code,
     })
 
-    // ── Process Details ───────────────────────────
-    const detailsData: SaleDetailDraft[] = []
-
-    for (const detail of data.details) {
-      const stockDetail = await tx.stockDetail.findFirst({
-        where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
-        select: {
-          id: true,
-          quantityPieces: true,
-          quantityPerBox: true,
-          expiryDate: true,
-          stockId: true,
-          stock: {
-            select: {
-              id: true,
-              medicineId: true,
-              totalPieces: true,
-            },
-          },
-        },
-      })
-
-      if (!stockDetail) {
-        throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
-      }
-
-      if (detail.isFefoOverride && !allowFefoOverride) {
-        throw new BadRequestException(
-          'FEFO override is not allowed. Items must be sold in expiry order.'
-        )
-      }
-
-      if (!allowExpiredSale && stockDetail.expiryDate < new Date()) {
-        throw new BadRequestException(
-          `Medicine batch is expired: ${detail.stockDetailUuid}`
-        )
-      }
-
-      const reservedAgg = await tx.stockReservation.aggregate({
-        where: { stockDetailId: stockDetail.id },
-        _sum: { quantityPieces: true },
-      })
-      const availablePieces =
-        stockDetail.quantityPieces - (reservedAgg._sum.quantityPieces ?? 0)
-      if (availablePieces < detail.quantityPieces) {
-        throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
-      }
-
-      const sellingPrice = detail.sellingPrice
-      const originalPrice = detail.originalPrice
-      const discountAmount = detail.discountAmount ?? 0
-      const itemTotal = sellingPrice * detail.quantityPieces
-      const quantityBox = Math.floor(detail.quantityPieces / stockDetail.quantityPerBox)
-
-      detailsData.push({
-        stockDetailId: stockDetail.id,
-        medicineId: stockDetail.stock.medicineId,
-        quantityPieces: detail.quantityPieces,
-        quantityBox,
-        sellingPrice: new Decimal(sellingPrice.toFixed(2)),
-        originalPrice: new Decimal(originalPrice.toFixed(2)),
-        discountPercentage: new Decimal((detail.discountPercentage ?? 0).toFixed(2)),
-        discountAmount: new Decimal(discountAmount.toFixed(2)),
-        totalAmount: new Decimal(itemTotal.toFixed(2)),
-        isFefoOverride: detail.isFefoOverride ?? false,
-        requiresPrescription: detail.requiresPrescription ?? false,
-        createdById: userId,
-        _stockDetailId: stockDetail.id,
-        _stockId: stockDetail.stockId,
-        _quantityPieces: detail.quantityPieces,
-        _quantityBefore: stockDetail.stock.totalPieces,
-        _stockDetailQuantityBefore: stockDetail.quantityPieces,
-        _stockDetailQuantityPerBox: stockDetail.quantityPerBox,
-      })
-    }
+    // ── Lines & totals (server-priced) ────────────
+    const lines = await buildSaleLines(tx, data.details, pharmacyId, ctx, actor)
+    const totals = computeSaleTotals(lines, data, ctx, actor)
 
     // ── Prescription Gate ─────────────────────────
     const prescriptionId = await resolvePrescriptionId(tx, {
@@ -490,29 +804,16 @@ export const createSale = async (
       prescription: data.prescription,
       isPrescription: data.isPrescription,
       isPending: data.isPending,
-      medicineIds: [...new Set(detailsData.map((d) => d.medicineId))],
+      medicineIds: [...new Set(lines.map((d) => d.medicineId))],
       pharmacyId,
       customerId,
       userId,
     })
 
-    // ── Header Amounts (all from input) ──────────
-    const discountPercentage = data.discountPercentage ?? 0
-    const discountAmount = data.discountAmount ?? 0
-    const ppnPercentage = data.ppnPercentage ?? 0
-    const ppnAmount = data.ppnAmount ?? 0
-    const totalAmount = data.totalAmount
-    const grandTotal = data.grandTotal
-    const paidAmount = !data.isPending && data.saleType === SaleType.CASH
-      ? (data.paidAmount ?? grandTotal)
-      : 0
-
+    const saleType = data.saleType ?? SaleType.CASH
+    const isCashCompleted = !data.isPending && saleType === SaleType.CASH
     const soldAt = new Date()
-    let dueDate: Date | undefined
-    if (!data.isPending && data.saleType === SaleType.CREDIT) {
-      dueDate = new Date(soldAt)
-      dueDate.setDate(dueDate.getDate() + creditPaymentDays)
-    }
+    const dueDate = data.isPending ? undefined : dueDateFor(saleType, soldAt, ctx.creditPaymentDays)
 
     // ── Create Sale ───────────────────────────────
     const sale = await tx.sale.create({
@@ -521,32 +822,17 @@ export const createSale = async (
         customerId,
         saleNumber,
         ...(prescriptionId && { prescriptionId }),
-        saleType: data.saleType ?? SaleType.CASH,
+        saleType,
         status: data.isPending ? SaleStatus.PENDING : SaleStatus.COMPLETED,
-        totalAmount: new Decimal(totalAmount.toFixed(2)),
-        discountPercentage: new Decimal(discountPercentage.toFixed(2)),
-        discountAmount: new Decimal(discountAmount.toFixed(2)),
-        ppnPercentage: new Decimal(ppnPercentage.toFixed(2)),
-        ppnAmount: new Decimal(ppnAmount.toFixed(2)),
-        grandTotal: new Decimal(grandTotal.toFixed(2)),
-        paidAmount: new Decimal(paidAmount.toFixed(2)),
+        ...totals,
+        paidAmount: isCashCompleted ? totals.grandTotal : new Decimal(0),
         dueDate,
         soldAt,
         description: data.description,
         createdById: userId,
-        details: {
-          create: detailsData.map(({
-            _stockDetailId,
-            _stockId,
-            _quantityPieces,
-            _quantityBefore,
-            _stockDetailQuantityBefore,
-            _stockDetailQuantityPerBox,
-            ...d
-          }) => d),
-        },
+        details: { create: lines.map(stripDraft) },
       },
-      select: { id: true, details: { select: { id: true } } },
+      select: { id: true, details: { select: { id: true }, orderBy: { id: 'asc' } } },
     })
 
     // Link inline prescription back to this sale
@@ -558,99 +844,25 @@ export const createSale = async (
     }
 
     if (data.isPending) {
-      // ── Create Stock Reservations ─────────────────
-      for (const detail of detailsData) {
+      // ── Reserve stock for the held sale ───────────
+      for (const line of lines) {
         await tx.stockReservation.create({
           data: {
             pharmacyId,
             saleId: sale.id,
-            stockId: detail._stockId,
-            stockDetailId: detail._stockDetailId,
-            medicineId: detail.medicineId,
-            quantityPieces: detail._quantityPieces,
+            stockId: line._stockId,
+            stockDetailId: line.stockDetailId,
+            medicineId: line.medicineId,
+            quantityPieces: line.quantityPieces,
             createdById: userId,
           },
         })
       }
     } else {
-      // ── Deduct Stock + Create Movements ───────────
-      let stockMovementOffset = 0
-      for (let i = 0; i < detailsData.length; i++) {
-        const detail = detailsData[i]
-        const saleDetail = sale.details[i]
-
-        const quantityBefore = detail._quantityBefore - stockMovementOffset
-        const quantityAfter = quantityBefore - detail._quantityPieces
-        stockMovementOffset += detail._quantityPieces
-
-        await tx.stock.update({
-          where: { id: detail._stockId },
-          data: {
-            totalPieces: { decrement: detail._quantityPieces },
-            updatedById: userId,
-          },
-        })
-
-        const newDetailQuantityPieces =
-          detail._stockDetailQuantityBefore - detail._quantityPieces
-        await tx.stockDetail.update({
-          where: { id: detail._stockDetailId },
-          data: {
-            quantityPieces: newDetailQuantityPieces,
-            quantityBox: Math.floor(
-              newDetailQuantityPieces / detail._stockDetailQuantityPerBox
-            ),
-            updatedById: userId,
-          },
-        })
-
-        await tx.stockMovement.create({
-          data: {
-            pharmacyId,
-            medicineId: detail.medicineId,
-            stockId: detail._stockId,
-            stockDetailId: detail._stockDetailId,
-            saleDetailId: saleDetail.id,
-            type: 'OUT',
-            reason: 'SALE',
-            quantity: detail._quantityPieces,
-            quantityBefore,
-            quantityAfter,
-            createdById: userId,
-          },
-        })
-      }
-
-      // ── Create Payment ────────────────────────────
-      if (data.saleType === SaleType.CASH) {
-        await tx.salePayment.create({
-          data: {
-            saleId: sale.id,
-            totalAmount: new Decimal(grandTotal.toFixed(2)),
-            paidAmount: new Decimal(paidAmount.toFixed(2)),
-            paymentStatus: PaymentStatus.PAID,
-            createdById: userId,
-            history: {
-              create: {
-                amount: new Decimal(paidAmount.toFixed(2)),
-                paymentMethod: data.payment!.paymentMethod,
-                paymentDate: soldAt,
-                description: data.payment!.description,
-                createdById: userId,
-              },
-            },
-          },
-        })
-      } else {
-        await tx.salePayment.create({
-          data: {
-            saleId: sale.id,
-            totalAmount: new Decimal(grandTotal.toFixed(2)),
-            paidAmount: new Decimal(0),
-            paymentStatus: PaymentStatus.UNPAID,
-            createdById: userId,
-          },
-        })
+      await deductStockForSale(tx, lines, sale.details.map((d) => d.id), pharmacyId, userId)
+      await createSalePaymentRecord(tx, sale.id, saleType, totals.grandTotal, data.payment, soldAt, userId)
+      if (prescriptionId && !data.prescription) {
+        await syncPrescriptionDispensing(tx, prescriptionId, sale.id, lines, 1, userId)
       }
     }
 
@@ -669,25 +881,10 @@ export const completeSale = async (
   uuid: string,
   data: CreateSaleInput,
   pharmacyId: number,
-  userId: number
+  actor: SaleActor
 ): Promise<SaleResponse> => {
-  const [allowExpiredParam, allowFefoParam, creditDaysParam] = await Promise.all([
-    prisma.systemParameter.findUnique({
-      where: { key: 'ALLOW_EXPIRED_MEDICINE_SALE' },
-      select: { value: true },
-    }),
-    prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'ALLOW_FEFO_OVERRIDE' } },
-      select: { value: true },
-    }),
-    prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'CREDIT_PAYMENT_DAYS' } },
-      select: { value: true },
-    }),
-  ])
-  const allowExpiredSale = allowExpiredParam?.value === 'true'
-  const allowFefoOverride = allowFefoParam?.value !== 'false'
-  const creditPaymentDays = parseInt(creditDaysParam?.value ?? '30', 10)
+  const userId = actor.userId
+  const ctx = await loadSaleContext(pharmacyId)
 
   const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.sale.findFirst({
@@ -700,77 +897,12 @@ export const completeSale = async (
       throw new BadRequestException('Only pending sales can be completed')
     }
 
-    // ── Resolve party ────────────────────────────
-    let customerId = existing.customerId
-    if (data.customerUuid) {
-      const party = await tx.customer.findFirst({
-        where: { uuid: data.customerUuid, pharmacyId, status: 'ACTIVE' },
-        select: { id: true, isWalkIn: true },
-      })
-      if (!party) throw new NotFoundException('Party not found')
-      if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
-      customerId = party.id
-    }
+    const customerId = (await resolveSaleCustomer(tx, data.customerUuid, pharmacyId)) ?? existing.customerId
 
-    // ── Release old reservations ──────────────────
+    // ── Release this sale's reservations, then re-validate against live stock ──
     await tx.stockReservation.deleteMany({ where: { saleId: existing.id } })
-
-    // ── Validate + build new details ──────────────
-    const detailsData: SaleDetailDraft[] = []
-
-    for (const detail of data.details) {
-      const stockDetail = await tx.stockDetail.findFirst({
-        where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
-        select: {
-          id: true,
-          quantityPieces: true,
-          quantityPerBox: true,
-          expiryDate: true,
-          stockId: true,
-          stock: { select: { id: true, medicineId: true, totalPieces: true } },
-        },
-      })
-      if (!stockDetail) {
-        throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
-      }
-
-      if (detail.isFefoOverride && !allowFefoOverride) {
-        throw new BadRequestException('FEFO override is not allowed. Items must be sold in expiry order.')
-      }
-      if (!allowExpiredSale && stockDetail.expiryDate < new Date()) {
-        throw new BadRequestException(`Medicine batch is expired: ${detail.stockDetailUuid}`)
-      }
-
-      const reservedAgg = await tx.stockReservation.aggregate({
-        where: { stockDetailId: stockDetail.id },
-        _sum: { quantityPieces: true },
-      })
-      const availablePieces = stockDetail.quantityPieces - (reservedAgg._sum.quantityPieces ?? 0)
-      if (availablePieces < detail.quantityPieces) {
-        throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
-      }
-
-      detailsData.push({
-        stockDetailId: stockDetail.id,
-        medicineId: stockDetail.stock.medicineId,
-        quantityPieces: detail.quantityPieces,
-        quantityBox: Math.floor(detail.quantityPieces / stockDetail.quantityPerBox),
-        sellingPrice: new Decimal(detail.sellingPrice.toFixed(2)),
-        originalPrice: new Decimal(detail.originalPrice.toFixed(2)),
-        discountPercentage: new Decimal((detail.discountPercentage ?? 0).toFixed(2)),
-        discountAmount: new Decimal((detail.discountAmount ?? 0).toFixed(2)),
-        totalAmount: new Decimal((detail.sellingPrice * detail.quantityPieces).toFixed(2)),
-        isFefoOverride: detail.isFefoOverride ?? false,
-        requiresPrescription: detail.requiresPrescription ?? false,
-        createdById: userId,
-        _stockDetailId: stockDetail.id,
-        _stockId: stockDetail.stockId,
-        _quantityPieces: detail.quantityPieces,
-        _quantityBefore: stockDetail.stock.totalPieces,
-        _stockDetailQuantityBefore: stockDetail.quantityPieces,
-        _stockDetailQuantityPerBox: stockDetail.quantityPerBox,
-      })
-    }
+    const lines = await buildSaleLines(tx, data.details, pharmacyId, ctx, actor)
+    const totals = computeSaleTotals(lines, data, ctx, actor)
 
     // ── Prescription Gate ─────────────────────────
     const prescriptionId = await resolvePrescriptionId(tx, {
@@ -779,21 +911,15 @@ export const completeSale = async (
       existingPrescriptionId: existing.prescriptionId,
       isPrescription: data.isPrescription,
       isPending: false,
-      medicineIds: [...new Set(detailsData.map((d) => d.medicineId))],
+      medicineIds: [...new Set(lines.map((d) => d.medicineId))],
       pharmacyId,
       customerId,
       userId,
     })
 
-    // ── Amounts ───────────────────────────────────
-    const grandTotal = data.grandTotal
-    const paidAmount = data.saleType === SaleType.CASH ? (data.paidAmount ?? grandTotal) : 0
+    const saleType = data.saleType ?? SaleType.CASH
     const soldAt = new Date()
-    let dueDate: Date | undefined
-    if (data.saleType === SaleType.CREDIT) {
-      dueDate = new Date(soldAt)
-      dueDate.setDate(dueDate.getDate() + creditPaymentDays)
-    }
+    const dueDate = dueDateFor(saleType, soldAt, ctx.creditPaymentDays)
 
     // ── Update sale + replace details ─────────────
     const updated = await tx.sale.update({
@@ -801,29 +927,20 @@ export const completeSale = async (
       data: {
         customerId,
         ...(prescriptionId !== undefined && { prescriptionId }),
-        saleType: data.saleType ?? SaleType.CASH,
+        saleType,
         status: SaleStatus.COMPLETED,
-        totalAmount: new Decimal(data.totalAmount.toFixed(2)),
-        discountPercentage: new Decimal((data.discountPercentage ?? 0).toFixed(2)),
-        discountAmount: new Decimal((data.discountAmount ?? 0).toFixed(2)),
-        ppnPercentage: new Decimal((data.ppnPercentage ?? 0).toFixed(2)),
-        ppnAmount: new Decimal((data.ppnAmount ?? 0).toFixed(2)),
-        grandTotal: new Decimal(grandTotal.toFixed(2)),
-        paidAmount: new Decimal(paidAmount.toFixed(2)),
+        ...totals,
+        paidAmount: saleType === SaleType.CASH ? totals.grandTotal : new Decimal(0),
         soldAt,
         ...(dueDate && { dueDate }),
         description: data.description,
         updatedById: userId,
         details: {
           deleteMany: {},
-          create: detailsData.map(({
-            _stockDetailId, _stockId, _quantityPieces,
-            _quantityBefore, _stockDetailQuantityBefore, _stockDetailQuantityPerBox,
-            ...d
-          }) => d),
+          create: lines.map(stripDraft),
         },
       },
-      select: { id: true, details: { select: { id: true } } },
+      select: { id: true, details: { select: { id: true }, orderBy: { id: 'asc' } } },
     })
 
     // Link inline prescription back to this sale
@@ -834,79 +951,10 @@ export const completeSale = async (
       })
     }
 
-    // ── Deduct stock + create movements ───────────
-    const stockOffsets = new Map<number, number>()
-    for (let i = 0; i < detailsData.length; i++) {
-      const detail = detailsData[i]
-      const saleDetail = updated.details[i]
-
-      const offset = stockOffsets.get(detail._stockId) ?? 0
-      const quantityBefore = detail._quantityBefore - offset
-      const quantityAfter = quantityBefore - detail._quantityPieces
-      stockOffsets.set(detail._stockId, offset + detail._quantityPieces)
-
-      await tx.stock.update({
-        where: { id: detail._stockId },
-        data: { totalPieces: { decrement: detail._quantityPieces }, updatedById: userId },
-      })
-
-      const newDetailQty = detail._stockDetailQuantityBefore - detail._quantityPieces
-      await tx.stockDetail.update({
-        where: { id: detail._stockDetailId },
-        data: {
-          quantityPieces: newDetailQty,
-          quantityBox: Math.floor(newDetailQty / detail._stockDetailQuantityPerBox),
-          updatedById: userId,
-        },
-      })
-
-      await tx.stockMovement.create({
-        data: {
-          pharmacyId,
-          medicineId: detail.medicineId,
-          stockId: detail._stockId,
-          stockDetailId: detail._stockDetailId,
-          saleDetailId: saleDetail.id,
-          type: 'OUT',
-          reason: 'SALE',
-          quantity: detail._quantityPieces,
-          quantityBefore,
-          quantityAfter,
-          createdById: userId,
-        },
-      })
-    }
-
-    // ── Create payment record ─────────────────────
-    if (data.saleType === SaleType.CASH) {
-      await tx.salePayment.create({
-        data: {
-          saleId: existing.id,
-          totalAmount: new Decimal(grandTotal.toFixed(2)),
-          paidAmount: new Decimal(paidAmount.toFixed(2)),
-          paymentStatus: PaymentStatus.PAID,
-          createdById: userId,
-          history: {
-            create: {
-              amount: new Decimal(paidAmount.toFixed(2)),
-              paymentMethod: data.payment!.paymentMethod,
-              paymentDate: soldAt,
-              description: data.payment?.description,
-              createdById: userId,
-            },
-          },
-        },
-      })
-    } else {
-      await tx.salePayment.create({
-        data: {
-          saleId: existing.id,
-          totalAmount: new Decimal(grandTotal.toFixed(2)),
-          paidAmount: new Decimal(0),
-          paymentStatus: PaymentStatus.UNPAID,
-          createdById: userId,
-        },
-      })
+    await deductStockForSale(tx, lines, updated.details.map((d) => d.id), pharmacyId, userId)
+    await createSalePaymentRecord(tx, existing.id, saleType, totals.grandTotal, data.payment, soldAt, userId)
+    if (prescriptionId && !data.prescription) {
+      await syncPrescriptionDispensing(tx, prescriptionId, existing.id, lines, 1, userId)
     }
 
     return existing.id
@@ -936,6 +984,7 @@ export const cancelOrRefundSale = async (
         status: true,
         totalAmount: true,
         soldAt: true,
+        prescriptionId: true,
         details: {
           select: {
             id: true,
@@ -998,27 +1047,26 @@ export const cancelOrRefundSale = async (
       await tx.stockReservation.deleteMany({ where: { saleId: sale.id } })
     } else {
       // ── Restore stock + create IN RETURN movements ────────
+      // Increment (not set) and read back, so concurrent sales and several
+      // lines on the same batch all log correct before/after quantities.
       for (const detail of sale.details) {
         const stockDetail = detail.stockDetail
-        const quantityBefore = stockDetail.stock.totalPieces
-        const quantityAfter = quantityBefore + detail.quantityPieces
-        const newDetailQuantity = stockDetail.quantityPieces + detail.quantityPieces
+        const qty = detail.quantityPieces
 
+        const detailAfter = await tx.stockDetail.update({
+          where: { id: stockDetail.id },
+          data: { quantityPieces: { increment: qty }, updatedById: userId },
+          select: { quantityPieces: true, quantityPerBox: true },
+        })
         await tx.stockDetail.update({
           where: { id: stockDetail.id },
-          data: {
-            quantityPieces: newDetailQuantity,
-            quantityBox: Math.floor(newDetailQuantity / stockDetail.quantityPerBox),
-            updatedById: userId,
-          },
+          data: { quantityBox: Math.floor(detailAfter.quantityPieces / Math.max(detailAfter.quantityPerBox, 1)) },
         })
 
-        await tx.stock.update({
+        const stockAfter = await tx.stock.update({
           where: { id: stockDetail.stockId },
-          data: {
-            totalPieces: { increment: detail.quantityPieces },
-            updatedById: userId,
-          },
+          data: { totalPieces: { increment: qty }, updatedById: userId },
+          select: { totalPieces: true },
         })
 
         await tx.stockMovement.create({
@@ -1030,13 +1078,17 @@ export const cancelOrRefundSale = async (
             saleDetailId: detail.id,
             type: 'IN',
             reason: 'RETURN',
-            quantity: detail.quantityPieces,
-            quantityBefore,
-            quantityAfter,
+            quantity: qty,
+            quantityBefore: stockAfter.totalPieces - qty,
+            quantityAfter: stockAfter.totalPieces,
             description: data.description,
             createdById: userId,
           },
         })
+      }
+
+      if (sale.prescriptionId) {
+        await syncPrescriptionDispensing(tx, sale.prescriptionId, sale.id, sale.details, -1, userId)
       }
     }
 
@@ -1081,20 +1133,10 @@ export const updateSale = async (
   uuid: string,
   data: UpdateSaleInput,
   pharmacyId: number,
-  userId: number
+  actor: SaleActor
 ): Promise<SaleResponse> => {
-  const [allowExpiredParam, allowFefoParam] = await Promise.all([
-    prisma.systemParameter.findUnique({
-      where: { key: 'ALLOW_EXPIRED_MEDICINE_SALE' },
-      select: { value: true },
-    }),
-    prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId, key: 'ALLOW_FEFO_OVERRIDE' } },
-      select: { value: true },
-    }),
-  ])
-  const allowExpiredSale = allowExpiredParam?.value === 'true'
-  const allowFefoOverride = allowFefoParam?.value !== 'false'
+  const userId = actor.userId
+  const ctx = await loadSaleContext(pharmacyId)
 
   const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.sale.findFirst({
@@ -1110,95 +1152,20 @@ export const updateSale = async (
     // ── Release old reservations first ────────────
     await tx.stockReservation.deleteMany({ where: { saleId: existing.id } })
 
-    // ── Resolve Party ────────────────────────────
-    let customerId: number | undefined
-    if (data.customerUuid) {
-      const party = await tx.customer.findFirst({
-        where: { uuid: data.customerUuid, pharmacyId, status: 'ACTIVE' },
-        select: { id: true, isWalkIn: true },
-      })
-      if (!party) throw new NotFoundException('Party not found')
-      if (party.isWalkIn) throw new BadRequestException('Omit partyUuid for walk-in sales')
-      customerId = party.id
-    }
-
-    // ── Validate + build new details + reservation drafts ──
-    type ReservationDraft = {
-      stockId: number
-      stockDetailId: number
-      medicineId: number
-      quantityPieces: number
-    }
-
-    const detailsCreate = []
-    const reservationDrafts: ReservationDraft[] = []
-
-    for (const detail of data.details) {
-      const stockDetail = await tx.stockDetail.findFirst({
-        where: { uuid: detail.stockDetailUuid, stock: { pharmacyId } },
-        select: {
-          id: true,
-          quantityPieces: true,
-          quantityPerBox: true,
-          expiryDate: true,
-          stockId: true,
-          stock: { select: { id: true, medicineId: true } },
-        },
-      })
-      if (!stockDetail) {
-        throw new NotFoundException(`Stock detail not found: ${detail.stockDetailUuid}`)
-      }
-
-      if (detail.isFefoOverride && !allowFefoOverride) {
-        throw new BadRequestException('FEFO override is not allowed. Items must be sold in expiry order.')
-      }
-      if (!allowExpiredSale && stockDetail.expiryDate < new Date()) {
-        throw new BadRequestException(`Medicine batch has expired: ${detail.stockDetailUuid}`)
-      }
-
-      const reservedAgg = await tx.stockReservation.aggregate({
-        where: { stockDetailId: stockDetail.id },
-        _sum: { quantityPieces: true },
-      })
-      const availablePieces = stockDetail.quantityPieces - (reservedAgg._sum.quantityPieces ?? 0)
-      if (availablePieces < detail.quantityPieces) {
-        throw new BadRequestException(`Insufficient stock for batch: ${detail.stockDetailUuid}`)
-      }
-
-      detailsCreate.push({
-        stockDetailId: stockDetail.id,
-        medicineId: stockDetail.stock.medicineId,
-        quantityPieces: detail.quantityPieces,
-        quantityBox: Math.floor(detail.quantityPieces / stockDetail.quantityPerBox),
-        sellingPrice: new Decimal(detail.sellingPrice.toFixed(2)),
-        originalPrice: new Decimal(detail.originalPrice.toFixed(2)),
-        discountPercentage: new Decimal((detail.discountPercentage ?? 0).toFixed(2)),
-        discountAmount: new Decimal((detail.discountAmount ?? 0).toFixed(2)),
-        totalAmount: new Decimal((detail.sellingPrice * detail.quantityPieces).toFixed(2)),
-        isFefoOverride: detail.isFefoOverride ?? false,
-        requiresPrescription: detail.requiresPrescription ?? false,
-        createdById: userId,
-      })
-
-      reservationDrafts.push({
-        stockId: stockDetail.stockId,
-        stockDetailId: stockDetail.id,
-        medicineId: stockDetail.stock.medicineId,
-        quantityPieces: detail.quantityPieces,
-      })
-    }
+    const customerId = await resolveSaleCustomer(tx, data.customerUuid, pharmacyId)
+    const lines = await buildSaleLines(tx, data.details, pharmacyId, ctx, actor)
+    const totals = computeSaleTotals(lines, data, ctx, actor)
 
     // ── Prescription Gate ─────────────────────────
-    const resolvedPartyId = customerId ?? existing.customerId
     const prescriptionId = await resolvePrescriptionId(tx, {
       prescriptionUuid: data.prescriptionUuid,
       prescription: data.prescription,
       existingPrescriptionId: existing.prescriptionId,
       isPrescription: data.isPrescription,
       isPending: true,
-      medicineIds: [...new Set(detailsCreate.map((d) => d.medicineId))],
+      medicineIds: [...new Set(lines.map((d) => d.medicineId))],
       pharmacyId,
-      customerId: resolvedPartyId,
+      customerId: customerId ?? existing.customerId,
       userId,
     })
 
@@ -1209,18 +1176,13 @@ export const updateSale = async (
         ...(customerId && { customerId }),
         ...(prescriptionId !== undefined && { prescriptionId }),
         saleType: data.saleType ?? SaleType.CASH,
-        totalAmount: new Decimal(data.totalAmount.toFixed(2)),
-        discountPercentage: new Decimal((data.discountPercentage ?? 0).toFixed(2)),
-        discountAmount: new Decimal((data.discountAmount ?? 0).toFixed(2)),
-        ppnPercentage: new Decimal((data.ppnPercentage ?? 0).toFixed(2)),
-        ppnAmount: new Decimal((data.ppnAmount ?? 0).toFixed(2)),
-        grandTotal: new Decimal(data.grandTotal.toFixed(2)),
+        ...totals,
         paidAmount: new Decimal(0),
         description: data.description,
         updatedById: userId,
         details: {
           deleteMany: {},
-          create: detailsCreate,
+          create: lines.map(stripDraft),
         },
       },
     })
@@ -1234,9 +1196,17 @@ export const updateSale = async (
     }
 
     // ── Create new reservations ───────────────────
-    for (const r of reservationDrafts) {
+    for (const line of lines) {
       await tx.stockReservation.create({
-        data: { pharmacyId, saleId: existing.id, createdById: userId, ...r },
+        data: {
+          pharmacyId,
+          saleId: existing.id,
+          stockId: line._stockId,
+          stockDetailId: line.stockDetailId,
+          medicineId: line.medicineId,
+          quantityPieces: line.quantityPieces,
+          createdById: userId,
+        },
       })
     }
 

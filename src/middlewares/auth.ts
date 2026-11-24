@@ -35,7 +35,7 @@ export const authenticate = async (
     // ── Verify Token ────────────────────────────────
     let decoded: JwtPayload
     try {
-      decoded = jwt.verify(token, env.JWT_SECRET as string) as JwtPayload
+      decoded = jwt.verify(token, env.JWT_SECRET as string, { algorithms: ['HS256'] }) as JwtPayload
     } catch (err) {
       if (err instanceof jwt.TokenExpiredError) {
         res.status(HTTP_STATUS.UNAUTHORIZED).json({

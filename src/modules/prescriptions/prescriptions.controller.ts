@@ -1,3 +1,4 @@
+import { saleActorOf } from '@utils/saleActor'
 import { Request, Response, NextFunction } from 'express'
 import { parseUuid } from '@utils/parseUuid'
 import * as PrescriptionService from './prescriptions.service'
@@ -61,7 +62,7 @@ export const deletePrescription = async (req: DeletePrescriptionRequest, res: Re
 
 export const dispensePrescription = async (req: DispensePrescriptionRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const rx = await PrescriptionService.dispensePrescription(parseUuid(req.params.prescription_uuid), req.body, req.user!.pharmacyId!, req.user!.id)
+    const rx = await PrescriptionService.dispensePrescription(parseUuid(req.params.prescription_uuid), req.body, req.user!.pharmacyId!, saleActorOf(req))
     sendSuccess(res, MESSAGE_CODES.PRESCRIPTION_DISPENSED, rx)
   } catch (err) { next(err) }
 }

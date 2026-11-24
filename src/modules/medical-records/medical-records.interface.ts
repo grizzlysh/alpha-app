@@ -1,5 +1,5 @@
 import { Request } from 'express'
-import { UpdateMedicalRecordInput, CreateAllergyInput, CreateVisitInput, UpdateVisitInput } from './medical-records.validation'
+import { UpdateMedicalRecordInput, CreateAllergyInput, UpdateAllergyInput, CreateVisitInput, UpdateVisitInput } from './medical-records.validation'
 
 export interface MedicalRecordResponse {
   uuid: string
@@ -38,7 +38,7 @@ export interface MedicalVisitResponse {
   bloodPressure: string | null
   temperatureCelsius: number | null
   pulsePerMinute: number | null
-  prescription: { uuid: string; prescriptionNumber: string | null } | null
+  prescription: { uuid: string; prescriptionNumber: string | null; status: string } | null
   doctor: { uuid: string; name: string } | null
   createdAt: Date
   updatedAt: Date
@@ -56,6 +56,11 @@ export interface UpdateMedicalRecordRequest extends Request {
 export interface CreateAllergyRequest extends Request {
   params: { customer_uuid: string }
   body: CreateAllergyInput
+}
+
+export interface UpdateAllergyRequest extends Request {
+  params: { customer_uuid: string; allergy_uuid: string }
+  body: UpdateAllergyInput
 }
 
 export interface DeleteAllergyRequest extends Request {

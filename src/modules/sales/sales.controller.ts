@@ -27,6 +27,8 @@ import {
   sendPaginated,
 } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
+import { saleActorOf } from '@utils/saleActor'
+
 
 export const getSales = async (
   req: GetSalesRequest,
@@ -71,7 +73,7 @@ export const createSale = async (
     const sale = await SaleService.createSale(
       req.body as any,
       req.user!.pharmacyId!,
-      req.user!.id
+      saleActorOf(req)
     )
 
     sendCreated(res, MESSAGE_CODES.SALE_CREATED, sale)
@@ -90,7 +92,7 @@ export const updateSale = async (
       parseUuid(req.params.sale_uuid),
       req.body as any,
       req.user!.pharmacyId!,
-      req.user!.id
+      saleActorOf(req)
     )
 
     sendSuccess(res, MESSAGE_CODES.SALE_UPDATED, sale)
@@ -109,7 +111,7 @@ export const completeSale = async (
       parseUuid(req.params.sale_uuid),
       req.body as any,
       req.user!.pharmacyId!,
-      req.user!.id
+      saleActorOf(req)
     )
 
     sendSuccess(res, MESSAGE_CODES.SALE_COMPLETED, sale)

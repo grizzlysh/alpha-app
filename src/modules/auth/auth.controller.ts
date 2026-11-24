@@ -83,7 +83,8 @@ export const refresh = async (
 
     res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS)
 
-    const response: RefreshTokenResponse = { accessToken: result.accessToken, refreshToken: result.refreshToken }
+    // The refresh token only travels in the httpOnly cookie, never in the body.
+    const response: RefreshTokenResponse = { accessToken: result.accessToken }
 
     sendSuccess(res, MESSAGE_CODES.TOKEN_REFRESHED, response)
   } catch (err) {

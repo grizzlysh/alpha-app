@@ -64,6 +64,7 @@ export interface PrescriptionResponse {
   customer: { uuid: string; name: string }
   doctor: { uuid: string; name: string; licenseNumber: string | null; clinicName: string | null } | null
   sale: { uuid: string; saleNumber: string } | null
+  medicalVisit: { uuid: string; visitDate: Date; diagnosis: string | null } | null
   details: PrescriptionDetailResponse[]
 }
 

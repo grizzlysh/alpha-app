@@ -1,0 +1,45 @@
+-- Indexes for tenant-scoped lists, date-range reports and FK joins.
+-- Postgres does not index foreign keys automatically.
+
+CREATE INDEX "inv_stock_details_stock_id_expiry_date_idx" ON "inv_stock_details"("stock_id", "expiry_date");
+CREATE INDEX "inv_stock_details_invoice_detail_id_idx" ON "inv_stock_details"("invoice_detail_id");
+CREATE INDEX "inv_stock_movements_pharmacy_id_created_at_idx" ON "inv_stock_movements"("pharmacy_id", "created_at");
+CREATE INDEX "inv_stock_movements_stock_detail_id_created_at_idx" ON "inv_stock_movements"("stock_detail_id", "created_at");
+CREATE INDEX "inv_stock_movements_medicine_id_idx" ON "inv_stock_movements"("medicine_id");
+CREATE INDEX "inv_stock_reservations_stock_detail_id_idx" ON "inv_stock_reservations"("stock_detail_id");
+CREATE INDEX "inv_stock_reservations_sale_id_idx" ON "inv_stock_reservations"("sale_id");
+CREATE INDEX "mst_business_licenses_pharmacy_id_idx" ON "mst_business_licenses"("pharmacy_id");
+CREATE INDEX "mst_customers_pharmacy_id_customer_type_idx" ON "mst_customers"("pharmacy_id", "customer_type");
+CREATE INDEX "mst_distributors_pharmacy_id_idx" ON "mst_distributors"("pharmacy_id");
+CREATE INDEX "mst_medicine_ingredients_medicine_id_idx" ON "mst_medicine_ingredients"("medicine_id");
+CREATE INDEX "mst_medicines_pharmacy_id_idx" ON "mst_medicines"("pharmacy_id");
+CREATE INDEX "mst_medicines_type_id_idx" ON "mst_medicines"("type_id");
+CREATE INDEX "mst_placements_user_id_pharmacy_id_idx" ON "mst_placements"("user_id", "pharmacy_id");
+CREATE INDEX "mst_placements_pharmacy_id_idx" ON "mst_placements"("pharmacy_id");
+CREATE INDEX "mst_practice_licenses_placement_id_idx" ON "mst_practice_licenses"("placement_id");
+CREATE INDEX "mst_roles_pharmacy_id_idx" ON "mst_roles"("pharmacy_id");
+CREATE INDEX "mst_user_tokens_user_id_idx" ON "mst_user_tokens"("user_id");
+CREATE INDEX "sys_idempotency_keys_expires_at_idx" ON "sys_idempotency_keys"("expires_at");
+CREATE INDEX "trx_invoice_details_invoice_id_idx" ON "trx_invoice_details"("invoice_id");
+CREATE INDEX "trx_invoice_payment_history_invoice_payment_id_idx" ON "trx_invoice_payment_history"("invoice_payment_id");
+CREATE INDEX "trx_invoice_payments_invoice_id_idx" ON "trx_invoice_payments"("invoice_id");
+CREATE INDEX "trx_invoices_pharmacy_id_invoice_date_idx" ON "trx_invoices"("pharmacy_id", "invoice_date");
+CREATE INDEX "trx_invoices_purchase_order_id_idx" ON "trx_invoices"("purchase_order_id");
+CREATE INDEX "trx_medical_record_allergies_medical_record_id_idx" ON "trx_medical_record_allergies"("medical_record_id");
+CREATE INDEX "trx_medical_visits_medical_record_id_visit_date_idx" ON "trx_medical_visits"("medical_record_id", "visit_date");
+CREATE INDEX "trx_prescription_details_prescription_id_idx" ON "trx_prescription_details"("prescription_id");
+CREATE INDEX "trx_prescriptions_pharmacy_id_prescribed_at_idx" ON "trx_prescriptions"("pharmacy_id", "prescribed_at");
+CREATE INDEX "trx_prescriptions_customer_id_idx" ON "trx_prescriptions"("customer_id");
+CREATE INDEX "trx_purchase_order_details_purchase_order_id_idx" ON "trx_purchase_order_details"("purchase_order_id");
+CREATE INDEX "trx_purchase_orders_pharmacy_id_ordered_at_idx" ON "trx_purchase_orders"("pharmacy_id", "ordered_at");
+CREATE INDEX "trx_sale_details_sale_id_idx" ON "trx_sale_details"("sale_id");
+CREATE INDEX "trx_sale_details_stock_detail_id_idx" ON "trx_sale_details"("stock_detail_id");
+CREATE INDEX "trx_sale_payment_history_sale_payment_id_idx" ON "trx_sale_payment_history"("sale_payment_id");
+CREATE INDEX "trx_sale_payments_sale_id_idx" ON "trx_sale_payments"("sale_id");
+CREATE INDEX "trx_sales_pharmacy_id_sold_at_idx" ON "trx_sales"("pharmacy_id", "sold_at");
+CREATE INDEX "trx_sales_pharmacy_id_status_idx" ON "trx_sales"("pharmacy_id", "status");
+CREATE INDEX "trx_sales_customer_id_idx" ON "trx_sales"("customer_id");
+CREATE INDEX "trx_stock_disposal_details_stock_disposal_id_idx" ON "trx_stock_disposal_details"("stock_disposal_id");
+CREATE INDEX "trx_stock_disposals_pharmacy_id_disposed_at_idx" ON "trx_stock_disposals"("pharmacy_id", "disposed_at");
+CREATE INDEX "trx_stock_return_details_stock_return_id_idx" ON "trx_stock_return_details"("stock_return_id");
+CREATE INDEX "trx_stock_returns_pharmacy_id_returned_at_idx" ON "trx_stock_returns"("pharmacy_id", "returned_at");

@@ -46,6 +46,7 @@ const PERMISSIONS = [
   { module: 'sales',              action: 'create' },
   { module: 'sales',              action: 'update' },
   { module: 'sales',              action: 'delete' },
+  { module: 'sales',             action: 'override_price' },
   { module: 'stock_return',       action: 'read' },
   { module: 'stock_return',       action: 'create' },
   { module: 'stock_return',       action: 'update' },
@@ -229,7 +230,6 @@ async function main() {
     { key: 'MAX_LOGIN_ATTEMPTS',          value: '5',                      dataType: DataType.NUMBER,  description: 'Maximum consecutive failed login attempts before lockout' },
     { key: 'SESSION_TIMEOUT_MINUTES',     value: '480',                    dataType: DataType.NUMBER,  description: 'Access token lifetime in minutes (8 hours)' },
     { key: 'PASSWORD_MIN_LENGTH',         value: '8',                      dataType: DataType.NUMBER,  description: 'Minimum password length required for all users' },
-    { key: 'ALLOW_EXPIRED_MEDICINE_SALE', value: 'false',                  dataType: DataType.BOOLEAN, description: 'Allow pharmacies to sell medicines past their expiry date' },
     { key: 'MAINTENANCE_MODE',            value: 'false',                  dataType: DataType.BOOLEAN, description: 'When true, only platform admins can access the system' },
   ]
   for (const sp of systemParams) {

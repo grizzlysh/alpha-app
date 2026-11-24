@@ -12,6 +12,8 @@ const prescriptionDetailSchema = z.object({
 export const createPrescriptionSchema = z.object({
   customerUuid: z.string().uuid(),
   doctorUuid: z.string().uuid().optional(),
+  // The examination this prescription came out of, if any.
+  medicalVisitUuid: z.string().uuid().optional(),
   prescriptionNumber: z.string().max(100).optional(),
   prescribedAt: z.coerce.date(),
   notes: z.string().optional(),
@@ -51,8 +53,9 @@ const dispenseItemSchema = z.object({
   detailUuid: z.string().uuid(),
   dispensedQty: z.number().int().min(1),
   stockDetailUuid: z.string().uuid(),
-  sellingPrice: z.number().positive(),
-  originalPrice: z.number().min(0),
+  // Optional: the server prices from stock; a different price needs sales.override_price.
+  sellingPrice: z.number().positive().optional(),
+  originalPrice: z.number().min(0).optional(),
   discountPercentage: z.number().min(0).max(100).default(0),
   discountAmount: z.number().min(0).default(0),
 })
@@ -64,8 +67,9 @@ export const dispensePrescriptionSchema = z.object({
   discountAmount: z.number().min(0).default(0),
   ppnPercentage: z.number().min(0).max(100).default(0),
   ppnAmount: z.number().min(0).default(0),
-  totalAmount: z.number().min(0),
-  grandTotal: z.number().min(0),
+  // Computed by the server; accepted for backward compatibility and ignored.
+  totalAmount: z.number().min(0).optional(),
+  grandTotal: z.number().min(0).optional(),
   description: z.string().optional(),
   payment: z.object({
     paymentMethod: z.enum(['CASH', 'TRANSFER', 'DEBIT', 'CREDIT_CARD', 'QRIS']),
