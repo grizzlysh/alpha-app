@@ -140,6 +140,10 @@ export const PERMISSIONS = {
   // medical records
   MEDICAL_RECORDS_READ: 'medical_records.read',
   MEDICAL_RECORDS_WRITE: 'medical_records.write',
+  EXAMINATIONS_READ: 'examinations.read',
+  EXAMINATIONS_CHECKIN: 'examinations.checkin',
+  EXAMINATIONS_PERFORM: 'examinations.perform',
+  EXAMINATIONS_TRIAGE: 'examinations.triage',
 
   // dashboard
   DASHBOARD_READ: 'dashboard.read',

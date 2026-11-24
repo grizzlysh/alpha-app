@@ -1054,6 +1054,42 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Allergy record removed successfully',
     id: 'Data alergi berhasil dihapus',
   },
+  EXAMINATION_QUEUE_FETCHED: {
+    en: 'Examination queue fetched',
+    id: 'Antrean pemeriksaan berhasil diambil',
+  },
+  EXAMINATION_FETCHED: {
+    en: 'Examination fetched',
+    id: 'Data pemeriksaan berhasil diambil',
+  },
+  EXAMINATION_CHECKED_IN: {
+    en: 'Patient added to the queue',
+    id: 'Pasien berhasil didaftarkan ke antrean',
+  },
+  EXAMINATION_STARTED: {
+    en: 'Examination started',
+    id: 'Pemeriksaan dimulai',
+  },
+  EXAMINATION_TRIAGED: {
+    en: 'Vital signs saved',
+    id: 'Tanda vital berhasil disimpan',
+  },
+  EXAMINATION_SAVED: {
+    en: 'Examination saved',
+    id: 'Pemeriksaan berhasil disimpan',
+  },
+  EXAMINATION_COMPLETED: {
+    en: 'Examination completed',
+    id: 'Pemeriksaan selesai',
+  },
+  EXAMINATION_CANCELLED: {
+    en: 'Examination cancelled',
+    id: 'Pemeriksaan dibatalkan',
+  },
+  EXAMINATION_ALLERGY_CHECKED: {
+    en: 'Allergy check done',
+    id: 'Pengecekan alergi selesai',
+  },
   MEDICAL_ALLERGY_UPDATED: {
     en: 'Allergy record updated successfully',
     id: 'Data alergi berhasil diperbarui',

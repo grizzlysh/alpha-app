@@ -20,13 +20,16 @@ export const updateAllergySchema = createAllergySchema.partial()
 export const createVisitSchema = z.object({
   visitDate: z.string().datetime(),
   chiefComplaint: z.string().trim().optional(),
+  findings: z.string().trim().optional(),
   diagnosis: z.string().trim().optional(),
+  advice: z.string().trim().optional(),
   notes: z.string().trim().optional(),
   weightKg: z.number().positive().optional(),
   heightCm: z.number().positive().optional(),
   bloodPressure: z.string().trim().optional(),
   temperatureCelsius: z.number().optional(),
   pulsePerMinute: z.number().int().positive().optional(),
+  oxygenSaturation: z.number().int().min(50).max(100).optional(),
   // null unlinks the prescription on update
   prescriptionUuid: z.string().uuid().nullable().optional(),
   doctorUuid: z.string().uuid().optional(),

@@ -2,7 +2,7 @@ import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
-export type DocType = 'PO' | 'INV' | 'SL' | 'SR' | 'SD' | 'MR'
+export type DocType = 'PO' | 'INV' | 'SL' | 'SR' | 'SD' | 'MR' | 'RX'
 
 // Maps DocType to the DB column name holding the unique document number.
 const DOC_NUMBER_FIELD: Record<DocType, string> = {
@@ -12,6 +12,7 @@ const DOC_NUMBER_FIELD: Record<DocType, string> = {
   SR: 'return_number',
   SD: 'disposal_number',
   MR: 'number',
+  RX: 'prescription_number',
 }
 
 /**
@@ -51,12 +52,42 @@ interface GenerateDocNumberOptions {
   pharmacyCode: string
 }
 
-const getTimezone = async (): Promise<string> => {
+export const getTimezone = async (): Promise<string> => {
   const param = await prisma.systemParameter.findUnique({
     where: { key: 'DEFAULT_TIMEZONE' },
     select: { value: true },
   })
   return param?.value ?? 'UTC'
+}
+
+/** Start/end of "today" in the configured timezone, plus its yyyyMMdd key. */
+export const todayRange = async (): Promise<{ startOfDay: Date; endOfDay: Date; dateKey: string }> => {
+  const dt = DateTime.now().setZone(await getTimezone())
+  return {
+    startOfDay: dt.startOf('day').toUTC().toJSDate(),
+    endOfDay: dt.endOf('day').toUTC().toJSDate(),
+    dateKey: dt.toFormat('yyyyMMdd'),
+  }
+}
+
+/**
+ * Atomically draws the next value of a per-pharmacy, per-day counter.
+ * `seed` is the value used when the day's row does not exist yet.
+ */
+export const nextDailySequence = async (
+  pharmacyId: number,
+  type: string,
+  dateKey: string,
+  seed = 1
+): Promise<number> => {
+  const rows = await prisma.$queryRaw<{ last_value: number }[]>`
+    INSERT INTO "sys_doc_sequences" ("pharmacy_id", "type", "date_key", "last_value", "updated_at")
+    VALUES (${pharmacyId}, ${type}, ${dateKey}, ${seed}, NOW())
+    ON CONFLICT ("pharmacy_id", "type", "date_key")
+    DO UPDATE SET "last_value" = "sys_doc_sequences"."last_value" + 1, "updated_at" = NOW()
+    RETURNING "last_value"
+  `
+  return Number(rows[0].last_value)
 }
 
 const countExisting = async (type: DocType, pharmacyId: number, gte: Date, lte: Date): Promise<number> => {
@@ -68,6 +99,7 @@ const countExisting = async (type: DocType, pharmacyId: number, gte: Date, lte: 
     case 'SR': return prisma.stockReturn.count({ where })
     case 'SD': return prisma.stockDisposal.count({ where })
     case 'MR': return prisma.medicalRecord.count({ where })
+    case 'RX': return prisma.prescription.count({ where: { ...where, prescriptionNumber: { startsWith: 'RX-' } } })
   }
 }
 
@@ -87,14 +119,7 @@ export const generateDocNumber = async (
   // so documents issued before this counter existed are not re-numbered.
   const existing = await countExisting(type, pharmacyId, startOfDay, endOfDay)
 
-  const rows = await prisma.$queryRaw<{ last_value: number }[]>`
-    INSERT INTO "sys_doc_sequences" ("pharmacy_id", "type", "date_key", "last_value", "updated_at")
-    VALUES (${pharmacyId}, ${type}, ${dateStr}, ${existing + 1}, NOW())
-    ON CONFLICT ("pharmacy_id", "type", "date_key")
-    DO UPDATE SET "last_value" = "sys_doc_sequences"."last_value" + 1, "updated_at" = NOW()
-    RETURNING "last_value"
-  `
-  const next = Number(rows[0].last_value)
+  const next = await nextDailySequence(pharmacyId, type, dateStr, existing + 1)
 
   const seq = String(next).padStart(3, '0')
 

@@ -41,6 +41,15 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'The prescription belongs to a different patient': 'Resep ini milik pasien lain',
   'The prescription is already linked to another visit': 'Resep ini sudah terhubung ke kunjungan lain',
   'This visit already has a prescription': 'Kunjungan ini sudah memiliki resep',
+  'This patient is already in the examination queue': 'Pasien ini sudah ada di antrean pemeriksaan',
+  'Only waiting patients can be called in': 'Hanya pasien yang sedang menunggu yang bisa dipanggil',
+  'Choose the examining doctor': 'Pilih dokter yang memeriksa',
+  'This patient has just been called in by someone else': 'Pasien ini baru saja dipanggil oleh pengguna lain',
+  'The examination is not in progress': 'Pemeriksaan ini tidak sedang berlangsung',
+  'Vital signs can only be recorded before the examination is finished': 'Tanda vital hanya bisa dicatat sebelum pemeriksaan selesai',
+  'The examination was changed by someone else, please refresh': 'Pemeriksaan ini baru diubah pengguna lain, silakan muat ulang',
+  'Only waiting or ongoing examinations can be cancelled': 'Hanya pemeriksaan yang menunggu atau berlangsung yang bisa dibatalkan',
+  'Invalid date': 'Tanggal tidak valid',
   'The visit belongs to a different patient': 'Kunjungan ini milik pasien lain',
   'Purchase order not found': 'Surat pesanan tidak ditemukan',
   'Role not found': 'Peran tidak ditemukan',
@@ -148,6 +157,11 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
  * originals embed internal UUIDs that mean nothing to a cashier.
  */
 export const PATTERN_TRANSLATIONS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) => string; id: (m: RegExpMatchArray) => string }> = [
+  {
+    pattern: /^Allergy warning: (.+)$/,
+    en: (m) => `Allergy warning: ${m[1]}. Confirm to continue.`,
+    id: (m) => `Peringatan alergi: ${m[1]}. Konfirmasi untuk melanjutkan.`,
+  },
   {
     pattern: /^Insufficient stock for (.+): stock changed, please refresh$/,
     en: (m) => `Stock for ${m[1]} just changed. Refresh and try again.`,

@@ -7,7 +7,8 @@ import { MESSAGE_CODES, MessageCode } from '@constants/messageCodes'
 import { HTTP_STATUS } from '@constants/httpStatus'
 import { MESSAGES } from '@constants/messages'
 import { translateMessage } from '@constants/errorTranslations'
-import { fieldLabel } from '@utils/zodErrors'
+import { ZodError } from 'zod'
+import { fieldLabel, formatZodErrors } from '@utils/zodErrors'
 
 type Bilingual = { en: string; id: string }
 
@@ -33,13 +34,16 @@ export const errorHandler = (
   }
 
   // ── Validation Exception ────────────────────────────
-  if (err instanceof ValidationException) {
+  // Controllers that call schema.parse() directly throw a raw ZodError; it is
+  // still a client mistake (422), not a server fault.
+  if (err instanceof ValidationException || err instanceof ZodError) {
+    const errors = err instanceof ZodError ? formatZodErrors(err) : err.errors
     res.status(HTTP_STATUS.UNPROCESSABLE).json({
       success: false,
       code: MESSAGE_CODES.VALIDATION_ERROR,
-      message: summarizeValidation(err.errors),
+      message: summarizeValidation(errors),
       data: null,
-      errors: err.errors,
+      errors,
       meta: null,
     })
     return

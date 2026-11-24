@@ -31,13 +31,19 @@ export interface MedicalVisitResponse {
   uuid: string
   visitDate: Date
   chiefComplaint: string | null
+  findings: string | null
   diagnosis: string | null
+  advice: string | null
   notes: string | null
   weightKg: number | null
   heightCm: number | null
   bloodPressure: string | null
   temperatureCelsius: number | null
   pulsePerMinute: number | null
+  oxygenSaturation: number | null
+  triagedAt: Date | null
+  status: string
+  queueNumber: number | null
   prescription: { uuid: string; prescriptionNumber: string | null; status: string } | null
   doctor: { uuid: string; name: string } | null
   createdAt: Date
