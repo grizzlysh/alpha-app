@@ -312,6 +312,7 @@ model Pharmacy {
   doctors             Doctor[]
   medicalRecords      MedicalRecord[]
   medicalVisits       MedicalVisit[]
+  notifications       Notification[]
 
   @@map("mst_pharmacies")
 }
@@ -562,6 +563,10 @@ model User {
   invoicesSigned       Invoice[]       @relation("InvoiceSignedBy")
   stockReturnsSigned   StockReturn[]   @relation("StockReturnSignedBy")
   stockDisposalsSigned StockDisposal[] @relation("StockDisposalSignedBy")
+
+  // ── Background jobs & notifications ───────────────────
+  jobRunsTriggered  JobRun[]           @relation("JobRunTriggeredBy")
+  notificationReads NotificationRead[]
 
   @@map("mst_users")
 }
@@ -1744,4 +1749,92 @@ model IdempotencyKey {
 
   @@index([expiresAt])
   @@map("sys_idempotency_keys")
+}
+
+// ── SYS JOB RUNS ─────────────────────────────────────────
+// One row per execution of a background job (scheduled or started by hand).
+
+enum JobRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED // another instance held the job's lock
+}
+
+enum JobTrigger {
+  SCHEDULE
+  MANUAL
+}
+
+model JobRun {
+  id            Int          @id @default(autoincrement())
+  uuid          String       @unique @default(uuid())
+  name          String
+  status        JobRunStatus @default(RUNNING)
+  trigger       JobTrigger
+  startedAt     DateTime     @default(now()) @map("started_at")
+  finishedAt    DateTime?    @map("finished_at")
+  affected      Int          @default(0)
+  details       Json?
+  error         String?
+  triggeredById Int?         @map("triggered_by_id")
+
+  triggeredBy User? @relation("JobRunTriggeredBy", fields: [triggeredById], references: [id])
+
+  @@index([name, startedAt])
+  @@map("sys_job_runs")
+}
+
+// ── TRX NOTIFICATIONS ────────────────────────────────────
+// Daily per-pharmacy alerts. The text is rendered by the client from `type`
+// and `count`, so it follows the viewer's language. Staff only see a
+// notification when they hold its `permission`.
+
+enum NotificationType {
+  EXPIRING_BATCHES
+  EXPIRED_BATCHES
+  LOW_STOCK
+  OVERDUE_PAYABLES
+  OVERDUE_RECEIVABLES
+  LICENSE_EXPIRING
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model Notification {
+  id         Int                  @id @default(autoincrement())
+  uuid       String               @unique @default(uuid())
+  pharmacyId Int                  @map("pharmacy_id")
+  type       NotificationType
+  severity   NotificationSeverity
+  count      Int
+  data       Json?
+  link       String?
+  permission String?
+  dedupeKey  String               @map("dedupe_key")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  updatedAt  DateTime             @updatedAt @map("updated_at")
+
+  pharmacy Pharmacy           @relation(fields: [pharmacyId], references: [id])
+  reads    NotificationRead[]
+
+  @@unique([pharmacyId, dedupeKey])
+  @@index([pharmacyId, createdAt])
+  @@map("trx_notifications")
+}
+
+model NotificationRead {
+  notificationId Int      @map("notification_id")
+  userId         Int      @map("user_id")
+  readAt         DateTime @default(now()) @map("read_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@id([notificationId, userId])
+  @@map("trx_notification_reads")
 }

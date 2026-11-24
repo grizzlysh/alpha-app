@@ -1284,4 +1284,40 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: "This request is still being processed. Please wait a moment.",
     id: "Permintaan ini masih diproses. Mohon tunggu sebentar.",
   },
+
+  // ── Notifications ──────────────────────────────
+  NOTIFICATIONS_FETCHED: {
+    en: "Notifications retrieved successfully",
+    id: "Notifikasi berhasil diambil",
+  },
+  NOTIFICATION_MARKED_READ: {
+    en: "Notification marked as read",
+    id: "Notifikasi ditandai sudah dibaca",
+  },
+  NOTIFICATIONS_ALL_MARKED_READ: {
+    en: "All notifications marked as read",
+    id: "Semua notifikasi ditandai sudah dibaca",
+  },
+  NOTIFICATION_NOT_FOUND: {
+    en: "Notification not found",
+    id: "Notifikasi tidak ditemukan",
+  },
+
+  // ── Background jobs ────────────────────────────
+  JOBS_FETCHED: {
+    en: "Background jobs retrieved successfully",
+    id: "Daftar job latar belakang berhasil diambil",
+  },
+  JOB_RUNS_FETCHED: {
+    en: "Job runs retrieved successfully",
+    id: "Riwayat job berhasil diambil",
+  },
+  JOB_RUN_FINISHED: {
+    en: "Job run finished",
+    id: "Job selesai dijalankan",
+  },
+  JOB_NOT_FOUND: {
+    en: "Background job not found",
+    id: "Job latar belakang tidak ditemukan",
+  },
 }

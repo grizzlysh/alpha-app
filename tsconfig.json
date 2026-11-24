@@ -24,7 +24,8 @@
       "@utils": ["src/utils/index.ts"],
       "@utils/*": ["src/utils/*"],
       "@entity/*": ["src/entity/*"],
-      "@types/*": ["src/types/*"]
+      "@types/*": ["src/types/*"],
+      "@jobs/*": ["src/jobs/*"]
     }
   },
   "include": ["src/**/*"],

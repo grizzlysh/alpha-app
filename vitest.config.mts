@@ -18,6 +18,7 @@ export default defineConfig({
       '@interfaces': src('interfaces'),
       '@entity': src('entity'),
       '@types': src('types'),
+      '@jobs': src('jobs'),
     },
   },
   test: {
