@@ -98,6 +98,8 @@ const PERMISSIONS = [
   { module: 'system_parameters',  action: 'update' },
   { module: 'settings',           action: 'read' },
   { module: 'settings',           action: 'update' },
+  { module: 'shifts',             action: 'read' },
+  { module: 'shifts',             action: 'manage' },
   { module: 'dashboard',          action: 'read' },
   { module: 'dashboard',          action: 'advanced' },
 ]
@@ -132,19 +134,21 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'examinations.read', 'examinations.checkin',
     'reports.read', 'reports.export',
     'business_parameters.read', 'pharmacies.read', 'licenses.read',
+    'shifts.read', 'shifts.manage',
     'dashboard.read', 'dashboard.advanced',
   ),
 
   HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
 
   // Pharmacists run the queue but don't examine patients (that's the doctor's job).
-  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters').filter((k) => k !== 'examinations.perform'),
+  PHARMACIST: excluded('users', 'roles', 'permissions', 'pharmacies', 'system_parameters').filter((k) => k !== 'examinations.perform' && k !== 'shifts.manage'),
 
   CASHIER: only(
     'customers.read', 'customers.create', 'customers.update',
     'medicines.read',
     'stock.read',
     'sales.read', 'sales.create', 'sales.update', 'sales.delete',
+    'shifts.read',
     'prescriptions.read',
     'doctors.read',
     'storage.read',

@@ -38,6 +38,7 @@ export const as = (token: string) => ({
   get: (url: string) => api.get(url).set('Authorization', `Bearer ${token}`),
   post: (url: string, body?: object) => api.post(url).set('Authorization', `Bearer ${token}`).send(body ?? {}),
   put: (url: string, body?: object) => api.put(url).set('Authorization', `Bearer ${token}`).send(body ?? {}),
+  patch: (url: string, body?: object) => api.patch(url).set('Authorization', `Bearer ${token}`).send(body ?? {}),
   delete: (url: string) => api.delete(url).set('Authorization', `Bearer ${token}`),
 })
 

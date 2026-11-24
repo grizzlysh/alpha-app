@@ -42,6 +42,7 @@ import catalogRoutes from '@modules/catalog/catalog.routes'
 import dataTransferRoutes from '@modules/data-transfer/data-transfer.routes'
 import notificationRoutes from '@modules/notifications/notifications.routes'
 import jobRoutes from '@modules/jobs/jobs.routes'
+import shiftRoutes from '@modules/shifts/shifts.routes'
 
 
 
@@ -101,6 +102,7 @@ app.use('/api/stock', stockRoutes)
 app.use('/api/stock-returns', stockReturnRoutes)
 app.use('/api/stock-disposals', stockDisposalRoutes)
 app.use('/api/sales', salesRoutes)
+app.use('/api/shifts', shiftRoutes)
 app.use('/api/stock-movements', stockMovementRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/dashboard', dashboardRoutes)

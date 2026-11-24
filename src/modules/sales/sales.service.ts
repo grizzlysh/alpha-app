@@ -17,6 +17,7 @@ import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 import { assertRestrictedSaleLimit } from '@utils/orderLetter'
+import { getShiftSettings, shiftForMoney } from '@utils/cashierShift'
 import { Decimal } from '@prisma/client/runtime/library'
 
 // ── Helpers ───────────────────────────────────────────
@@ -354,6 +355,8 @@ interface SaleContext {
   creditPaymentDays: number
   ppnPercentage: Decimal
   maxDiscountPercentage: Decimal
+  /** Cashier shifts are on: money can only be taken inside an open shift. */
+  shiftEnabled: boolean
 }
 
 const HUNDRED = new Decimal(100)
@@ -364,11 +367,12 @@ const loadSaleContext = async (pharmacyId: number): Promise<SaleContext> => {
   const param = (key: string) =>
     prisma.businessParameter.findUnique({ where: { pharmacyId_key: { pharmacyId, key } }, select: { value: true } })
 
-  const [allowFefoParam, creditDaysParam, ppnParam, maxDiscountParam] = await Promise.all([
+  const [allowFefoParam, creditDaysParam, ppnParam, maxDiscountParam, shift] = await Promise.all([
     param('ALLOW_FEFO_OVERRIDE'),
     param('CREDIT_PAYMENT_DAYS'),
     param('PPN_PERCENTAGE_SELL'),
     param('MAX_DISCOUNT_PERCENTAGE'),
+    getShiftSettings(pharmacyId),
   ])
 
   const decimalOr = (raw: string | undefined, fallback: number): Decimal => {
@@ -382,6 +386,7 @@ const loadSaleContext = async (pharmacyId: number): Promise<SaleContext> => {
     ppnPercentage: decimalOr(ppnParam?.value, 0),
     // Missing parameter = no discount without override permission.
     maxDiscountPercentage: decimalOr(maxDiscountParam?.value, 0),
+    shiftEnabled: shift.enabled,
   }
 }
 
@@ -616,7 +621,8 @@ const createSalePaymentRecord = async (
   grandTotal: Decimal,
   payment: CreateSaleInput['payment'],
   soldAt: Date,
-  userId: number
+  userId: number,
+  shiftId: number | null
 ): Promise<void> => {
   if (saleType === SaleType.CASH) {
     await tx.salePayment.create({
@@ -632,6 +638,7 @@ const createSalePaymentRecord = async (
             paymentMethod: payment!.paymentMethod,
             paymentDate: soldAt,
             description: payment?.description,
+            shiftId,
             createdById: userId,
           },
         },
@@ -816,6 +823,8 @@ export const createSale = async (
     const isCashCompleted = !data.isPending && saleType === SaleType.CASH
     const soldAt = new Date()
     const dueDate = data.isPending ? undefined : dueDateFor(saleType, soldAt, ctx.creditPaymentDays)
+    // A held sale takes no money yet; it joins a shift when it is completed.
+    const shiftId = data.isPending ? null : await shiftForMoney(tx, pharmacyId, userId, ctx.shiftEnabled)
 
     // ── Create Sale ───────────────────────────────
     const sale = await tx.sale.create({
@@ -830,6 +839,7 @@ export const createSale = async (
         paidAmount: isCashCompleted ? totals.grandTotal : new Decimal(0),
         dueDate,
         soldAt,
+        shiftId,
         description: data.description,
         createdById: userId,
         details: { create: lines.map(stripDraft) },
@@ -862,7 +872,7 @@ export const createSale = async (
       }
     } else {
       await deductStockForSale(tx, lines, sale.details.map((d) => d.id), pharmacyId, userId)
-      await createSalePaymentRecord(tx, sale.id, saleType, totals.grandTotal, data.payment, soldAt, userId)
+      await createSalePaymentRecord(tx, sale.id, saleType, totals.grandTotal, data.payment, soldAt, userId, shiftId)
       if (prescriptionId && !data.prescription) {
         await syncPrescriptionDispensing(tx, prescriptionId, sale.id, lines, 1, userId)
       }
@@ -923,6 +933,7 @@ export const completeSale = async (
     const saleType = data.saleType ?? SaleType.CASH
     const soldAt = new Date()
     const dueDate = dueDateFor(saleType, soldAt, ctx.creditPaymentDays)
+    const shiftId = await shiftForMoney(tx, pharmacyId, userId, ctx.shiftEnabled)
 
     // ── Update sale + replace details ─────────────
     const updated = await tx.sale.update({
@@ -935,6 +946,7 @@ export const completeSale = async (
         ...totals,
         paidAmount: saleType === SaleType.CASH ? totals.grandTotal : new Decimal(0),
         soldAt,
+        shiftId,
         ...(dueDate && { dueDate }),
         description: data.description,
         updatedById: userId,
@@ -955,7 +967,7 @@ export const completeSale = async (
     }
 
     await deductStockForSale(tx, lines, updated.details.map((d) => d.id), pharmacyId, userId)
-    await createSalePaymentRecord(tx, existing.id, saleType, totals.grandTotal, data.payment, soldAt, userId)
+    await createSalePaymentRecord(tx, existing.id, saleType, totals.grandTotal, data.payment, soldAt, userId, shiftId)
     if (prescriptionId && !data.prescription) {
       await syncPrescriptionDispensing(tx, prescriptionId, existing.id, lines, 1, userId)
     }
@@ -1008,6 +1020,7 @@ export const cancelOrRefundSale = async (
             },
           },
         },
+        paidAmount: true,
         payment: {
           select: { id: true, paymentStatus: true },
         },
@@ -1095,6 +1108,12 @@ export const cancelOrRefundSale = async (
       }
     }
 
+    // Money paid back on a completed sale comes out of the current shift's drawer.
+    const paysBack = sale.status === SaleStatus.COMPLETED && sale.paidAmount.gt(0)
+    const refundShiftId = paysBack
+      ? await shiftForMoney(tx, pharmacyId, userId, (await getShiftSettings(pharmacyId, tx)).enabled)
+      : null
+
     // ── Update Sale Status ────────────────────────
     await tx.sale.update({
       where: { id: sale.id },
@@ -1102,6 +1121,7 @@ export const cancelOrRefundSale = async (
         status,
         description: data.description,
         paidAmount: new Decimal(0),
+        ...(refundShiftId && { refundShiftId }),
         updatedById: userId,
       },
     })
@@ -1281,6 +1301,7 @@ export const addPayment = async (
     const newPaymentStatus = newPaid >= totalAmount
       ? PaymentStatus.PAID
       : PaymentStatus.PARTIAL
+    const shiftId = await shiftForMoney(tx, pharmacyId, userId, (await getShiftSettings(pharmacyId, tx)).enabled)
 
     await tx.salePayment.update({
       where: { id: sale.payment.id },
@@ -1298,6 +1319,7 @@ export const addPayment = async (
         paymentMethod: data.paymentMethod,
         paymentDate: new Date(data.paymentDate),
         description: data.description,
+        shiftId,
         createdById: userId,
       },
     })
@@ -1353,10 +1375,11 @@ export const updatePaymentHistory = async (
       uuid: historyUuid,
       salePayment: { sale: { pharmacyId, deletedAt: null } },
     },
-    select: { id: true, salePaymentId: true },
+    select: { id: true, salePaymentId: true, shift: { select: { status: true } } },
   })
 
   if (!history) throw new NotFoundException('Payment record not found')
+  if (history.shift?.status === 'CLOSED') throw new BadRequestException('SHIFT_CLOSED_PAYMENT_LOCKED')
 
   await prisma.salePaymentHistory.update({
     where: { id: history.id },
@@ -1391,6 +1414,7 @@ export const deletePaymentHistory = async (
         id: true,
         amount: true,
         salePaymentId: true,
+        shift: { select: { status: true } },
         salePayment: {
           select: {
             id: true,
@@ -1402,6 +1426,7 @@ export const deletePaymentHistory = async (
     })
 
     if (!history) throw new NotFoundException('Payment record not found')
+    if (history.shift?.status === 'CLOSED') throw new BadRequestException('SHIFT_CLOSED_PAYMENT_LOCKED')
 
     const payment = history.salePayment
     const newPaid = Math.max(0, parseFloat(payment.paidAmount.toString()) - parseFloat(history.amount.toString()))

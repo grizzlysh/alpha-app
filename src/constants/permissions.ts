@@ -145,6 +145,10 @@ export const PERMISSIONS = {
   EXAMINATIONS_PERFORM: 'examinations.perform',
   EXAMINATIONS_TRIAGE: 'examinations.triage',
 
+  // cashier shifts
+  SHIFTS_READ: 'shifts.read',
+  SHIFTS_MANAGE: 'shifts.manage',
+
   // dashboard
   DASHBOARD_READ: 'dashboard.read',
   DASHBOARD_ADVANCED: 'dashboard.advanced',

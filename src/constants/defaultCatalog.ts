@@ -86,5 +86,9 @@ export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'NAME_DISPLAY_CASE',         value: 'UPPER', dataType: DataType.STRING,     description: 'How names are displayed and printed: UPPER, TITLE, LOWER or AS_TYPED' },
   { key: 'MEDICINE_NAME_FORMAT',      value: 'NAME_STRENGTH_SHAPE', dataType: DataType.STRING, description: 'How medicine names are put together: NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH or NAME_STRENGTH' },
   { key: 'RESTRICTED_SALE_LIMIT',     value: '10',    dataType: DataType.NUMBER,     description: 'Most pieces of one precursor or obat-obat tertentu medicine sold per sale without a prescription (0 = no limit)' },
+  { key: 'CASHIER_SHIFT_ENABLED',     value: 'false', dataType: DataType.BOOLEAN,    description: 'Cashiers open a shift with the drawer cash before selling and close it by counting the drawer' },
+  { key: 'CASHIER_SHIFT_OPENING_CASH', value: '0',    dataType: DataType.NUMBER,     description: 'Opening cash (float) suggested when a shift is opened' },
+  { key: 'CASHIER_SHIFT_BLIND_CLOSE', value: 'false', dataType: DataType.BOOLEAN,    description: 'When closing, the cashier counts the drawer without seeing the expected cash' },
+  { key: 'CASHIER_SHIFT_DIFFERENCE_TOLERANCE', value: '0', dataType: DataType.NUMBER, description: 'A cash difference larger than this (Rp) needs a note when the shift is closed' },
   { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
 ]

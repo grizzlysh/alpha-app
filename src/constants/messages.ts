@@ -1328,4 +1328,20 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: "Job settings saved",
     id: "Pengaturan job disimpan",
   },
+
+  // ── Cashier shifts ─────────────────────────────
+  SHIFT_FETCHED: { en: 'Shift fetched', id: 'Data shift berhasil diambil' },
+  SHIFTS_FETCHED: { en: 'Shifts fetched', id: 'Daftar shift berhasil diambil' },
+  SHIFT_OPENED: { en: 'Shift opened', id: 'Shift dibuka' },
+  SHIFT_CLOSED: { en: 'Shift closed', id: 'Shift ditutup' },
+  SHIFT_CASH_MOVEMENT_ADDED: { en: 'Cash movement recorded', id: 'Kas masuk/keluar dicatat' },
+  SHIFT_NOT_FOUND: { en: 'Shift not found', id: 'Shift tidak ditemukan' },
+  SHIFT_NOT_YOURS: { en: 'This is another cashier\'s shift', id: 'Shift ini milik kasir lain' },
+  SHIFT_DISABLED: { en: 'Cashier shifts are turned off for this pharmacy', id: 'Shift kasir tidak diaktifkan di apotek ini' },
+  SHIFT_NOT_OPEN: { en: 'Open your shift before taking payments', id: 'Buka shift terlebih dahulu sebelum menerima pembayaran' },
+  SHIFT_ALREADY_OPEN: { en: 'You already have an open shift', id: 'Anda masih memiliki shift yang terbuka' },
+  SHIFT_ALREADY_CLOSED: { en: 'This shift is already closed', id: 'Shift ini sudah ditutup' },
+  SHIFT_CASH_OUT_EXCEEDS: { en: 'The drawer does not hold that much cash', id: 'Uang di laci tidak mencukupi untuk jumlah ini' },
+  SHIFT_DIFFERENCE_NOTE_REQUIRED: { en: 'The counted cash differs from the expected amount: add a note', id: 'Uang terhitung berbeda dengan yang seharusnya: isi catatan penjelasan' },
+  SHIFT_CLOSED_PAYMENT_LOCKED: { en: 'This payment belongs to a closed shift and can no longer be changed', id: 'Pembayaran ini masuk shift yang sudah ditutup dan tidak bisa diubah lagi' },
 }
