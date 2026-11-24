@@ -3,6 +3,7 @@ import { prisma } from '@config/db'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { DEFAULT_MEDICINE_TYPES } from '@constants/defaultCatalog'
 import { CatalogImportInput } from './catalog.validation'
+import { buildMedicineName, getMedicineNameFormat, normalizeStrength, splitIngredient } from '@utils/medicineName'
 import { CatalogExport, CatalogImportResult, CatalogInvalidRow } from './catalog.interface'
 
 type Tx = Prisma.TransactionClient
@@ -27,11 +28,14 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
       where: live,
       select: {
         name: true,
+        baseName: true,
+        variant: true,
+        isCustomName: true,
         unit: true,
         shape: { select: { name: true } },
         type: { select: { name: true } },
         medicineClass: { select: { name: true } },
-        ingredients: { select: { name: true }, orderBy: { id: 'asc' } },
+        ingredients: { select: { name: true, strength: true }, orderBy: { id: 'asc' } },
       },
       orderBy: { name: 'asc' },
     }),
@@ -45,11 +49,14 @@ export async function exportCatalog(pharmacyId: number, db: Tx | typeof prisma =
     classes,
     medicines: medicines.map((m) => ({
       name: m.name,
+      baseName: m.baseName,
+      variant: m.variant,
+      isCustomName: m.isCustomName,
       unit: m.unit,
       shape: m.shape.name,
       type: m.type.name,
       class: m.medicineClass.name,
-      ingredients: m.ingredients.map((i) => i.name),
+      ingredients: m.ingredients,
     })),
   }
 }
@@ -78,20 +85,42 @@ export async function applyCatalog(
   input: CatalogImportInput
 ): Promise<CatalogImportResult> {
   const live = { where: { pharmacyId, deletedAt: null }, select: { id: true, name: true } }
+  const existingShapes = await tx.medicineShape.findMany(live)
+  const shapeName = new Map(existingShapes.map((s) => [key(s.name), s.name]))
+  const format = await getMedicineNameFormat(pharmacyId, tx)
   const [shapeIds, typeIds, classIds, medicineIds] = await Promise.all([
-    nameIndex(tx.medicineShape.findMany(live)),
+    nameIndex(Promise.resolve(existingShapes)),
     nameIndex(tx.medicineType.findMany(live)),
     nameIndex(tx.medicineClass.findMany(live)),
     nameIndex(tx.medicine.findMany(live)),
   ])
 
   // ── Validate medicine rows ── (names keep their typed case; matching ignores it)
+  // A structured row gets its full name here, with this pharmacy's format.
+  type Row = Omit<CatalogImportInput['medicines'][number], 'ingredients'> & {
+    ingredients: { name: string; strength: string | null }[]
+    isCustomName: boolean
+  }
   const invalid: CatalogInvalidRow[] = []
   const seen = new Set<string>()
-  const rows: CatalogImportInput['medicines'] = []
+  const rows: Row[] = []
   input.medicines.forEach((m, i) => {
-    const fail = (reason: CatalogInvalidRow['reason']) => invalid.push({ row: i + 1, name: m.name, reason })
-    const ingredients = m.ingredients.filter(Boolean)
+    const fail = (reason: CatalogInvalidRow['reason']) => invalid.push({ row: i + 1, name: m.name || m.baseName || '', reason })
+    const ingredients = m.ingredients
+      .map((x) => (typeof x === 'string' ? splitIngredient(x) : { name: x.name, strength: x.strength ? normalizeStrength(x.strength) : null }))
+      .filter((x) => x.name)
+    const isCustomName = m.isCustomName ?? !m.baseName
+    if (!isCustomName && m.shape) {
+      m = {
+        ...m,
+        name: buildMedicineName(format, {
+          baseName: m.baseName!,
+          strengths: ingredients.map((x) => x.strength),
+          shape: shapeName.get(key(m.shape)) ?? m.shape,
+          variant: m.variant,
+        }),
+      }
+    }
     if (!m.name) return fail('NAME_REQUIRED')
     if (!m.unit) return fail('UNIT_REQUIRED')
     if (!m.shape) return fail('SHAPE_REQUIRED')
@@ -99,7 +128,7 @@ export async function applyCatalog(
     if (!m.class) return fail('CLASS_REQUIRED')
     if (seen.has(key(m.name))) return fail('DUPLICATE_IN_FILE')
     seen.add(key(m.name))
-    rows.push({ ...m, ingredients })
+    rows.push({ ...m, ingredients, isCustomName })
   })
 
   // ── Classifications: listed ones plus any a medicine refers to (key → name as first written) ──
@@ -159,6 +188,9 @@ export async function applyCatalog(
       data: newMedicines.map((m) => ({
         ...by,
         name: m.name,
+        baseName: m.isCustomName ? null : (m.baseName ?? null),
+        variant: m.isCustomName ? null : (m.variant ?? null),
+        isCustomName: m.isCustomName,
         unit: m.unit,
         shapeId: shapeIds.get(key(m.shape))!,
         typeId: typeIds.get(key(m.type))!,
@@ -168,7 +200,7 @@ export async function applyCatalog(
     })
     const idByName = new Map(created.map((r) => [key(r.name), r.id]))
     const ingredients = newMedicines.flatMap((m) =>
-      m.ingredients.map((name) => ({ medicineId: idByName.get(key(m.name))!, name, createdById: userId }))
+      m.ingredients.map((x) => ({ medicineId: idByName.get(key(m.name))!, ...x, createdById: userId }))
     )
     if (ingredients.length) await tx.medicineIngredient.createMany({ data: ingredients })
   }

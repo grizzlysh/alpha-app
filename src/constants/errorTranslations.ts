@@ -86,6 +86,7 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Invoice has recorded payments and cannot be deleted': 'Faktur sudah ada pembayarannya dan tidak bisa dihapus',
   'Stock from this invoice has already been used and the invoice cannot be deleted': 'Stok dari faktur ini sudah terpakai (terjual, diretur, dimusnahkan, atau disesuaikan), jadi faktur tidak bisa dihapus',
   'Value must be one of UPPER, TITLE, LOWER, AS_TYPED': 'Pilihan harus UPPER, TITLE, LOWER, atau AS_TYPED',
+  'Value must be one of NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH, NAME_STRENGTH': 'Pilihan harus NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH, atau NAME_STRENGTH',
   'Medicine type with this name already exists': 'Nama jenis obat sudah terdaftar',
   'Medicine with this name already exists': 'Nama obat sudah terdaftar',
   'Pharmacy code already exists': 'Kode apotek sudah dipakai',
@@ -161,6 +162,11 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
  * originals embed internal UUIDs that mean nothing to a cashier.
  */
 export const PATTERN_TRANSLATIONS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) => string; id: (m: RegExpMatchArray) => string }> = [
+  {
+    pattern: /^This format would give several medicines the same name: (.+)$/,
+    en: (m) => `This format would give several medicines the same name: ${m[1]}`,
+    id: (m) => `Format ini membuat beberapa obat bernama sama: ${m[1]}. Bedakan dulu (misalnya dengan varian) sebelum mengganti format.`,
+  },
   {
     pattern: /^Medicine (shape|type|class) is still used by (\d+) medicine\(s\)$/,
     en: (m) => `This medicine ${m[1]} is still used by ${m[2]} medicine(s)`,

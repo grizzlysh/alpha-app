@@ -1,4 +1,4 @@
-import { NameCase } from '@constants/defaultCatalog'
+import { MedicineNameFormat, NameCase } from '@constants/defaultCatalog'
 import { Request } from 'express'
 import { PlatformRole, AppRole } from '@prisma/client'
 import { PharmacyItem } from '@interfaces/pharmacy.interface'
@@ -86,6 +86,8 @@ export interface CurrentPharmacyData {
   permissions: PermissionMap
   /** Display preference for names (business parameter NAME_DISPLAY_CASE). */
   nameCase: NameCase
+  /** How structured medicine names are put together (MEDICINE_NAME_FORMAT). */
+  medicineNameFormat: MedicineNameFormat
 }
 
 export interface LoginResponse {

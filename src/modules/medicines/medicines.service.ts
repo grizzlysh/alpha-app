@@ -12,12 +12,16 @@ import {
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
+import { buildMedicineName, combinedStrength, getMedicineNameFormat } from '@utils/medicineName'
 
 // ── Helpers ───────────────────────────────────────────
 
 const medicineSelect = {
   uuid: true,
   name: true,
+  baseName: true,
+  variant: true,
+  isCustomName: true,
   unit: true,
   barcode: true,
   status: true,
@@ -33,8 +37,32 @@ const medicineSelect = {
     select: { uuid: true, name: true }
   },
   ingredients: {
-    select: { uuid: true, name: true }
+    select: { uuid: true, name: true, strength: true },
+    orderBy: { id: 'asc' as const },
   },
+}
+
+type Ingredient = { name: string; strength: string | null }
+
+/**
+ * The stored name: typed as is for a custom name, otherwise built from the
+ * parts with the pharmacy's format (so "Amlodipin" + "10 mg" + "Tablet").
+ */
+const resolveName = async (
+  pharmacyId: number,
+  p: { isCustomName: boolean; name?: string | null; baseName?: string | null; variant?: string | null; shapeId: number; ingredients: Ingredient[] }
+): Promise<string> => {
+  if (p.isCustomName) return p.name!.trim()
+  const [format, shape] = await Promise.all([
+    getMedicineNameFormat(pharmacyId),
+    prisma.medicineShape.findUniqueOrThrow({ where: { id: p.shapeId }, select: { name: true } }),
+  ])
+  return buildMedicineName(format, {
+    baseName: p.baseName!,
+    strengths: p.ingredients.map((i) => i.strength),
+    shape: shape.name,
+    variant: p.variant,
+  })
 }
 
 const checkDuplicate = async (
@@ -77,6 +105,10 @@ const checkBarcode = async (barcode: string, pharmacyId: number, excludeUuid?: s
 const formatResponse = (m: Prisma.MedicineGetPayload<{ select: typeof medicineSelect }>): MedicineResponse => ({
   uuid: m.uuid,
   name: m.name,
+  baseName: m.baseName,
+  variant: m.variant,
+  isCustomName: m.isCustomName,
+  strength: combinedStrength(m.ingredients.map((i) => i.strength)),
   unit: m.unit,
   barcode: m.barcode,
   status: m.status,
@@ -193,7 +225,6 @@ export const createMedicine = async (
   userUuid: string,
   userId: number
 ): Promise<MedicineResponse> => {
-  await checkDuplicate(data.name, pharmacyId)
   if (data.barcode) await checkBarcode(data.barcode, pharmacyId)
 
   const { shapeId, typeId, medicineClassId } = await resolveMedicineRefs(
@@ -202,11 +233,17 @@ export const createMedicine = async (
     data.medicineClassUuid,
     pharmacyId
   )
+  const isCustomName = data.isCustomName ?? !data.baseName
+  const name = await resolveName(pharmacyId, { ...data, isCustomName, shapeId })
+  await checkDuplicate(name, pharmacyId)
 
   const medicine = await prisma.medicine.create({
     data: {
       pharmacyId,
-      name: data.name,
+      name,
+      baseName: isCustomName ? null : data.baseName!,
+      variant: isCustomName ? null : (data.variant ?? null),
+      isCustomName,
       shapeId,
       typeId,
       medicineClassId,
@@ -214,11 +251,8 @@ export const createMedicine = async (
       barcode: data.barcode ?? null,
       createdById: userId,
       ingredients: {
-        create: data.ingredients.map((name) => ({
-          name,
-          createdById: userId,
-        }))
-      }
+        create: data.ingredients.map((i) => ({ ...i, createdById: userId })),
+      },
     },
     select: medicineSelect,
   })
@@ -234,16 +268,21 @@ export const updateMedicine = async (
 ): Promise<MedicineResponse> => {
   const existing = await prisma.medicine.findFirst({
     where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true }
+    select: {
+      id: true,
+      name: true,
+      baseName: true,
+      variant: true,
+      isCustomName: true,
+      shapeId: true,
+      ingredients: { select: { name: true, strength: true }, orderBy: { id: 'asc' } },
+    },
   })
 
   if (!existing) {
     throw new NotFoundException('Medicine not found')
   }
 
-  if (data.name) {
-    await checkDuplicate(data.name, pharmacyId, uuid)
-  }
   if (data.barcode) await checkBarcode(data.barcode, pharmacyId, uuid)
 
   let shapeId: number | undefined
@@ -272,10 +311,27 @@ export const updateMedicine = async (
     medicineClassId = medicineClass?.id
   }
 
+  // Sending only `name` (as older clients do) switches to a custom name.
+  const isCustomName = data.isCustomName ?? (data.baseName ? false : data.name ? true : existing.isCustomName)
+  const baseName = data.baseName ?? existing.baseName ?? existing.name
+  const variant = data.variant !== undefined ? data.variant : existing.variant
+  const name = await resolveName(pharmacyId, {
+    isCustomName,
+    name: data.name ?? existing.name,
+    baseName,
+    variant,
+    shapeId: shapeId ?? existing.shapeId,
+    ingredients: data.ingredients ?? existing.ingredients,
+  })
+  if (name.toLowerCase() !== existing.name.toLowerCase()) await checkDuplicate(name, pharmacyId, uuid)
+
   const medicine = await prisma.medicine.update({
     where: { id: existing.id },
     data: {
-      ...(data.name && { name: data.name }),
+      name,
+      baseName: isCustomName ? null : baseName,
+      variant: isCustomName ? null : variant,
+      isCustomName,
       ...(shapeId && { shapeId }),
       ...(typeId && { typeId }),
       ...(medicineClassId && { medicineClassId }),
@@ -286,12 +342,9 @@ export const updateMedicine = async (
       ...(data.ingredients && {
         ingredients: {
           deleteMany: {},
-          create: data.ingredients.map((name) => ({
-            name,
-            createdById: userId,
-          }))
-        }
-      })
+          create: data.ingredients.map((i) => ({ ...i, createdById: userId })),
+        },
+      }),
     },
     select: medicineSelect,
   })

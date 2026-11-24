@@ -2,12 +2,17 @@
 // referenced by name, so a file exported at one branch imports cleanly at another.
 
 export interface CatalogMedicine {
+  /** The full name as shown. */
   name: string
+  /** Set for a structured name: the name part only. */
+  baseName: string | null
+  variant: string | null
+  isCustomName: boolean
   unit: string
   shape: string
   type: string
   class: string
-  ingredients: string[]
+  ingredients: { name: string; strength: string | null }[]
 }
 
 export interface CatalogExport {

@@ -64,6 +64,11 @@ export const NAME_CASES = ['UPPER', 'TITLE', 'LOWER', 'AS_TYPED'] as const
 export type NameCase = (typeof NAME_CASES)[number]
 export const NAME_DISPLAY_CASE_KEY = 'NAME_DISPLAY_CASE'
 
+/** How a structured medicine name is put together (the variant always comes last). */
+export const MEDICINE_NAME_FORMATS = ['NAME_STRENGTH_SHAPE', 'NAME_SHAPE_STRENGTH', 'NAME_STRENGTH'] as const
+export type MedicineNameFormat = (typeof MEDICINE_NAME_FORMATS)[number]
+export const MEDICINE_NAME_FORMAT_KEY = 'MEDICINE_NAME_FORMAT'
+
 export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'MARGIN_PERCENTAGE',         value: '20',    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
   { key: 'PPN_PERCENTAGE_SELL',       value: '11',    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
@@ -79,5 +84,6 @@ export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'LICENSE_ALERT_DAYS',        value: '30',    dataType: DataType.NUMBER,     description: 'Daily alert lists business and practice licenses expiring within this many days' },
   { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
   { key: 'NAME_DISPLAY_CASE',         value: 'UPPER', dataType: DataType.STRING,     description: 'How names are displayed and printed: UPPER, TITLE, LOWER or AS_TYPED' },
+  { key: 'MEDICINE_NAME_FORMAT',      value: 'NAME_STRENGTH_SHAPE', dataType: DataType.STRING, description: 'How medicine names are put together: NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH or NAME_STRENGTH' },
   { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
 ]

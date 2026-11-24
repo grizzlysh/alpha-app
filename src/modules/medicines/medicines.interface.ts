@@ -20,24 +20,25 @@ export interface MedicineUuidParam extends ParamsDictionary {
   medicine_uuid: string
 }
 
-export interface CreateMedicineBody {
+export interface MedicineIngredientBody {
   name: string
+  strength?: string | null
+}
+
+export interface CreateMedicineBody {
+  /** The full name; required only for a custom name. */
+  name?: string
+  baseName?: string
+  variant?: string | null
+  isCustomName?: boolean
   medicineShapeUuid: string
   medicineTypeUuid: string
   medicineClassUuid: string
   unit: string
-  ingredients: string[]
+  ingredients: (string | MedicineIngredientBody)[]
 }
 
-export interface UpdateMedicineBody {
-  name?: string
-  medicineShapeUuid?: string
-  medicineTypeUuid?: string
-  medicineClassUuid?: string
-  unit?: string
-  ingredients?: string[]
-  status?: RecordStatus
-}
+export type UpdateMedicineBody = Partial<CreateMedicineBody> & { status?: RecordStatus }
 
 // ── Typed Request Aliases ─────────────────────────────
 
@@ -77,6 +78,7 @@ export type DeleteMedicineRequest = Request<
 export interface MedicineIngredientResponse {
   uuid: string
   name: string
+  strength: string | null
 }
 
 export interface MedicineShapeResponse {
@@ -96,7 +98,13 @@ export interface MedicineClassResponse {
 
 export interface MedicineResponse {
   uuid: string
+  /** The name shown everywhere (built, or typed when isCustomName). */
   name: string
+  baseName: string | null
+  variant: string | null
+  isCustomName: boolean
+  /** The ingredients' strengths as shown in the name ("500/50 mg"). */
+  strength: string
   unit: string
   barcode: string | null
   status: RecordStatus
