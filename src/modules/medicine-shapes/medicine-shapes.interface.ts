@@ -7,7 +7,6 @@ import { RecordStatus } from '@prisma/client'
 export interface MedicineShapeQueryParams {
   search?: string
   status?: RecordStatus
-  isGlobal?: string
   sortBy?: 'name' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
   page?: string
@@ -21,7 +20,6 @@ export interface MedicineShapeUuidParam extends ParamsDictionary {
 export interface CreateMedicineShapeBody {
   name: string
   status: RecordStatus
-  pharmacyUuid?: string   // ← PLATFORM_ADMIN only, optional
 }
 
 export interface UpdateMedicineShapeBody {
@@ -67,8 +65,8 @@ export type DeleteMedicineShapeRequest = Request<
 export interface MedicineShapeResponse {
   uuid: string
   name: string
-  isGlobal: boolean
   status: RecordStatus
+  medicineCount: number
   createdAt: Date
   updatedAt: Date
 }
@@ -76,5 +74,4 @@ export interface MedicineShapeResponse {
 export interface MedicineShapeDropdownItem {
   uuid: string
   name: string
-  isGlobal: boolean
 }

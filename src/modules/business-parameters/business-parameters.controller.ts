@@ -2,15 +2,10 @@ import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as BusinessParameterService from './business-parameters.service'
 import {
-  businessParameterQuerySchema,
-  updateBusinessParameterSchema,
-} from './business-parameters.validation'
-import {
   GetBusinessParametersRequest,
   GetBusinessParameterRequest,
   UpdateBusinessParameterRequest,
 } from './business-parameters.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 
@@ -21,8 +16,7 @@ export const getBusinessParameters = async (
 ): Promise<void> => {
   try {
     const { data, meta } = await BusinessParameterService.getBusinessParameters(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query as any
     )
 
@@ -40,8 +34,7 @@ export const getBusinessParameter = async (
   try {
     const param = await BusinessParameterService.getBusinessParameterByUuid(
       parseUuid(req.params.business_parameter_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole
+      req.user!.pharmacyId!
     )
 
     sendSuccess(res, MESSAGE_CODES.PHARMACY_PARAMETERS_FETCHED, param)
@@ -59,8 +52,7 @@ export const updateBusinessParameter = async (
     const param = await BusinessParameterService.updateBusinessParameter(
       parseUuid(req.params.business_parameter_uuid),
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 

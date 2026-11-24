@@ -18,6 +18,7 @@ import {
   AllergyType,
   AllergySeverity,
 } from '@prisma/client'
+import { ensureBusinessParams, seedDefaultClassifications } from '../../src/utils/pharmacyDefaults'
 import bcrypt from 'bcryptjs'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -120,8 +121,6 @@ const PERMISSIONS = [
   { module: 'settings',           action: 'update' },
   { module: 'dashboard',          action: 'read' },
   { module: 'dashboard',          action: 'advanced' },
-  { module: 'sign',               action: 'standard' },
-  { module: 'sign',               action: 'full' },
 ]
 
 const all = PERMISSIONS.map((p) => `${p.module}.${p.action}`)
@@ -134,7 +133,26 @@ const only = (...keys: string[]) => keys
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   OWNER: all,
 
-  ADMIN: excluded('system_parameters', 'pharmacies'),
+  // Office staff: master data, purchasing and invoices, reports. No people or
+  // role management, no pricing parameters, no POS/returns, no stock changes.
+  ADMIN: only(
+    'medicine_shapes.read', 'medicine_shapes.create', 'medicine_shapes.update', 'medicine_shapes.delete',
+    'medicine_types.read', 'medicine_types.create', 'medicine_types.update', 'medicine_types.delete',
+    'medicine_classes.read', 'medicine_classes.create', 'medicine_classes.update', 'medicine_classes.delete',
+    'medicines.read', 'medicines.create', 'medicines.update', 'medicines.delete',
+    'distributors.read', 'distributors.create', 'distributors.update', 'distributors.delete',
+    'customers.read', 'customers.create', 'customers.update', 'customers.delete',
+    'doctors.read', 'doctors.create', 'doctors.update', 'doctors.delete',
+    'storage.read', 'storage.create', 'storage.update', 'storage.delete',
+    'stock.read', 'stock_movements.read',
+    'purchase_orders.read', 'purchase_orders.create', 'purchase_orders.update', 'purchase_orders.delete',
+    'invoices.read', 'invoices.create', 'invoices.update', 'invoices.delete', 'invoices.verify',
+    'sales.read', 'stock_return.read', 'stock_disposal.read', 'prescriptions.read',
+    'examinations.read', 'examinations.checkin',
+    'reports.read', 'reports.export',
+    'business_parameters.read', 'pharmacies.read', 'licenses.read',
+    'dashboard.read', 'dashboard.advanced',
+  ),
 
   HEAD_PHARMACIST: excluded('system_parameters', 'pharmacies'),
 
@@ -152,7 +170,6 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'medical_records.read',
     'examinations.read', 'examinations.checkin',
     'dashboard.read',
-    'sign.standard',
   ),
 
   DOCTOR: only(
@@ -483,7 +500,7 @@ async function main() {
   console.log('Creating roles...')
   const roleDefs: { name: string; type: AppRole; description: string; requiresLicense: boolean }[] = [
     { name: 'Owner',           type: AppRole.OWNER,           description: 'Pharmacy owner with full access',                                   requiresLicense: false },
-    { name: 'Admin',           type: AppRole.ADMIN,           description: 'Pharmacy administrator with full operational access',                requiresLicense: false },
+    { name: 'Admin',           type: AppRole.ADMIN,           description: 'Office staff: master data, purchasing, invoices and reports', requiresLicense: false },
     { name: 'Head Pharmacist', type: AppRole.HEAD_PHARMACIST, description: 'Senior licensed pharmacist with staff and license management access', requiresLicense: true  },
     { name: 'Pharmacist',      type: AppRole.PHARMACIST,      description: 'Licensed pharmacist with dispensing access',                         requiresLicense: true  },
     { name: 'Cashier',         type: AppRole.CASHIER,         description: 'Cashier with sales and patient access',                             requiresLicense: false },
@@ -592,38 +609,7 @@ async function main() {
 
   // ── 10. Business parameters ───────────────────────────────────────────────
   console.log('Creating business parameters...')
-  const businessParams = [
-    // Pricing
-    { key: 'MARGIN_PERCENTAGE',         value: '20',                    dataType: DataType.PERCENTAGE, description: 'Default selling price margin applied over purchase price' },
-    { key: 'PPN_PERCENTAGE_SELL',       value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage charged to patients on sales (output VAT)' },
-    { key: 'PPN_PERCENTAGE_BUY',        value: '11',                    dataType: DataType.PERCENTAGE, description: 'PPN percentage on purchases from distributors (input VAT)' },
-    { key: 'MAX_DISCOUNT_PERCENTAGE',   value: '30',                    dataType: DataType.PERCENTAGE, description: 'Maximum discount percentage staff can apply to a sale item' },
-    // Stock management
-    { key: 'REORDER_LEVEL_DEFAULT',     value: '10',                    dataType: DataType.NUMBER,  description: 'Default low-stock alert threshold in pieces' },
-    { key: 'LOW_STOCK_ALERT_THRESHOLD', value: '5',                     dataType: DataType.NUMBER,  description: 'Critical stock threshold in pieces before urgent reorder alert' },
-    { key: 'ALLOW_FEFO_OVERRIDE',       value: 'true',                  dataType: DataType.BOOLEAN, description: 'Allow staff to select non-FEFO batches during sale' },
-    // Sales & payment
-    { key: 'CREDIT_PAYMENT_DAYS',       value: '30',                    dataType: DataType.NUMBER,  description: 'Default credit term in days for non-cash sales' },
-    { key: 'RETURN_POLICY_DAYS',        value: '7',                     dataType: DataType.NUMBER,  description: 'Number of days after sale within which a return is accepted' },
-    // Receipt
-    { key: 'RECEIPT_HEADER',            value: 'Apotek Sejahtera',       dataType: DataType.STRING,  description: 'Header text printed on patient receipts' },
-    { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
-  ]
-  for (const bp of businessParams) {
-    const existing = await prisma.businessParameter.findUnique({
-      where: { pharmacyId_key: { pharmacyId: pharmacy.id, key: bp.key } },
-    })
-    if (!existing) {
-      await prisma.businessParameter.create({
-        data: {
-          pharmacyId: pharmacy.id,
-          ...bp,
-          createdById: owner.id,
-          updatedById: owner.id,
-        },
-      })
-    }
-  }
+  await ensureBusinessParams(prisma as never, pharmacy.id, owner.id, { RECEIPT_HEADER: 'Apotek Sejahtera' })
 
   // ── 11. Storage ───────────────────────────────────────────────────────────
   console.log('Creating storage cabinets, shelves, and bins...')
@@ -717,47 +703,16 @@ async function main() {
   // ── 12. Medicine master data ──────────────────────────────────────────────
   console.log('Creating medicine master data...')
 
-  const shapeNames = ['Tablet', 'Kapsul', 'Sirup', 'Salep', 'Injeksi']
-  const shapes: Record<string, { id: number }> = {}
-  for (const name of shapeNames) {
-    const existing = await prisma.medicineShape.findFirst({
-      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
-    })
-    const shape = existing ?? await prisma.medicineShape.create({
-      data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
-    })
-    shapes[name] = shape
+  // Each pharmacy owns its classifications; start from the default template.
+  if ((await prisma.medicineShape.count({ where: { pharmacyId: pharmacy.id } })) === 0) {
+    await seedDefaultClassifications(prisma as never, pharmacy.id, owner.id)
   }
-
-  const typeNames = ['Obat Bebas', 'Obat Bebas Terbatas', 'Obat Keras', 'Narkotika']
-  const types: Record<string, { id: number }> = {}
-  for (const name of typeNames) {
-    const existing = await prisma.medicineType.findFirst({
-      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
-    })
-    const type = existing ?? await prisma.medicineType.create({
-      data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
-    })
-    types[name] = type
-  }
-
-  const classNames = [
-    'Analgesik & Antipiretik',
-    'Antibiotik',
-    'Antihipertensi',
-    'Vitamin & Suplemen',
-    'Antiinflamasi Nonsteroid',
-  ]
-  const classes: Record<string, { id: number }> = {}
-  for (const name of classNames) {
-    const existing = await prisma.medicineClass.findFirst({
-      where: { name, pharmacyId: null, status: RecordStatus.ACTIVE },
-    })
-    const cls = existing ?? await prisma.medicineClass.create({
-      data: { name, pharmacyId: null, status: RecordStatus.ACTIVE, createdById: platformAdmin.id, updatedById: platformAdmin.id },
-    })
-    classes[name] = cls
-  }
+  const byName = <T extends { id: number; name: string }>(rows: T[]) =>
+    Object.fromEntries(rows.map((r) => [r.name.toLowerCase(), r])) as Record<string, T>
+  const live = { where: { pharmacyId: pharmacy.id, deletedAt: null }, select: { id: true, name: true } }
+  const shapes = byName(await prisma.medicineShape.findMany(live))
+  const types = byName(await prisma.medicineType.findMany(live))
+  const classes = byName(await prisma.medicineClass.findMany(live))
 
   // ── 12. Medicines ─────────────────────────────────────────────────────────
   console.log('Creating medicines...')
@@ -777,9 +732,9 @@ async function main() {
       data: {
         pharmacyId: pharmacy.id,
         name: def.name,
-        shapeId: shapes[def.shape].id,
-        typeId: types[def.type].id,
-        medicineClassId: classes[def.cls].id,
+        shapeId: shapes[def.shape.toLowerCase()].id,
+        typeId: types[def.type.toLowerCase()].id,
+        medicineClassId: classes[def.cls.toLowerCase()].id,
         unit: def.unit,
         status: RecordStatus.ACTIVE,
         createdById: owner.id,

@@ -80,6 +80,12 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Invoice number already exists': 'Nomor faktur sudah terdaftar',
   'Medicine class with this name already exists': 'Nama kelas obat sudah terdaftar',
   'Medicine shape with this name already exists': 'Nama bentuk obat sudah terdaftar',
+  'Value must be a number of 0 or more': 'Nilai harus berupa angka 0 atau lebih',
+  'Percentage must be between 0 and 100': 'Persentase harus antara 0 sampai 100',
+  'Value must be true or false': 'Nilai harus true atau false',
+  'Invoice has recorded payments and cannot be deleted': 'Faktur sudah ada pembayarannya dan tidak bisa dihapus',
+  'Stock from this invoice has already been used and the invoice cannot be deleted': 'Stok dari faktur ini sudah terpakai (terjual, diretur, dimusnahkan, atau disesuaikan), jadi faktur tidak bisa dihapus',
+  'Value must be one of UPPER, TITLE, LOWER, AS_TYPED': 'Pilihan harus UPPER, TITLE, LOWER, atau AS_TYPED',
   'Medicine type with this name already exists': 'Nama jenis obat sudah terdaftar',
   'Medicine with this name already exists': 'Nama obat sudah terdaftar',
   'Pharmacy code already exists': 'Kode apotek sudah dipakai',
@@ -134,10 +140,8 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Stock return must be signed before completing': 'Retur harus ditandatangani sebelum diselesaikan',
 
   // ── Signing ───────────────────────────────────────
-  'Only authorized personnel can sign stock adjustments': 'Hanya petugas berwenang yang dapat menandatangani penyesuaian stok',
-  'Only authorized personnel can sign this document': 'Hanya petugas berwenang yang dapat menandatangani dokumen ini',
-  'Only fully authorized personnel can sign disposal documents': 'Hanya petugas dengan wewenang penuh yang dapat menandatangani dokumen pemusnahan',
-  'Only fully authorized personnel can sign purchase orders': 'Hanya petugas dengan wewenang penuh yang dapat menandatangani surat pesanan',
+  'Only the Head Pharmacist with an active practice license can sign this document': 'Dokumen ini hanya bisa ditandatangani Head Pharmacist dengan izin praktik (SIPA) aktif',
+  'Only a pharmacist with an active practice license can sign this document': 'Dokumen ini hanya bisa ditandatangani apoteker dengan izin praktik (SIPA) aktif',
 
   // ── Ownership ─────────────────────────────────────
   'Global roles can only be modified by platform admin': 'Peran global hanya dapat diubah oleh platform admin',
@@ -157,6 +161,11 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
  * originals embed internal UUIDs that mean nothing to a cashier.
  */
 export const PATTERN_TRANSLATIONS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) => string; id: (m: RegExpMatchArray) => string }> = [
+  {
+    pattern: /^Medicine (shape|type|class) is still used by (\d+) medicine\(s\)$/,
+    en: (m) => `This medicine ${m[1]} is still used by ${m[2]} medicine(s)`,
+    id: (m) => `Masih dipakai oleh ${m[2]} obat — pindahkan obatnya dulu sebelum menghapus`,
+  },
   {
     pattern: /^Allergy warning: (.+)$/,
     en: (m) => `Allergy warning: ${m[1]}. Confirm to continue.`,

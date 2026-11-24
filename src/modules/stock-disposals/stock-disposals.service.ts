@@ -1,6 +1,6 @@
 import { StockDisposalStatus, Prisma } from '@prisma/client'
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { resolveSigner } from '@utils/signer'
 import {
   CreateStockDisposalInput,
   UpdateStockDisposalInput,
@@ -10,7 +10,6 @@ import {
 import { StockDisposalResponse } from './stock-disposals.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 
@@ -46,38 +45,6 @@ const stockDisposalSelect = {
       },
     },
   },
-}
-
-const resolveSignedBy = async (
-  signedByUuid: string,
-  pharmacyId: number,
-  tx: Prisma.TransactionClient
-) => {
-  const signer = await tx.user.findFirst({
-    where: { uuid: signedByUuid, deletedAt: null },
-    select: {
-      id: true,
-      placements: {
-        where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-        select: {
-          role: {
-            select: {
-              rolePermissions: {
-                where: { isEnabled: true },
-                select: { permission: { select: { module: true, action: true } } },
-              },
-            },
-          },
-        },
-      },
-    },
-  })
-  if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-  const hasSignFull = signer.placements[0].role.rolePermissions.some(
-    (rp) => `${rp.permission.module}.${rp.permission.action}` === PERMISSIONS.SIGN_FULL
-  )
-  if (!hasSignFull) throw new ForbiddenException('Only fully authorized personnel can sign disposal documents')
-  return signer
 }
 
 const resolveStockDetail = async (
@@ -195,8 +162,8 @@ export const createStockDisposal = async (
 
     let signedById: number | undefined
     if (data.signedByUuid) {
-      const signer = await resolveSignedBy(data.signedByUuid, pharmacyId, tx)
-      signedById = signer.id
+      // A disposal record (berita acara pemusnahan) is signed by the Head Pharmacist.
+      signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, 'HEAD_PHARMACIST')
     }
 
     const pharmacy = await tx.pharmacy.findUnique({
@@ -325,8 +292,8 @@ export const updateStockDisposal = async (
 
     let signedById: number | undefined
     if (data.signedByUuid) {
-      const signer = await resolveSignedBy(data.signedByUuid, pharmacyId, tx)
-      signedById = signer.id
+      // A disposal record (berita acara pemusnahan) is signed by the Head Pharmacist.
+      signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, 'HEAD_PHARMACIST')
     }
 
     if (data.details) {

@@ -2,7 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { sendSuccess, sendCreated, sendPaginated, sendNoContent } from '@utils/responseHelper';
-import { ValidationException } from '@exceptions/ValidationException';
 import * as userService from './users.service';
 import {
   UserUuidParam,
@@ -20,19 +19,6 @@ import {
   CreateLicenseBody,
   UpdateLicenseBody,
 } from './users.interface';
-import {
-  listUserSchema,
-  createUserSchema,
-  updateUserSchema,
-  updateMeSchema,
-  changePasswordSchema,
-  listPlacementSchema,
-  createPlacementSchema,
-  updatePlacementSchema,
-  listLicenseSchema,
-  createLicenseSchema,
-  updateLicenseSchema,
-} from './users.validation';
 
 const actorOf = (req: Request<any, any, any, any>): userService.UserActor => ({
   id: req.user!.id,
@@ -90,6 +76,14 @@ export async function getUsersDropdown(
       req.user!.pharmacyId!,
       req.query.search as string | undefined
     );
+    sendSuccess(res, 'USERS_FETCHED', data);
+  } catch (err) { next(err); }
+}
+
+export async function getSignersDropdown(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const level = req.query.level === 'HEAD_PHARMACIST' ? 'HEAD_PHARMACIST' : 'PHARMACIST';
+    const data = await userService.getSignersDropdown(req.user!.pharmacyId!, level);
     sendSuccess(res, 'USERS_FETCHED', data);
   } catch (err) { next(err); }
 }

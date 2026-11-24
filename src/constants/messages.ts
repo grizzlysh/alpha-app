@@ -144,6 +144,34 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Customers fetched successfully',
     id: 'Data pelanggan berhasil diambil',
   },
+  DATA_EXPORTED: {
+    en: 'Data exported',
+    id: 'Data berhasil diekspor',
+  },
+  DATA_IMPORT_PREVIEWED: {
+    en: 'Import checked',
+    id: 'Impor sudah diperiksa',
+  },
+  DATA_IMPORTED: {
+    en: 'Data imported',
+    id: 'Data berhasil diimpor',
+  },
+  CATALOG_EXPORTED: {
+    en: 'Medicine catalog exported',
+    id: 'Daftar obat berhasil diekspor',
+  },
+  CATALOG_IMPORT_PREVIEWED: {
+    en: 'Import checked',
+    id: 'Impor sudah diperiksa',
+  },
+  CATALOG_IMPORTED: {
+    en: 'Medicine catalog imported',
+    id: 'Daftar obat berhasil diimpor',
+  },
+  CUSTOMER_PURCHASES_FETCHED: {
+    en: 'Purchase history retrieved',
+    id: 'Riwayat pembelian berhasil diambil',
+  },
   CUSTOMER_FETCHED: {
     en: 'Customer fetched successfully',
     id: 'Data pelanggan berhasil diambil',
@@ -634,6 +662,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Email address is already in use',
     id: 'Alamat email sudah digunakan',
   },
+  EMAIL_BELONGS_TO_DELETED_USER: {
+    en: 'This email belonged to a deleted account and cannot be reused. Use another email.',
+    id: 'Email ini pernah dipakai akun yang sudah dihapus dan tidak bisa dipakai lagi. Gunakan email lain.',
+  },
   DEFAULT_PASSWORD_NOT_CONFIGURED: {
     en: 'Default password has not been configured',
     id: 'Kata sandi default belum dikonfigurasi',
@@ -665,16 +697,12 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     id: 'Penempatan tidak ditemukan',
   },
   MAX_PLACEMENTS_REACHED: {
-    en: 'Maximum number of placements has been reached',
-    id: 'Batas maksimal penempatan telah tercapai',
+    en: 'This person already works at 3 pharmacies. End one placement first.',
+    id: 'Orang ini sudah bertugas di 3 apotek. Akhiri salah satu penempatannya dulu.',
   },
   USER_ALREADY_PLACED_AT_PHARMACY: {
     en: 'User is already placed at this pharmacy',
     id: 'Pengguna sudah ditempatkan di apotek ini',
-  },
-  PHARMACY_ALREADY_HAS_SIGN_FULL_USER: {
-    en: 'Pharmacy already has a user with full signing authority',
-    id: 'Apotek sudah memiliki pengguna dengan otoritas tanda tangan penuh',
   },
   PHARMACY_ALREADY_HAS_HEAD_PHARMACIST: {
     en: 'This pharmacy already has a Head Pharmacist. Unmark the current one first.',
@@ -1171,6 +1199,18 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
   ROLE_NOT_IN_PHARMACY: {
     en: 'This role does not belong to the selected pharmacy',
     id: 'Peran ini bukan milik apotek yang dipilih',
+  },
+  PLATFORM_USER_CANNOT_OWN_PHARMACY: {
+    en: 'A platform account cannot be a pharmacy owner',
+    id: 'Akun platform tidak bisa dijadikan pemilik apotek',
+  },
+  PASSWORD_CHANGE_REQUIRED: {
+    en: 'Please replace your temporary password first',
+    id: 'Ganti kata sandi sementara Anda terlebih dahulu',
+  },
+  USER_INACTIVE: {
+    en: 'This account is inactive',
+    id: 'Akun ini tidak aktif',
   },
   CANNOT_MANAGE_PLATFORM_USER: {
     en: 'Only a platform admin can modify platform accounts',

@@ -2,18 +2,12 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as DistributorService from './distributors.service'
 import {
-  createDistributorSchema,
-  updateDistributorSchema,
-  distributorQuerySchema,
-} from './distributors.validation'
-import {
   GetDistributorsRequest,
   GetDistributorRequest,
   CreateDistributorRequest,
   UpdateDistributorRequest,
   DeleteDistributorRequest,
 } from './distributors.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

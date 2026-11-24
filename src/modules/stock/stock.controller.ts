@@ -4,11 +4,6 @@ import * as StockService from './stock.service'
 import {
   stockDetailQuerySchema,
   stockCatalogQuerySchema,
-  stockQuerySchema,
-  stockMovementQuerySchema,
-  updatePriceSchema,
-  updateReorderLevelSchema,
-  adjustStockSchema,
 } from './stock.validation'
 import {
   GetStockDetailsRequest,
@@ -21,7 +16,6 @@ import {
   AdjustStockRequest,
   GetCrossPharmacyStockRequest,
 } from './stock.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendPaginated,

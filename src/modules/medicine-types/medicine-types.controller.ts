@@ -1,11 +1,7 @@
 import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineTypeService from './medicine-types.service'
-import {
-  createMedicineTypeSchema,
-  updateMedicineTypeSchema,
-  medicineTypeQuerySchema,
-} from './medicine-types.validation'
+import type { CreateMedicineTypeInput } from './medicine-types.validation'
 import {
   GetMedicineTypesRequest,
   GetMedicineTypeRequest,
@@ -13,7 +9,6 @@ import {
   UpdateMedicineTypeRequest,
   DeleteMedicineTypeRequest,
 } from './medicine-types.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,
@@ -28,8 +23,7 @@ export const getMedicineTypes = async (
 ): Promise<void> => {
   try {
     const { data, meta } = await MedicineTypeService.getMedicineTypes(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query as any
     )
 
@@ -47,8 +41,7 @@ export const getMedicineType = async (
   try {
     const medicine_type = await MedicineTypeService.getMedicineTypeByUuid(
       parseUuid(req.params.medicine_type_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole
+      req.user!.pharmacyId!
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_TYPE_FETCHED, medicine_type)
@@ -64,9 +57,9 @@ export const createMedicineType = async (
 ): Promise<void> => {
   try {
     const medicine_type = await MedicineTypeService.createMedicineType(
-      req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      // validateBody has applied the schema defaults (isControlled → false)
+      req.body as CreateMedicineTypeInput,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -85,8 +78,7 @@ export const updateMedicineType = async (
     const medicine_type = await MedicineTypeService.updateMedicineType(
       parseUuid(req.params.medicine_type_uuid),
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -104,8 +96,7 @@ export const deleteMedicineType = async (
   try {
     await MedicineTypeService.deleteMedicineType(
       parseUuid(req.params.medicine_type_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -122,8 +113,7 @@ export const getMedicineTypesDropdown = async (
 ): Promise<void> => {
   try {
     const data = await MedicineTypeService.getMedicineTypesDropdown(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query.search as string | undefined
     )
     sendSuccess(res, MESSAGE_CODES.MEDICINE_TYPES_FETCHED, data)

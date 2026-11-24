@@ -1,12 +1,13 @@
-import { PlatformRole, Prisma } from '@prisma/client'
+import { DataType, Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
+import { NAME_CASES, NAME_DISPLAY_CASE_KEY } from '@constants/defaultCatalog'
 import {
   BusinessParameterQueryInput,
   UpdateBusinessParameterInput,
 } from './business-parameters.validation'
 import { BusinessParameterResponse } from './business-parameters.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
+import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 
 // ── Helpers ───────────────────────────────────────────
@@ -30,36 +31,18 @@ const formatResponse = (param: Prisma.BusinessParameterGetPayload<{ select: type
 })
 
 // ── Services ──────────────────────────────────────────
+// Parameters always belong to the pharmacy selected in the token — platform
+// admins included — so one pharmacy's settings never leak into another's list.
 
 export const getBusinessParameters = async (
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   query: BusinessParameterQueryInput
 ): Promise<{ data: BusinessParameterResponse[]; meta: PaginationMeta }> => {
-  const { search, pharmacyUuid, sortBy, sortOrder, page, limit } = query
-  const skip = (page - 1) * limit
+  const { search, sortBy, sortOrder, page, limit } = query
 
-  let effectivePharmacyId: number | null
-  if (platformRole === PlatformRole.PLATFORM_ADMIN) {
-    if (pharmacyUuid) {
-      const pharmacy = await prisma.pharmacy.findFirst({
-        where: { uuid: pharmacyUuid, deletedAt: null },
-        select: { id: true },
-      })
-      if (!pharmacy) throw new NotFoundException('Pharmacy not found')
-      effectivePharmacyId = pharmacy.id
-    } else {
-      effectivePharmacyId = null
-    }
-  } else {
-    effectivePharmacyId = pharmacyId!
-  }
-
-  const where = {
-    ...(effectivePharmacyId !== null && { pharmacyId: effectivePharmacyId }),
-    ...(search && {
-      key: { contains: search, mode: 'insensitive' as const },
-    }),
+  const where: Prisma.BusinessParameterWhereInput = {
+    pharmacyId,
+    ...(search && { key: { contains: search, mode: 'insensitive' as const } }),
   }
 
   const [params, total] = await prisma.$transaction([
@@ -67,79 +50,76 @@ export const getBusinessParameters = async (
       where,
       select: businessParameterSelect,
       orderBy: { [sortBy]: sortOrder },
-      skip,
+      skip: (page - 1) * limit,
       take: limit,
     }),
     prisma.businessParameter.count({ where }),
   ])
 
-  const meta: PaginationMeta = {
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
+  return {
+    data: params.map(formatResponse),
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
   }
-
-  return { data: params.map(formatResponse), meta }
 }
 
 export const getBusinessParameterByUuid = async (
   uuid: string,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null
+  pharmacyId: number
 ): Promise<BusinessParameterResponse> => {
-  const where =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { uuid }
-      : { uuid, pharmacyId: pharmacyId! }
-
   const param = await prisma.businessParameter.findFirst({
-    where,
+    where: { uuid, pharmacyId },
     select: businessParameterSelect,
   })
-
   if (!param) throw new NotFoundException('Business parameter not found')
-
   return formatResponse(param)
+}
+
+/** Rejects values the code reading the parameter couldn't use (e.g. a margin of "abc"). */
+const assertValueMatchesType = (dataType: DataType, value: string): void => {
+  if (dataType === DataType.NUMBER || dataType === DataType.PERCENTAGE) {
+    const n = Number(value)
+    if (!Number.isFinite(n) || n < 0) throw new BadRequestException('Value must be a number of 0 or more')
+    if (dataType === DataType.PERCENTAGE && n > 100) throw new BadRequestException('Percentage must be between 0 and 100')
+  }
+  if (dataType === DataType.BOOLEAN && value !== 'true' && value !== 'false') {
+    throw new BadRequestException('Value must be true or false')
+  }
 }
 
 export const updateBusinessParameter = async (
   uuid: string,
   data: UpdateBusinessParameterInput,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   userId: number
 ): Promise<BusinessParameterResponse> => {
   const existing = await prisma.businessParameter.findFirst({
-    where: { uuid },
-    select: { id: true, key: true, pharmacyId: true },
+    where: { uuid, pharmacyId },
+    select: { id: true, key: true, dataType: true },
   })
-
   if (!existing) throw new NotFoundException('Business parameter not found')
 
-  // non-admin can only update their own pharmacy's parameters
-  if (
-    platformRole !== PlatformRole.PLATFORM_ADMIN &&
-    existing.pharmacyId !== pharmacyId
-  ) {
-    throw new ForbiddenException('You can only update your own pharmacy parameters')
+  assertValueMatchesType(existing.dataType, data.value)
+  if (existing.key === NAME_DISPLAY_CASE_KEY && !(NAME_CASES as readonly string[]).includes(data.value)) {
+    throw new BadRequestException('Value must be one of UPPER, TITLE, LOWER, AS_TYPED')
   }
 
-  const param = await prisma.businessParameter.update({
-    where: { id: existing.id },
-    data: { ...data, updatedById: userId },
-    select: businessParameterSelect,
+  return prisma.$transaction(async (tx) => {
+    const param = await tx.businessParameter.update({
+      where: { id: existing.id },
+      data: { ...data, updatedById: userId },
+      select: businessParameterSelect,
+    })
+
+    if (existing.key === 'MARGIN_PERCENTAGE') {
+      const margin = Number(param.value)
+      await tx.$executeRaw`
+        UPDATE inv_stocks
+        SET calculated_price = base_price + (base_price * ${margin} / 100),
+            updated_at = NOW()
+        WHERE pharmacy_id = ${pharmacyId}
+      `
+    }
+
+    return formatResponse(param)
   })
-
-  if (existing.key === 'MARGIN_PERCENTAGE' && existing.pharmacyId !== null) {
-    const margin = parseFloat(param.value)
-    await prisma.$executeRaw`
-      UPDATE inv_stocks
-      SET calculated_price = base_price + (base_price * ${margin} / 100),
-          updated_at = NOW()
-      WHERE pharmacy_id = ${existing.pharmacyId}
-    `
-  }
-
-  return formatResponse(param)
 }

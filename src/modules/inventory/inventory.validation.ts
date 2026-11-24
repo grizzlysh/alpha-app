@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- source of the Rotation type below
 const rotationValues = [0, 90, 180, 270] as const
 
 export const updateCabinetPositionSchema = z.object({

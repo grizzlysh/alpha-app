@@ -1,4 +1,4 @@
-import { PlatformRole, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@config/db'
 import {
   CreateMedicineClassInput,
@@ -8,298 +8,157 @@ import {
 import { MedicineClassResponse, MedicineClassDropdownItem } from './medicine-classes.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
+
+// Every pharmacy owns its own list — there are no shared/global rows. A new
+// pharmacy starts from the default template (see constants/defaultCatalog).
 
 // ── Helpers ───────────────────────────────────────────
 
 const medicineClassSelect = {
   uuid: true,
   name: true,
-  pharmacyId: true,
   status: true,
   createdAt: true,
   updatedAt: true,
-}
+  _count: { select: { medicines: { where: { deletedAt: null } } } },
+} satisfies Prisma.MedicineClassSelect
 
-const formatResponse = (medicine_class: Prisma.MedicineClassGetPayload<{ select: typeof medicineClassSelect }>): MedicineClassResponse => ({
-  uuid: medicine_class.uuid,
-  name: medicine_class.name,
-  isGlobal: medicine_class.pharmacyId === null,
-  status: medicine_class.status,
-  createdAt: medicine_class.createdAt,
-  updatedAt: medicine_class.updatedAt,
+const formatResponse = (row: Prisma.MedicineClassGetPayload<{ select: typeof medicineClassSelect }>): MedicineClassResponse => ({
+  uuid: row.uuid,
+  name: row.name,
+  status: row.status,
+  medicineCount: row._count.medicines,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
 })
 
-const checkDuplicate = async (
-  name: string,
-  pharmacyId: number | null,
-  excludeUuid?: string
-): Promise<void> => {
+const checkDuplicate = async (name: string, pharmacyId: number, excludeUuid?: string): Promise<void> => {
   const existing = await prisma.medicineClass.findFirst({
     where: {
-      name,
+      name: { equals: name, mode: 'insensitive' },
       pharmacyId,
       deletedAt: null,
-      ...(excludeUuid && { NOT: { uuid: excludeUuid } })
-    }
+      ...(excludeUuid && { NOT: { uuid: excludeUuid } }),
+    },
+    select: { id: true },
   })
-
-  if (existing) {
-    throw new ConflictException('Medicine class with this name already exists')
-  }
+  if (existing) throw new ConflictException('Medicine class with this name already exists')
 }
 
-const checkGlobalAccess = async (
-  uuid: string,
-  platformRole: PlatformRole | null
-): Promise<void> => {
-  const medicine_class = await prisma.medicineClass.findUnique({
-    where: { uuid },
-    select: { pharmacyId: true }
+const findOwn = async (uuid: string, pharmacyId: number): Promise<{ id: number }> => {
+  const row = await prisma.medicineClass.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
+    select: { id: true },
   })
-
-  if (medicine_class?.pharmacyId === null &&
-    platformRole !== PlatformRole.PLATFORM_ADMIN) {
-    throw new ForbiddenException(
-      'Global records can only be modified by platform admin'
-    )
-  }
-}
-
-const resolvePharmacyId = async (
-  pharmacyUuid?: string
-): Promise<number | null> => {
-  if (!pharmacyUuid) return null
-
-  const pharmacy = await prisma.pharmacy.findUnique({
-    where: { uuid: pharmacyUuid },
-    select: { id: true }
-  })
-
-  if (!pharmacy) throw new NotFoundException('Pharmacy not found')
-
-  return pharmacy.id
+  if (!row) throw new NotFoundException('Medicine class not found')
+  return row
 }
 
 // ── Services ──────────────────────────────────────────
 
 export const getMedicineClasses = async (
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   query: MedicineClassQueryInput
 ): Promise<{ data: MedicineClassResponse[]; meta: PaginationMeta }> => {
-  const { search, status, isGlobal, sortBy, sortOrder, page, limit } = query
+  const { search, status, sortBy, sortOrder, page, limit } = query
 
-  const skip: number = (page - 1) * limit
-
-  // build where based on role
-  let pharmacyFilter = {}
-
-  if (platformRole === PlatformRole.PLATFORM_ADMIN) {
-    // platform admin sees all
-    if (isGlobal === 'true') {
-      pharmacyFilter = { pharmacyId: null }
-    } else if (isGlobal === 'false') {
-      pharmacyFilter = { pharmacyId: { not: null } }
-    }
-    // no filter = sees everything
-  } else {
-    // pharmacy user sees global + their own
-    pharmacyFilter = {
-      OR: [
-        { pharmacyId: null },
-        { pharmacyId }
-      ]
-    }
-
-    if (isGlobal === 'true') {
-      pharmacyFilter = { pharmacyId: null }
-    } else if (isGlobal === 'false') {
-      pharmacyFilter = { pharmacyId }
-    }
-  }
-
-  const where = {
-    ...pharmacyFilter,
+  const where: Prisma.MedicineClassWhereInput = {
+    pharmacyId,
     deletedAt: null,
     ...(status && { status }),
-    ...(search && {
-      name: { contains: search, mode: 'insensitive' as const }
-    })
+    ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
   }
 
-  const [medicine_classes, total] = await prisma.$transaction([
+  const [rows, total] = await prisma.$transaction([
     prisma.medicineClass.findMany({
       where,
       select: medicineClassSelect,
       orderBy: { [sortBy]: sortOrder },
-      skip,
+      skip: (page - 1) * limit,
       take: limit,
     }),
     prisma.medicineClass.count({ where }),
   ])
 
-  const meta: PaginationMeta = {
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-  }
-
   return {
-    data: medicine_classes.map(formatResponse),
-    meta
+    data: rows.map(formatResponse),
+    meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
   }
 }
 
-export const getMedicineClassByUuid = async (
-  uuid: string,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null
-): Promise<MedicineClassResponse> => {
-  const where =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? { uuid, deletedAt: null }
-      : {
-        uuid,
-        deletedAt: null,
-        OR: [{ pharmacyId: null }, { pharmacyId }]
-      }
-
-  const medicine_class = await prisma.medicineClass.findFirst({
-    where,
+export const getMedicineClassByUuid = async (uuid: string, pharmacyId: number): Promise<MedicineClassResponse> => {
+  const row = await prisma.medicineClass.findFirst({
+    where: { uuid, pharmacyId, deletedAt: null },
     select: medicineClassSelect,
   })
-
-  if (!medicine_class) throw new NotFoundException('Medicine class not found')
-
-  return formatResponse(medicine_class)
+  if (!row) throw new NotFoundException('Medicine class not found')
+  return formatResponse(row)
 }
 
 export const createMedicineClass = async (
   data: CreateMedicineClassInput,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   userId: number
 ): Promise<MedicineClassResponse> => {
-  let resolvedPharmacyId: number | null
+  await checkDuplicate(data.name, pharmacyId)
 
-  if (platformRole === PlatformRole.PLATFORM_ADMIN) {
-    // platform admin: use pharmacyUuid from body or null (global)
-    resolvedPharmacyId = data.pharmacyUuid
-      ? await resolvePharmacyId(data.pharmacyUuid)
-      : null
-  } else {
-    // pharmacy user: always use their own pharmacyId
-    resolvedPharmacyId = pharmacyId
-  }
-
-  await checkDuplicate(data.name, resolvedPharmacyId)
-
-  const medicine_class = await prisma.medicineClass.create({
+  const row = await prisma.medicineClass.create({
     data: {
       name: data.name,
       status: data.status,
-      pharmacyId: resolvedPharmacyId,
+      pharmacyId,
       createdById: userId,
     },
     select: medicineClassSelect,
   })
 
-  return formatResponse(medicine_class)
+  return formatResponse(row)
 }
 
 export const updateMedicineClass = async (
   uuid: string,
   data: UpdateMedicineClassInput,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   userId: number
 ): Promise<MedicineClassResponse> => {
-  const existing = await prisma.medicineClass.findFirst({
-    where: { uuid, deletedAt: null },
-    select: { id: true, pharmacyId: true }
-  })
+  const existing = await findOwn(uuid, pharmacyId)
+  if (data.name) await checkDuplicate(data.name, pharmacyId, uuid)
 
-  if (!existing) throw new NotFoundException('Medicine class not found')
-
-  // check global access
-  await checkGlobalAccess(uuid, platformRole)
-
-  // check pharmacy user only edits their own custom
-  if (
-    platformRole !== PlatformRole.PLATFORM_ADMIN &&
-    existing.pharmacyId !== pharmacyId
-  ) {
-    throw new ForbiddenException('You can only edit your own pharmacy records')
-  }
-
-  if (data.name) {
-    await checkDuplicate(data.name, existing.pharmacyId, uuid)
-  }
-
-  const medicine_class = await prisma.medicineClass.update({
+  const row = await prisma.medicineClass.update({
     where: { id: existing.id },
     data: { ...data, updatedById: userId },
     select: medicineClassSelect,
   })
 
-  return formatResponse(medicine_class)
+  return formatResponse(row)
 }
 
-export const deleteMedicineClass = async (
-  uuid: string,
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
-  userId: number
-): Promise<void> => {
-  const existing = await prisma.medicineClass.findFirst({
-    where: { uuid, deletedAt: null },
-    select: { id: true, pharmacyId: true }
-  })
+export const deleteMedicineClass = async (uuid: string, pharmacyId: number, userId: number): Promise<void> => {
+  const existing = await findOwn(uuid, pharmacyId)
 
-  if (!existing) throw new NotFoundException('Medicine class not found')
-
-  // check global access
-  await checkGlobalAccess(uuid, platformRole)
-
-  // check pharmacy user only deletes their own custom
-  if (
-    platformRole !== PlatformRole.PLATFORM_ADMIN &&
-    existing.pharmacyId !== pharmacyId
-  ) {
-    throw new ForbiddenException('You can only delete your own pharmacy records')
+  const inUse = await prisma.medicine.count({ where: { medicineClassId: existing.id, deletedAt: null } })
+  if (inUse > 0) {
+    throw new ConflictException(`Medicine class is still used by ${inUse} medicine(s)`)
   }
 
   await prisma.medicineClass.update({
     where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    }
+    data: { deletedAt: new Date(), deletedById: userId },
   })
 }
 
 export const getMedicineClassesDropdown = async (
-  pharmacyId: number | null,
-  platformRole: PlatformRole | null,
+  pharmacyId: number,
   search?: string
 ): Promise<MedicineClassDropdownItem[]> => {
-  const pharmacyFilter =
-    platformRole === PlatformRole.PLATFORM_ADMIN
-      ? {}
-      : { OR: [{ pharmacyId: null }, { pharmacyId }] }
-
-  const rows = await prisma.medicineClass.findMany({
+  return prisma.medicineClass.findMany({
     where: {
-      ...pharmacyFilter,
+      pharmacyId,
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, pharmacyId: true },
+    select: { uuid: true, name: true },
     orderBy: { name: 'asc' },
   })
-
-  return rows.map(r => ({ uuid: r.uuid, name: r.name, isGlobal: r.pharmacyId === null }))
 }

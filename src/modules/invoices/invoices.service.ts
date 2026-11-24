@@ -1,13 +1,12 @@
 import { PaymentStatus, PurchaseOrderStatus } from '@prisma/client'
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { resolveSigner, signerLevelForMedicines } from '@utils/signer'
 import { withDocNumberRetry } from '@utils/generateDocNumbers'
 import { generateBarcode } from '@utils/generateBarcode'
 import { AddPaymentInput, CreateInvoiceInput, InvoiceQueryInput, UpdatePaymentHistoryInput } from './invoices.validation'
 import { InvoicePaymentResponse, InvoiceResponse } from './invoices.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -277,33 +276,6 @@ export const createInvoice = async (
       throw new ConflictException('Invoice number already exists')
     }
 
-    // ── Resolve Signed By ─────────────────────────
-    const signer = await tx.user.findFirst({
-      where: { uuid: data.signedByUuid, deletedAt: null },
-      select: {
-        id: true,
-        placements: {
-          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-          select: {
-            role: {
-              select: {
-                rolePermissions: {
-                  where: { isEnabled: true },
-                  select: { permission: { select: { module: true, action: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
-    })
-    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-    const hasSignPermission = signer.placements[0].role.rolePermissions.some(
-      (rp) => rp.permission.module === 'sign'
-    )
-    if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign this document')
-    const signedById = signer.id
-
     // ── Resolve Purchase Order ────────────────────
     let purchaseOrderId: number | undefined
     if (data.purchaseOrderUuid) {
@@ -409,6 +381,11 @@ export const createInvoice = async (
     const ppnPercentage = data.ppnPercentage ?? 0
     const ppnAmount = (netAmount * ppnPercentage) / 100
     const grandTotal = netAmount + ppnAmount
+
+    // ── Signed By: the pharmacist who received the goods (active SIPA);
+    //    the Head Pharmacist when the delivery includes controlled medicines ──
+    const signerLevel = await signerLevelForMedicines(tx, detailsData.map((d) => d.medicineId))
+    const signedById = await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, signerLevel)
 
     // ── Create Invoice + Details ──────────────────
     const invoice = await tx.invoice.create({
@@ -585,24 +562,85 @@ export const createInvoice = async (
   return formatInvoice(fullInvoice)
 }
 
+/**
+ * Deleting an invoice takes its received stock back out. That is only possible
+ * while the stock is untouched — nothing sold, returned, disposed, adjusted or
+ * reserved — and no payment has been recorded; otherwise the books would no
+ * longer add up and the invoice has to be corrected another way.
+ */
 export const deleteInvoice = async (
   uuid: string,
   pharmacyId: number,
   userId: number
 ): Promise<void> => {
-  const existing = await prisma.invoice.findFirst({
-    where: { uuid, pharmacyId, deletedAt: null },
-    select: { id: true },
-  })
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.invoice.findFirst({
+      where: { uuid, pharmacyId, deletedAt: null },
+      select: {
+        id: true,
+        payments: { select: { _count: { select: { history: true } } } },
+        details: {
+          select: {
+            id: true,
+            medicineId: true,
+            quantityPieces: true,
+            stockDetail: {
+              select: {
+                id: true,
+                stockId: true,
+                quantityPieces: true,
+                _count: { select: { saleDetails: true, stockReturnDetails: true, stockDisposalDetails: true, reservations: true, stockMovements: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+    if (!existing) throw new NotFoundException('Invoice not found')
 
-  if (!existing) throw new NotFoundException('Invoice not found')
+    if (existing.payments.some((p) => p._count.history > 0)) {
+      throw new ConflictException('Invoice has recorded payments and cannot be deleted')
+    }
+    const used = existing.details.some((d) => {
+      const sd = d.stockDetail
+      if (!sd) return false
+      const c = sd._count
+      // The receipt itself is the only movement an untouched batch has.
+      return sd.quantityPieces !== d.quantityPieces || c.saleDetails + c.stockReturnDetails + c.stockDisposalDetails + c.reservations > 0 || c.stockMovements > 1
+    })
+    if (used) throw new ConflictException('Stock from this invoice has already been used and the invoice cannot be deleted')
 
-  await prisma.invoice.update({
-    where: { id: existing.id },
-    data: {
-      deletedAt: new Date(),
-      deletedById: userId,
-    },
+    for (const d of existing.details) {
+      const sd = d.stockDetail
+      if (!sd || sd.quantityPieces === 0) continue
+      const stock = await tx.stock.update({
+        where: { id: sd.stockId },
+        data: { totalPieces: { decrement: sd.quantityPieces }, updatedById: userId },
+        select: { totalPieces: true },
+      })
+      await tx.stockDetail.update({ where: { id: sd.id }, data: { quantityPieces: 0, quantityBox: 0 } })
+      await tx.stockMovement.create({
+        data: {
+          pharmacyId,
+          medicineId: d.medicineId,
+          stockId: sd.stockId,
+          stockDetailId: sd.id,
+          invoiceDetailId: d.id,
+          type: 'OUT',
+          reason: 'ADJUSTMENT',
+          quantity: sd.quantityPieces,
+          quantityBefore: stock.totalPieces + sd.quantityPieces,
+          quantityAfter: stock.totalPieces,
+          description: 'Invoice deleted',
+          createdById: userId,
+        },
+      })
+    }
+
+    await tx.invoice.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), deletedById: userId },
+    })
   })
 }
 

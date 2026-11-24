@@ -32,7 +32,7 @@ const checkDuplicate = async (
 ): Promise<void> => {
   const existing = await prisma.distributor.findFirst({
     where: {
-      name,
+      name: { equals: name, mode: 'insensitive' },
       pharmacyId,
       deletedAt: null,
       ...(excludeUuid && {

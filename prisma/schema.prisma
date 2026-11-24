@@ -756,7 +756,7 @@ model StorageBin {
 model MedicineShape {
   id          Int          @id @default(autoincrement())
   uuid        String       @unique @default(uuid())
-  pharmacyId  Int?         @map("pharmacy_id")
+  pharmacyId  Int          @map("pharmacy_id")
   name        String
   status      RecordStatus @default(ACTIVE)
   createdAt   DateTime     @default(now()) @map("created_at")
@@ -766,21 +766,24 @@ model MedicineShape {
   updatedById Int?         @map("updated_by_id")
   deletedById Int?         @map("deleted_by_id")
 
-  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  pharmacy      Pharmacy   @relation(fields: [pharmacyId], references: [id])
   medicines     Medicine[]
   createdByUser User?      @relation("MedicineShapeCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?      @relation("MedicineShapeUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("MedicineShapeDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([pharmacyId])
   @@map("mst_medicine_shapes")
 }
 
 model MedicineType {
   id                   Int          @id @default(autoincrement())
   uuid                 String       @unique @default(uuid())
-  pharmacyId           Int?         @map("pharmacy_id")
+  pharmacyId           Int          @map("pharmacy_id")
   name                 String
   requiredPrescription Boolean      @default(false) @map("required_prescription")
+  /// Narcotics, psychotropics, precursors: orders, receipts, returns and disposals need the Head Pharmacist.
+  isControlled         Boolean      @default(false) @map("is_controlled")
   status               RecordStatus @default(ACTIVE)
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
@@ -789,19 +792,20 @@ model MedicineType {
   updatedById          Int?         @map("updated_by_id")
   deletedById          Int?         @map("deleted_by_id")
 
-  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  pharmacy      Pharmacy   @relation(fields: [pharmacyId], references: [id])
   medicines     Medicine[]
   createdByUser User?      @relation("MedicineTypeCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?      @relation("MedicineTypeUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("MedicineTypeDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([pharmacyId])
   @@map("mst_medicine_types")
 }
 
 model MedicineClass {
   id          Int          @id @default(autoincrement())
   uuid        String       @unique @default(uuid())
-  pharmacyId  Int?         @map("pharmacy_id")
+  pharmacyId  Int          @map("pharmacy_id")
   name        String
   status      RecordStatus @default(ACTIVE)
   createdAt   DateTime     @default(now()) @map("created_at")
@@ -811,12 +815,13 @@ model MedicineClass {
   updatedById Int?         @map("updated_by_id")
   deletedById Int?         @map("deleted_by_id")
 
-  pharmacy      Pharmacy?  @relation(fields: [pharmacyId], references: [id])
+  pharmacy      Pharmacy   @relation(fields: [pharmacyId], references: [id])
   medicines     Medicine[]
   createdByUser User?      @relation("MedicineClassCreatedBy", fields: [createdById], references: [id])
   updatedByUser User?      @relation("MedicineClassUpdatedBy", fields: [updatedById], references: [id])
   deletedByUser User?      @relation("MedicineClassDeletedBy", fields: [deletedById], references: [id])
 
+  @@index([pharmacyId])
   @@map("mst_medicine_classes")
 }
 

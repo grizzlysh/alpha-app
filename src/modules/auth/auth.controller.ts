@@ -1,7 +1,6 @@
 import { Response, NextFunction } from 'express'
 import { env } from '@config/env'
 import * as AuthService from './auth.service'
-import { loginSchema, selectPharmacySchema } from './auth.validation'
 import {
   LoginRequest,
   SelectPharmacyRequest,
@@ -13,7 +12,6 @@ import {
   RefreshTokenResponse,
   MeResponse,
 } from './auth.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import { UnauthorizedException } from '@exceptions/UnauthorizedException'
 import { sendSuccess } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'

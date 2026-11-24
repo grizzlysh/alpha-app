@@ -37,6 +37,8 @@ import prescriptionRoutes from '@modules/prescriptions/prescriptions.routes'
 import inventoryRoutes from '@modules/inventory/inventory.routes'
 import medicalRecordRoutes from '@modules/medical-records/medical-records.routes'
 import examinationRoutes from '@modules/examinations/examinations.routes'
+import catalogRoutes from '@modules/catalog/catalog.routes'
+import dataTransferRoutes from '@modules/data-transfer/data-transfer.routes'
 
 
 
@@ -60,6 +62,9 @@ app.use(rateLimiter)
 
 // ── Body Parser ──────────────────────────────
 app.use(cookieParser()) 
+// A whole medicine catalog can exceed the default 100kb body limit.
+app.use('/api/catalog', express.json({ limit: '5mb' }))
+app.use('/api/data-transfer', express.json({ limit: '5mb' }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
@@ -85,6 +90,8 @@ app.use('/api/medicines', medicineRoutes)
 app.use('/api/medicine-shapes', medicineShapeRoutes)
 app.use('/api/medicine-types', medicineTypeRoutes)
 app.use('/api/medicine-classes', medicineClassRoutes)
+app.use('/api/catalog', catalogRoutes)
+app.use('/api/data-transfer', dataTransferRoutes)
 app.use('/api/purchase-orders', purchaseOrderRoutes)
 app.use('/api/invoices', invoiceRoutes)
 app.use('/api/stock', stockRoutes)
@@ -110,12 +117,15 @@ app.get('/', (req: Request, res: Response): void => {
 app.use(errorHandler)
 
 // ── Server ──────────────────────
-app.listen(PORT, (error?: Error): void => {
-  if (error) {
-    console.error(`Failed to start server on port ${PORT}:`, error.message)
-    process.exit(1)
-  }
-  console.log(`Server running on port ${PORT}`)
-})
+// Tests drive the app in-process (supertest), without binding a port.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, (error?: Error): void => {
+    if (error) {
+      console.error(`Failed to start server on port ${PORT}:`, error.message)
+      process.exit(1)
+    }
+    console.log(`Server running on port ${PORT}`)
+  })
+}
 
 export default app

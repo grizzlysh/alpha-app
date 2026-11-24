@@ -13,15 +13,6 @@ import {
   UpdateBusinessLicenseRequest,
   DeleteBusinessLicenseRequest,
 } from './pharmacies.interface'
-import {
-  pharmacyQuerySchema,
-  createPharmacySchema,
-  updatePharmacySchema,
-  businessLicenseQuerySchema,
-  createBusinessLicenseSchema,
-  updateBusinessLicenseSchema,
-} from './pharmacies.validation'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess, sendCreated, sendPaginated, sendNoContent } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 
@@ -216,4 +207,13 @@ export const deleteBusinessLicense = async (
     )
     sendNoContent(res, MESSAGE_CODES.BUSINESS_LICENSE_DELETED)
   } catch (err) { next(err) }
+}
+
+export const getSetupStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data = await PharmacyService.getSetupStatus(req.user!.pharmacyId!)
+    sendSuccess(res, MESSAGE_CODES.PHARMACY_FETCHED, data)
+  } catch (err) {
+    next(err)
+  }
 }

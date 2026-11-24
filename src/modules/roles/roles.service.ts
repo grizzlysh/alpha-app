@@ -377,18 +377,26 @@ export const setRolePermissions = async (
 
 export const getRolesDdl = async (
   pharmacyId: number | null,
-  platformRole: PlatformRole | null
+  platformRole: PlatformRole | null,
+  pharmacyUuid?: string
 ): Promise<RoleDdlItem[]> => {
   const isPlatformAdmin = platformRole === PlatformRole.PLATFORM_ADMIN
 
-  const pharmacyFilter = isPlatformAdmin
-    ? {}
-    : { OR: [{ pharmacyId: null }, { pharmacyId }] }
+  // Roles assignable at one pharmacy: the global ones plus that pharmacy's own.
+  // A platform admin picks the pharmacy (e.g. while onboarding a new one).
+  let scopeId = pharmacyId
+  if (isPlatformAdmin && pharmacyUuid) {
+    const pharmacy = await prisma.pharmacy.findFirst({ where: { uuid: pharmacyUuid, deletedAt: null }, select: { id: true } })
+    if (!pharmacy) throw new NotFoundException('Pharmacy not found')
+    scopeId = pharmacy.id
+  }
+  const pharmacyFilter = scopeId ? { OR: [{ pharmacyId: null }, { pharmacyId: scopeId }] } : { pharmacyId: null }
 
   const roles = await prisma.role.findMany({
     where: {
       ...pharmacyFilter,
       status: 'ACTIVE',
+      deletedAt: null,
       ...(!isPlatformAdmin && { NOT: { type: AppRole.OWNER } }),
     },
     select: { uuid: true, name: true, type: true, pharmacyId: true, requiresLicense: true },

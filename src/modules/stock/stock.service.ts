@@ -1,5 +1,5 @@
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { resolveSigner } from '@utils/signer'
 import {
   StockDetailQueryInput,
   StockCatalogQueryInput,
@@ -18,7 +18,6 @@ import {
 } from './stock.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { Decimal } from '@prisma/client/runtime/library'
 
@@ -110,11 +109,12 @@ export const searchStockDetails = async (
   pharmacyId: number,
   query: StockDetailQueryInput
 ): Promise<StockDetailSearchResponse[]> => {
-  const { search } = query
+  const { search, medicineUuid } = query
 
   const where: any = {
-    stock: { pharmacyId },
+    stock: { pharmacyId, ...(medicineUuid && { medicine: { uuid: medicineUuid } }) },
     quantityPieces: { gt: 0 },
+    ...(medicineUuid && { expiryDate: { gt: new Date() } }),
     ...(search && {
       OR: [
         { stock: { medicine: { name: { contains: search, mode: 'insensitive' } } } },
@@ -600,33 +600,8 @@ export const adjustStock = async (
       throw new BadRequestException('Quantity cannot be negative')
     }
 
-    // ── Resolve Signed By ─────────────────────────
-    const signer = await tx.user.findFirst({
-      where: { uuid: data.signedByUuid, deletedAt: null },
-      select: {
-        id: true,
-        placements: {
-          where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-          select: {
-            role: {
-              select: {
-                rolePermissions: {
-                  where: { isEnabled: true },
-                  select: { permission: { select: { module: true, action: true } } },
-                },
-              },
-            },
-          },
-        },
-      },
-    })
-
-    if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-
-    const hasSignPermission = signer.placements[0].role.rolePermissions.some(
-      (rp) => rp.permission.module === 'sign'
-    )
-    if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign stock adjustments')
+    // ── Signed By: a pharmacist with an active SIPA confirms the correction ──
+    await resolveSigner(tx, { uuid: data.signedByUuid }, pharmacyId, 'PHARMACIST')
 
     // ── Calculate Adjustment ──────────────────────
     const quantityBefore = stockDetail.quantityPieces

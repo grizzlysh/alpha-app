@@ -2,13 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as StockReturnService from './stock-returns.service'
 import {
-  createStockReturnSchema,
-  updateStockReturnSchema,
-  cancelStockReturnSchema,
-  rejectStockReturnSchema,
-  stockReturnQuerySchema,
-} from './stock-returns.validation'
-import {
   GetStockReturnsRequest,
   GetStockReturnRequest,
   CreateStockReturnRequest,
@@ -18,7 +11,6 @@ import {
   RejectStockReturnRequest,
   DeleteStockReturnRequest,
 } from './stock-returns.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

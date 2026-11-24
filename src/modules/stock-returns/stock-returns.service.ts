@@ -1,6 +1,6 @@
 import { StockReturnStatus, Prisma } from '@prisma/client'
-import { PERMISSIONS } from '@constants/permissions'
 import { prisma } from '@config/db'
+import { resolveSigner, signerLevelForMedicines } from '@utils/signer'
 import {
   CreateStockReturnInput,
   UpdateStockReturnInput,
@@ -11,7 +11,6 @@ import {
 import { StockReturnResponse } from './stock-returns.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
-import { ForbiddenException } from '@exceptions/ForbiddenException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { generateDocNumber, withDocNumberRetry } from '@utils/generateDocNumbers'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -79,36 +78,20 @@ const resolveDistributor = async (
   return distributor
 }
 
+/** Returns to a distributor are signed by a pharmacist with an active SIPA. */
 const resolveSignedBy = async (
   signedByUuid: string,
   pharmacyId: number,
   tx: Prisma.TransactionClient
-) => {
-  const signer = await tx.user.findFirst({
-    where: { uuid: signedByUuid, deletedAt: null },
-    select: {
-      id: true,
-      placements: {
-        where: { pharmacyId, status: 'ACTIVE', deletedAt: null },
-        select: {
-          role: {
-            select: {
-              rolePermissions: {
-                where: { isEnabled: true },
-                select: { permission: { select: { module: true, action: true } } },
-              },
-            },
-          },
-        },
-      },
-    },
-  })
-  if (!signer || !signer.placements.length) throw new NotFoundException('Signer not found at this pharmacy')
-  const hasSignPermission = signer.placements[0].role.rolePermissions.some(
-    (rp) => rp.permission.module === 'sign'
-  )
-  if (!hasSignPermission) throw new ForbiddenException('Only authorized personnel can sign this document')
-  return signer
+): Promise<{ id: number }> => ({ id: await resolveSigner(tx, { uuid: signedByUuid }, pharmacyId, 'PHARMACIST') })
+
+/** Once the items are known: a return containing a controlled medicine needs the Head Pharmacist. */
+const assertReturnSigner = async (stockReturnId: number, pharmacyId: number, tx: Prisma.TransactionClient): Promise<void> => {
+  const ret = await tx.stockReturn.findUnique({ where: { id: stockReturnId }, select: { signedById: true } })
+  if (!ret?.signedById) return
+  const details = await tx.stockReturnDetail.findMany({ where: { stockReturnId }, select: { medicineId: true } })
+  const level = await signerLevelForMedicines(tx, details.map((d) => d.medicineId))
+  if (level === 'HEAD_PHARMACIST') await resolveSigner(tx, { id: ret.signedById }, pharmacyId, level)
 }
 
 const resolveStockDetail = async (
@@ -403,6 +386,8 @@ export const createStockReturn = async (
       })
     }
 
+    await assertReturnSigner(stockReturn.id, pharmacyId, tx)
+
     // Update header with final totalAmount
     await tx.stockReturn.update({
       where: { id: stockReturn.id },
@@ -522,7 +507,7 @@ export const updateStockReturn = async (
       newTotalAmount = newTotalAmount.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
     }
 
-    return tx.stockReturn.update({
+    const updated = await tx.stockReturn.update({
       where: { id: existing.id },
       data: {
         ...(distributorId && { distributorId }),
@@ -534,6 +519,8 @@ export const updateStockReturn = async (
       },
       select: stockReturnSelect,
     })
+    await assertReturnSigner(existing.id, pharmacyId, tx)
+    return updated
   }, { timeout: 10000, maxWait: 5000 })
 
   return stockReturn as unknown as StockReturnResponse

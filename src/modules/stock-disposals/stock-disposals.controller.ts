@@ -2,12 +2,6 @@ import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as StockDisposalService from './stock-disposals.service'
 import {
-  createStockDisposalSchema,
-  updateStockDisposalSchema,
-  cancelStockDisposalSchema,
-  stockDisposalQuerySchema,
-} from './stock-disposals.validation'
-import {
   GetStockDisposalsRequest,
   GetStockDisposalRequest,
   CreateStockDisposalRequest,
@@ -16,7 +10,6 @@ import {
   CancelStockDisposalRequest,
   DeleteStockDisposalRequest,
 } from './stock-disposals.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,

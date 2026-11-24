@@ -2,15 +2,10 @@ import { parseUuid } from '@utils/parseUuid'
 import { Response, NextFunction } from 'express'
 import * as SystemParameterService from './system-parameters.service'
 import {
-  systemParameterQuerySchema,
-  updateSystemParameterSchema,
-} from './system-parameters.validation'
-import {
   GetSystemParametersRequest,
   GetSystemParameterRequest,
   UpdateSystemParameterRequest,
 } from './system-parameters.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import { sendSuccess, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 

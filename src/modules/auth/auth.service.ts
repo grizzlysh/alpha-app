@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { AppRole, PlatformRole } from '@prisma/client'
 import { prisma } from '@config/db'
+import { NAME_CASES, NAME_DISPLAY_CASE_KEY, NameCase } from '@constants/defaultCatalog'
 import { env } from '@config/env'
 import { LoginInput, SelectPharmacyInput } from './auth.validation'
 import {
@@ -137,11 +138,21 @@ const getPharmaciesForUser = async (
   }))
 }
 
+/** The pharmacy's name display preference; UPPER when unset or invalid. */
+const getNameCase = async (pharmacyId: number): Promise<NameCase> => {
+  const param = await prisma.businessParameter.findUnique({
+    where: { pharmacyId_key: { pharmacyId, key: NAME_DISPLAY_CASE_KEY } },
+    select: { value: true },
+  })
+  return (NAME_CASES as readonly string[]).includes(param?.value ?? '') ? (param!.value as NameCase) : 'UPPER'
+}
+
 // ── Services ──────────────────────────────────────────
 
 export const login = async (data: LoginInput): Promise<LoginResult> => {
-  const user = await prisma.user.findUnique({
-    where: { email: data.email },
+  // Case-insensitive: "Budi@Apotek.com" signs in the account stored as budi@apotek.com.
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: data.email, mode: 'insensitive' } },
     select: {
       id: true,
       uuid: true,
@@ -152,6 +163,7 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
       status: true,
       failedLoginCount: true,
       lockedUntil: true,
+      mustChangePassword: true,
     },
   })
 
@@ -233,6 +245,7 @@ export const login = async (data: LoginInput): Promise<LoginResult> => {
       name: user.name,
       email: user.email,
       platformRole: user.platformRole,
+      mustChangePassword: user.mustChangePassword,
       accessiblePharmacies,
     },
     currentPharmacy: null,
@@ -274,7 +287,15 @@ export const selectPharmacy = async (
     throw new ForbiddenException('You do not have access to this pharmacy')
   }
 
-  if (platformRole !== PlatformRole.PLATFORM_ADMIN) {
+  // A temporary password (new account or reset) must be replaced before any pharmacy work.
+  const account = await prisma.user.findUnique({ where: { id: userId }, select: { mustChangePassword: true } })
+  if (account?.mustChangePassword) {
+    throw new ForbiddenException('PASSWORD_CHANGE_REQUIRED')
+  }
+
+  // Without a Head Pharmacist the pharmacy can't operate — except for its owner,
+  // who has to get in to appoint one (otherwise a new pharmacy is locked forever).
+  if (platformRole !== PlatformRole.PLATFORM_ADMIN && pharmacyRole?.type !== AppRole.OWNER) {
     const hasHeadPharmacist = await prisma.placement.findFirst({
       where: {
         pharmacyId: pharmacy.id,
@@ -318,7 +339,7 @@ export const selectPharmacy = async (
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { uuid: true, name: true, email: true, platformRole: true },
+    select: { uuid: true, name: true, email: true, platformRole: true, mustChangePassword: true },
   })
 
   if (!user) throw new UnauthorizedException('User not found')
@@ -330,6 +351,7 @@ export const selectPharmacy = async (
     name: pharmacy.name,
     role: pharmacyRole,
     permissions: toPermissionMap(permissions),
+    nameCase: await getNameCase(pharmacy.id),
   }
 
   return {
@@ -339,6 +361,7 @@ export const selectPharmacy = async (
       name: user.name,
       email: user.email,
       platformRole: user.platformRole,
+      mustChangePassword: user.mustChangePassword,
       accessiblePharmacies,
     },
     currentPharmacy,
@@ -449,7 +472,7 @@ export const getMe = async (
 ): Promise<MeResponse> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { uuid: true, name: true, email: true, platformRole: true },
+    select: { uuid: true, name: true, email: true, platformRole: true, mustChangePassword: true },
   })
 
   if (!user) {
@@ -463,6 +486,7 @@ export const getMe = async (
     name: user.name,
     email: user.email,
     platformRole: user.platformRole,
+    mustChangePassword: user.mustChangePassword,
     accessiblePharmacies,
   }
 
@@ -496,6 +520,7 @@ export const getMe = async (
     name: pharmacy.name,
     role,
     permissions: toPermissionMap(permissions),
+    nameCase: await getNameCase(pharmacyId),
   }
 
   return { user: userData, currentPharmacy }

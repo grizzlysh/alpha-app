@@ -7,7 +7,9 @@ import {
   CreateCustomerRequest,
   UpdateCustomerRequest,
   DeleteCustomerRequest,
+  PurchaseHistoryRequest,
 } from './customers.interface'
+import { purchaseHistoryQuerySchema, AllergyCheckInput } from './customers.validation'
 import { sendSuccess, sendCreated, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
 
@@ -55,4 +57,25 @@ export const getCustomersDropdown = async (req: Request, res: Response, next: Ne
     )
     sendSuccess(res, MESSAGE_CODES.CUSTOMERS_FETCHED, data)
   } catch (err) { next(err) }
+}
+
+export const getPurchaseHistory = async (req: PurchaseHistoryRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const query = purchaseHistoryQuerySchema.parse(req.query)
+    const history = await CustomerService.getPurchaseHistory(parseUuid(req.params.customer_uuid), req.user!.pharmacyId!, query)
+    sendSuccess(res, MESSAGE_CODES.CUSTOMER_PURCHASES_FETCHED, history)
+  } catch (err) { next(err) }
+}
+
+export const checkAllergies = async (
+  req: Request<{ customer_uuid: string }, {}, AllergyCheckInput>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const data = await CustomerService.checkAllergies(parseUuid(req.params.customer_uuid), req.user!.pharmacyId!, req.body.items)
+    sendSuccess(res, MESSAGE_CODES.CUSTOMER_FETCHED, data)
+  } catch (err) {
+    next(err)
+  }
 }

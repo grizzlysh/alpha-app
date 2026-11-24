@@ -61,12 +61,7 @@ export interface ExaminationQueueResponse {
 }
 
 /** One prescription line that matches one of the patient's recorded allergies. */
-export interface AllergyConflict {
-  medicineName: string
-  allergenName: string
-  severity: AllergySeverity
-  matchedOn: string
-}
+export type { AllergyConflict } from '@utils/allergyCheck'
 
 type P = { examination_uuid: string }
 export interface CheckInRequest extends Request { body: CheckInInput }

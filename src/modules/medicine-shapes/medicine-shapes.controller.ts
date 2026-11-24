@@ -2,18 +2,12 @@ import { parseUuid } from '@utils/parseUuid'
 import { Request, Response, NextFunction } from 'express'
 import * as MedicineShapeService from './medicine-shapes.service'
 import {
-  createMedicineShapeSchema,
-  updateMedicineShapeSchema,
-  medicineShapeQuerySchema,
-} from './medicine-shapes.validation'
-import {
   GetMedicineShapesRequest,
   GetMedicineShapeRequest,
   CreateMedicineShapeRequest,
   UpdateMedicineShapeRequest,
   DeleteMedicineShapeRequest,
 } from './medicine-shapes.interface'
-import { ValidationException } from '@exceptions/ValidationException'
 import {
   sendSuccess,
   sendCreated,
@@ -28,8 +22,7 @@ export const getMedicineShapes = async (
 ): Promise<void> => {
   try {
     const { data, meta } = await MedicineShapeService.getMedicineShapes(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query as any
     )
 
@@ -47,8 +40,7 @@ export const getMedicineShape = async (
   try {
     const medicine_shape = await MedicineShapeService.getMedicineShapeByUuid(
       parseUuid(req.params.medicine_shape_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole
+      req.user!.pharmacyId!
     )
 
     sendSuccess(res, MESSAGE_CODES.MEDICINE_SHAPE_FETCHED, medicine_shape)
@@ -65,8 +57,7 @@ export const createMedicineShape = async (
   try {
     const medicine_shape = await MedicineShapeService.createMedicineShape(
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -85,8 +76,7 @@ export const updateMedicineShape = async (
     const medicine_shape = await MedicineShapeService.updateMedicineShape(
       parseUuid(req.params.medicine_shape_uuid),
       req.body,
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -104,8 +94,7 @@ export const deleteMedicineShape = async (
   try {
     await MedicineShapeService.deleteMedicineShape(
       parseUuid(req.params.medicine_shape_uuid),
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.user!.id
     )
 
@@ -122,8 +111,7 @@ export const getMedicineShapesDropdown = async (
 ): Promise<void> => {
   try {
     const data = await MedicineShapeService.getMedicineShapesDropdown(
-      req.user!.pharmacyId,
-      req.user!.platformRole,
+      req.user!.pharmacyId!,
       req.query.search as string | undefined
     )
     sendSuccess(res, MESSAGE_CODES.MEDICINE_SHAPES_FETCHED, data)
