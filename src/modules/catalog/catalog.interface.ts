@@ -1,3 +1,5 @@
+import { OrderLetterKind } from '@prisma/client'
+
 // A pharmacy's medicine master, portable between pharmacies. Classifications are
 // referenced by name, so a file exported at one branch imports cleanly at another.
 
@@ -8,6 +10,8 @@ export interface CatalogMedicine {
   baseName: string | null
   variant: string | null
   isCustomName: boolean
+  /** Own order letter kind; null follows the type. */
+  orderLetterKind: OrderLetterKind | null
   unit: string
   shape: string
   type: string
@@ -19,7 +23,7 @@ export interface CatalogExport {
   pharmacy: { name: string; code: string }
   exportedAt: Date
   shapes: { name: string }[]
-  types: { name: string; requiredPrescription: boolean; isControlled: boolean }[]
+  types: { name: string; requiredPrescription: boolean; isControlled: boolean; orderLetterKind: OrderLetterKind }[]
   classes: { name: string }[]
   medicines: CatalogMedicine[]
 }

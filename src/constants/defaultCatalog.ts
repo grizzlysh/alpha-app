@@ -1,4 +1,4 @@
-import { DataType } from '@prisma/client'
+import { DataType, OrderLetterKind } from '@prisma/client'
 
 // Starting data every new pharmacy gets. Each pharmacy owns its own copy and
 // may rename, add or remove entries afterwards — nothing here is shared.
@@ -20,13 +20,13 @@ export const DEFAULT_MEDICINE_SHAPES: string[] = [
 ]
 
 /** Regulatory groups. `requiredPrescription` drives the prescription check at the POS. */
-export const DEFAULT_MEDICINE_TYPES: Array<{ name: string; requiredPrescription: boolean; isControlled?: boolean }> = [
+export const DEFAULT_MEDICINE_TYPES: Array<{ name: string; requiredPrescription: boolean; isControlled?: boolean; orderLetterKind?: OrderLetterKind }> = [
   { name: 'Obat Bebas', requiredPrescription: false },
   { name: 'Obat Bebas Terbatas', requiredPrescription: false },
   { name: 'Obat Keras', requiredPrescription: true },
-  { name: 'Psikotropika', requiredPrescription: true, isControlled: true },
-  { name: 'Narkotika', requiredPrescription: true, isControlled: true },
-  { name: 'Prekursor', requiredPrescription: true, isControlled: true },
+  { name: 'Psikotropika', requiredPrescription: true, isControlled: true, orderLetterKind: OrderLetterKind.PSYCHOTROPIC },
+  { name: 'Narkotika', requiredPrescription: true, isControlled: true, orderLetterKind: OrderLetterKind.NARCOTIC },
+  { name: 'Prekursor', requiredPrescription: true, isControlled: true, orderLetterKind: OrderLetterKind.PRECURSOR },
   { name: 'Jamu & Herbal', requiredPrescription: false },
   { name: 'Suplemen', requiredPrescription: false },
   { name: 'Alat Kesehatan', requiredPrescription: false },
@@ -85,5 +85,6 @@ export const DEFAULT_BUSINESS_PARAMS: DefaultBusinessParam[] = [
   { key: 'RECEIPT_HEADER',            value: '',      dataType: DataType.STRING,     description: 'Header text printed on patient receipts' },
   { key: 'NAME_DISPLAY_CASE',         value: 'UPPER', dataType: DataType.STRING,     description: 'How names are displayed and printed: UPPER, TITLE, LOWER or AS_TYPED' },
   { key: 'MEDICINE_NAME_FORMAT',      value: 'NAME_STRENGTH_SHAPE', dataType: DataType.STRING, description: 'How medicine names are put together: NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH or NAME_STRENGTH' },
+  { key: 'RESTRICTED_SALE_LIMIT',     value: '10',    dataType: DataType.NUMBER,     description: 'Most pieces of one precursor or obat-obat tertentu medicine sold per sale without a prescription (0 = no limit)' },
   { key: 'RECEIPT_FOOTER',            value: 'Terima kasih atas kepercayaan Anda. Semoga lekas sembuh!', dataType: DataType.STRING, description: 'Footer text printed on patient receipts' },
 ]

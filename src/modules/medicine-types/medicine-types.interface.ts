@@ -1,6 +1,6 @@
 import { Request } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
-import { RecordStatus } from '@prisma/client'
+import { OrderLetterKind, RecordStatus } from '@prisma/client'
 
 // ── Query/Param/Body Types ────────────────────────────
 
@@ -21,6 +21,7 @@ export interface CreateMedicineTypeBody {
   name: string
   requiredPrescription: boolean
   isControlled?: boolean
+  orderLetterKind?: OrderLetterKind
   status: RecordStatus
 }
 
@@ -28,6 +29,7 @@ export interface UpdateMedicineTypeBody {
   name?: string
   requiredPrescription?: boolean
   isControlled?: boolean
+  orderLetterKind?: OrderLetterKind
   status?: RecordStatus
 }
 
@@ -71,6 +73,8 @@ export interface MedicineTypeResponse {
   name: string
   requiredPrescription: boolean
   isControlled: boolean
+  /** The surat pesanan its medicines go on. */
+  orderLetterKind: OrderLetterKind
   status: RecordStatus
   medicineCount: number
   createdAt: Date
@@ -82,4 +86,5 @@ export interface MedicineTypeDropdownItem {
   name: string
   requiredPrescription: boolean
   isControlled: boolean
+  orderLetterKind: OrderLetterKind
 }

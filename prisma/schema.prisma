@@ -60,6 +60,17 @@ enum StockMovementReason {
   DONATION
 }
 
+/// Which surat pesanan (order letter) a medicine must be ordered on. Each kind
+/// goes on its own letter: regular medicines, narcotics (one medicine per
+/// letter), psychotropics, pharmaceutical precursors, and "obat-obat tertentu".
+enum OrderLetterKind {
+  REGULAR
+  NARCOTIC
+  PSYCHOTROPIC
+  PRECURSOR
+  CERTAIN_DRUG
+}
+
 enum PurchaseOrderStatus {
   DRAFT
   SENT
@@ -790,6 +801,8 @@ model MedicineType {
   requiredPrescription Boolean      @default(false) @map("required_prescription")
   /// Narcotics, psychotropics, precursors: orders, receipts, returns and disposals need the Head Pharmacist.
   isControlled         Boolean      @default(false) @map("is_controlled")
+  /// The order letter its medicines go on (a medicine can override it).
+  orderLetterKind      OrderLetterKind @default(REGULAR) @map("order_letter_kind")
   status               RecordStatus @default(ACTIVE)
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
@@ -844,6 +857,9 @@ model Medicine {
   /// Optional suffix ("Forte", "60 ml").
   variant         String?
   isCustomName    Boolean      @default(true) @map("is_custom_name")
+  /// Overrides the type's order letter, e.g. a precursor or an "obat-obat
+  /// tertentu" among ordinary prescription medicines. Null: follow the type.
+  orderLetterKind OrderLetterKind? @map("order_letter_kind")
   shapeId         Int          @map("shape_id")
   typeId          Int          @map("type_id")
   medicineClassId Int          @map("medicine_class_id")
@@ -1005,6 +1021,8 @@ model PurchaseOrder {
   distributorId      Int                 @map("distributor_id")
   signedById         Int?                @map("signed_by_id")
   orderNumber        String              @unique @map("order_number")
+  /// Set from the items, which must all be of one kind.
+  kind               OrderLetterKind     @default(REGULAR)
   status             PurchaseOrderStatus @default(DRAFT)
   description        String?
   cancellationReason String?             @map("cancellation_reason")

@@ -1,4 +1,4 @@
-import { StockMovementType, StockMovementReason } from '@prisma/client'
+import { OrderLetterKind, StockMovementType, StockMovementReason } from '@prisma/client'
 import { z } from 'zod'
 
 const dateRangeSchema = z.object({
@@ -92,3 +92,12 @@ export type DisposalExportInput = z.infer<typeof disposalExportSchema>
 export type ReturnSummaryInput = z.infer<typeof returnSummarySchema>
 export type ReturnListInput = z.infer<typeof returnListSchema>
 export type ReturnExportInput = z.infer<typeof returnExportSchema>
+
+// ── Controlled medicines (SIPNAP) ───────────────────────────
+
+export const controlledReportSchema = z.object({
+  /** yyyy-MM; defaults to the current month. */
+  month: z.string().trim().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+  kind: z.enum([OrderLetterKind.NARCOTIC, OrderLetterKind.PSYCHOTROPIC, OrderLetterKind.PRECURSOR, OrderLetterKind.CERTAIN_DRUG]).optional().default(OrderLetterKind.NARCOTIC),
+})
+export type ControlledReportInput = z.infer<typeof controlledReportSchema>

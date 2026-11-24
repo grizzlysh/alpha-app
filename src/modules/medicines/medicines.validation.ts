@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { RecordStatus } from '@prisma/client'
+import { OrderLetterKind, RecordStatus } from '@prisma/client'
 import { normalizeStrength } from '@utils/medicineName'
 
 /** A scanned or typed barcode: letters, digits and - . / only (what Code 128 / EAN carry). Empty clears it. */
@@ -50,6 +50,8 @@ const nameFields = {
   baseName: z.string().trim().min(1).max(200).optional(),
   variant: optionalText(100),
   isCustomName: z.boolean().optional(),
+  /** The surat pesanan it goes on when that differs from its type's; null follows the type. */
+  orderLetterKind: z.enum(OrderLetterKind).nullable().optional(),
 }
 
 export const createMedicineSchema = z.object({

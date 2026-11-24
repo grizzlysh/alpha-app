@@ -19,6 +19,7 @@ import {
   GetReturnSummaryRequest,
   GetReturnListRequest,
   GetReturnExportRequest,
+  GetControlledReportRequest,
 } from './reports.interface'
 import { sendSuccess, sendPaginated } from '@utils/responseHelper'
 import { MESSAGE_CODES } from '@constants/messageCodes'
@@ -161,5 +162,14 @@ export const getReturnExport = async (req: GetReturnExportRequest, res: Response
   try {
     const data = await ReportService.getReturnExport(req.user!.pharmacyId!, req.query as any)
     sendSuccess(res, MESSAGE_CODES.REPORT_RETURNS_FETCHED, data)
+  } catch (err) { next(err) }
+}
+
+// ── Controlled medicines (SIPNAP) ─────────────────────────────
+
+export const getControlledReport = async (req: GetControlledReportRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data = await ReportService.getControlledReport(req.user!.pharmacyId!, req.query as any)
+    sendSuccess(res, MESSAGE_CODES.REPORT_CONTROLLED_FETCHED, data)
   } catch (err) { next(err) }
 }

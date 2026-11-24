@@ -85,6 +85,8 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
   'Value must be true or false': 'Nilai harus true atau false',
   'Invoice has recorded payments and cannot be deleted': 'Faktur sudah ada pembayarannya dan tidak bisa dihapus',
   'Stock from this invoice has already been used and the invoice cannot be deleted': 'Stok dari faktur ini sudah terpakai (terjual, diretur, dimusnahkan, atau disesuaikan), jadi faktur tidak bisa dihapus',
+  'A narcotics purchase order can hold only one medicine': 'Satu surat pesanan narkotika hanya untuk satu jenis obat',
+  'Narcotics and psychotropics must belong to a prescription-only medicine type': 'Narkotika dan psikotropika harus berada di golongan obat yang wajib resep',
   'Value must be one of UPPER, TITLE, LOWER, AS_TYPED': 'Pilihan harus UPPER, TITLE, LOWER, atau AS_TYPED',
   'Value must be one of NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH, NAME_STRENGTH': 'Pilihan harus NAME_STRENGTH_SHAPE, NAME_SHAPE_STRENGTH, atau NAME_STRENGTH',
   'Medicine type with this name already exists': 'Nama jenis obat sudah terdaftar',
@@ -162,6 +164,16 @@ export const EXACT_TRANSLATIONS: Record<string, string> = {
  * originals embed internal UUIDs that mean nothing to a cashier.
  */
 export const PATTERN_TRANSLATIONS: Array<{ pattern: RegExp; en: (m: RegExpMatchArray) => string; id: (m: RegExpMatchArray) => string }> = [
+  {
+    pattern: /^Each kind of medicine needs its own purchase order: (.+)$/,
+    en: () => 'Narcotics, psychotropics, precursors, "obat-obat tertentu" and other medicines each need their own purchase order',
+    id: () => 'Narkotika, psikotropika, prekursor, obat-obat tertentu, dan obat lainnya harus dipesan di surat pesanan yang terpisah',
+  },
+  {
+    pattern: /^Without a prescription at most (\d+) pieces per sale: (.+)$/,
+    en: (m) => `Without a prescription, at most ${m[1]} pieces of each precursor or "obat-obat tertentu" medicine per sale: ${m[2]}`,
+    id: (m) => `Tanpa resep, prekursor dan obat-obat tertentu paling banyak ${m[1]} per transaksi: ${m[2]}`,
+  },
   {
     pattern: /^This format would give several medicines the same name: (.+)$/,
     en: (m) => `This format would give several medicines the same name: ${m[1]}`,

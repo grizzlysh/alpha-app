@@ -12,6 +12,7 @@ import {
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
+import { assertPrescriptionForKind } from '@utils/orderLetter'
 import { buildMedicineName, combinedStrength, getMedicineNameFormat } from '@utils/medicineName'
 
 // ── Helpers ───────────────────────────────────────────
@@ -22,6 +23,7 @@ const medicineSelect = {
   baseName: true,
   variant: true,
   isCustomName: true,
+  orderLetterKind: true,
   unit: true,
   barcode: true,
   status: true,
@@ -31,7 +33,7 @@ const medicineSelect = {
     select: { uuid: true, name: true }
   },
   type: {
-    select: { uuid: true, name: true }
+    select: { uuid: true, name: true, orderLetterKind: true }
   },
   medicineClass: {
     select: { uuid: true, name: true }
@@ -109,6 +111,8 @@ const formatResponse = (m: Prisma.MedicineGetPayload<{ select: typeof medicineSe
   variant: m.variant,
   isCustomName: m.isCustomName,
   strength: combinedStrength(m.ingredients.map((i) => i.strength)),
+  orderLetterKind: m.orderLetterKind,
+  effectiveOrderLetterKind: m.orderLetterKind ?? m.type.orderLetterKind,
   unit: m.unit,
   barcode: m.barcode,
   status: m.status,
@@ -233,6 +237,7 @@ export const createMedicine = async (
     data.medicineClassUuid,
     pharmacyId
   )
+  await assertPrescriptionForKind(prisma, typeId, data.orderLetterKind)
   const isCustomName = data.isCustomName ?? !data.baseName
   const name = await resolveName(pharmacyId, { ...data, isCustomName, shapeId })
   await checkDuplicate(name, pharmacyId)
@@ -244,6 +249,7 @@ export const createMedicine = async (
       baseName: isCustomName ? null : data.baseName!,
       variant: isCustomName ? null : (data.variant ?? null),
       isCustomName,
+      orderLetterKind: data.orderLetterKind ?? null,
       shapeId,
       typeId,
       medicineClassId,
@@ -275,6 +281,8 @@ export const updateMedicine = async (
       variant: true,
       isCustomName: true,
       shapeId: true,
+      typeId: true,
+      orderLetterKind: true,
       ingredients: { select: { name: true, strength: true }, orderBy: { id: 'asc' } },
     },
   })
@@ -311,6 +319,10 @@ export const updateMedicine = async (
     medicineClassId = medicineClass?.id
   }
 
+  if (typeId || data.orderLetterKind !== undefined) {
+    await assertPrescriptionForKind(prisma, typeId ?? existing.typeId, data.orderLetterKind !== undefined ? data.orderLetterKind : existing.orderLetterKind)
+  }
+
   // Sending only `name` (as older clients do) switches to a custom name.
   const isCustomName = data.isCustomName ?? (data.baseName ? false : data.name ? true : existing.isCustomName)
   const baseName = data.baseName ?? existing.baseName ?? existing.name
@@ -332,6 +344,7 @@ export const updateMedicine = async (
       baseName: isCustomName ? null : baseName,
       variant: isCustomName ? null : variant,
       isCustomName,
+      ...(data.orderLetterKind !== undefined && { orderLetterKind: data.orderLetterKind }),
       ...(shapeId && { shapeId }),
       ...(typeId && { typeId }),
       ...(medicineClassId && { medicineClassId }),
@@ -379,13 +392,15 @@ export const getMedicinesDropdown = async (
   pharmacyId: number,
   search?: string
 ): Promise<MedicineDropdownItem[]> => {
-  return prisma.medicine.findMany({
+  const rows = await prisma.medicine.findMany({
     where: {
       pharmacyId,
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, unit: true },
+    select: { uuid: true, name: true, unit: true, orderLetterKind: true, type: { select: { orderLetterKind: true } } },
     orderBy: { name: 'asc' },
   })
+  // The order letter kind lets the purchase order form keep each kind on its own letter.
+  return rows.map((m) => ({ uuid: m.uuid, name: m.name, unit: m.unit, orderLetterKind: m.orderLetterKind ?? m.type.orderLetterKind }))
 }

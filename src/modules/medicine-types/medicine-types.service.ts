@@ -9,6 +9,7 @@ import { MedicineTypeResponse, MedicineTypeDropdownItem } from './medicine-types
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { ConflictException } from '@exceptions/ConflictException'
 import { PaginationMeta } from '@interfaces/common.interface'
+import { PRESCRIPTION_ONLY_KINDS } from '@utils/orderLetter'
 
 // Every pharmacy owns its own list — there are no shared/global rows. A new
 // pharmacy starts from the default template (see constants/defaultCatalog).
@@ -20,6 +21,7 @@ const medicineTypeSelect = {
   name: true,
   requiredPrescription: true,
   isControlled: true,
+  orderLetterKind: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -31,6 +33,7 @@ const formatResponse = (row: Prisma.MedicineTypeGetPayload<{ select: typeof medi
   name: row.name,
   requiredPrescription: row.requiredPrescription,
   isControlled: row.isControlled,
+  orderLetterKind: row.orderLetterKind,
   status: row.status,
   medicineCount: row._count.medicines,
   createdAt: row.createdAt,
@@ -110,9 +113,10 @@ export const createMedicineType = async (
   const row = await prisma.medicineType.create({
     data: {
       name: data.name,
-      // A controlled medicine always needs a prescription.
-      requiredPrescription: data.requiredPrescription || data.isControlled,
+      // Controlled medicines, narcotics and psychotropics always need a prescription.
+      requiredPrescription: data.requiredPrescription || data.isControlled || PRESCRIPTION_ONLY_KINDS.includes(data.orderLetterKind),
       isControlled: data.isControlled,
+      orderLetterKind: data.orderLetterKind,
       status: data.status,
       pharmacyId,
       createdById: userId,
@@ -131,10 +135,12 @@ export const updateMedicineType = async (
 ): Promise<MedicineTypeResponse> => {
   const existing = await findOwn(uuid, pharmacyId)
   if (data.name) await checkDuplicate(data.name, pharmacyId, uuid)
+  const current = await prisma.medicineType.findUniqueOrThrow({ where: { id: existing.id }, select: { orderLetterKind: true } })
+  const prescriptionOnly = data.isControlled || PRESCRIPTION_ONLY_KINDS.includes(data.orderLetterKind ?? current.orderLetterKind)
 
   const row = await prisma.medicineType.update({
     where: { id: existing.id },
-    data: { ...data, ...(data.isControlled && { requiredPrescription: true }), updatedById: userId },
+    data: { ...data, ...(prescriptionOnly && { requiredPrescription: true }), updatedById: userId },
     select: medicineTypeSelect,
   })
 
@@ -165,7 +171,7 @@ export const getMedicineTypesDropdown = async (
       deletedAt: null,
       ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
     },
-    select: { uuid: true, name: true, requiredPrescription: true, isControlled: true },
+    select: { uuid: true, name: true, requiredPrescription: true, isControlled: true, orderLetterKind: true },
     orderBy: { name: 'asc' },
   })
 }

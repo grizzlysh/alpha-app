@@ -61,10 +61,21 @@ export async function resolveSigner(
 
 /**
  * Documents covering controlled medicines (a medicine type marked
- * isControlled: narcotics, psychotropics, precursors) need the Head Pharmacist.
+ * isControlled: narcotics, psychotropics, precursors) or any medicine that
+ * goes on a special order letter (including "obat-obat tertentu") need the
+ * Head Pharmacist.
  */
 export async function signerLevelForMedicines(db: Db, medicineIds: number[]): Promise<SignerLevel> {
   if (medicineIds.length === 0) return 'PHARMACIST'
-  const controlled = await db.medicine.count({ where: { id: { in: medicineIds }, type: { isControlled: true } } })
+  const controlled = await db.medicine.count({
+    where: {
+      id: { in: medicineIds },
+      OR: [
+        { type: { isControlled: true } },
+        { orderLetterKind: { not: 'REGULAR' } },
+        { orderLetterKind: null, type: { orderLetterKind: { not: 'REGULAR' } } },
+      ],
+    },
+  })
   return controlled > 0 ? 'HEAD_PHARMACIST' : 'PHARMACIST'
 }

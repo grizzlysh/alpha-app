@@ -840,6 +840,10 @@ export const MESSAGES: Record<MessageCode, BilingualMessage> = {
     en: 'Return report fetched successfully',
     id: 'Laporan retur berhasil diambil',
   },
+  REPORT_CONTROLLED_FETCHED: {
+    en: 'Controlled medicine report fetched successfully',
+    id: 'Laporan obat khusus berhasil diambil',
+  },
 
   // ─── Storage ───────────────────────────────────────────────────────────────
   STORAGE_CABINETS_FETCHED: {

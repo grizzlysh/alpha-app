@@ -23,6 +23,7 @@ import {
   returnSummarySchema,
   returnListSchema,
   returnExportSchema,
+  controlledReportSchema,
 } from './reports.validation'
 
 const router: Router = Router()
@@ -60,5 +61,8 @@ router.get('/disposals', perm, validateQuery(disposalListSchema), ReportControll
 router.get('/returns/summary', perm, validateQuery(returnSummarySchema), ReportController.getReturnSummary)
 router.get('/returns/export', perm, validateQuery(returnExportSchema), ReportController.getReturnExport)
 router.get('/returns', perm, validateQuery(returnListSchema), ReportController.getReturnList)
+
+// ── Controlled medicines (SIPNAP) ─────────────────────────────
+router.get('/controlled', perm, validateQuery(controlledReportSchema), ReportController.getControlledReport)
 
 export default router

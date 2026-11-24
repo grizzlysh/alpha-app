@@ -44,6 +44,7 @@ export async function seedDefaultClassifications(tx: Tx, pharmacyId: number, use
       name: t.name,
       requiredPrescription: t.requiredPrescription,
       isControlled: t.isControlled ?? false,
+      orderLetterKind: t.orderLetterKind ?? 'REGULAR',
       createdById: userId,
     })),
   })
