@@ -841,6 +841,9 @@ model Medicine {
   medicineClassId Int          @map("medicine_class_id")
   defaultBinId    Int?         @map("default_bin_id")
   unit            String
+  /// One code for every batch of this medicine: the maker's EAN-13 from the
+  /// pack, or one generated in-house. Batches keep their own StockDetail.barcode.
+  barcode         String?
   status          RecordStatus @default(ACTIVE)
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
@@ -868,6 +871,7 @@ model Medicine {
   prescriptionDetails  PrescriptionDetail[]
   stockReservations    StockReservation[]
 
+  @@unique([pharmacyId, barcode])
   @@index([pharmacyId])
   @@index([typeId])
   @@map("mst_medicines")

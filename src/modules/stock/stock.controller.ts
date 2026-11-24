@@ -1,9 +1,10 @@
 import { parseUuid } from '@utils/parseUuid'
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import * as StockService from './stock.service'
 import {
   stockDetailQuerySchema,
   stockCatalogQuerySchema,
+  MedicineStockCardQueryInput,
 } from './stock.validation'
 import {
   GetStockDetailsRequest,
@@ -196,6 +197,28 @@ export const getCrossPharmacyStock = async (
     )
 
     sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, stocks)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getBatchLabel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const label = await StockService.getBatchLabel(parseUuid(String(req.params.stock_detail_uuid)), req.user!.pharmacyId!)
+    sendSuccess(res, MESSAGE_CODES.STOCK_DETAIL_FETCHED, label)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export const getMedicineStockCard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const card = await StockService.getMedicineStockCard(
+      parseUuid(String(req.params.medicine_uuid)),
+      req.user!.pharmacyId!,
+      req.query as MedicineStockCardQueryInput
+    )
+    sendSuccess(res, MESSAGE_CODES.STOCK_FETCHED, card)
   } catch (err) {
     next(err)
   }

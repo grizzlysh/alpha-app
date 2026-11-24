@@ -125,6 +125,8 @@ export type GetCrossPharmacyStockRequest = Request<
 // ── Response Types ────────────────────────────────────
 
 export interface StockDetailSearchResponse {
+  /** On a barcode scan: what the code was (a batch, a medicine, or one item of a batch). */
+  scanMatch?: 'BATCH' | 'MEDICINE' | 'ITEM'
   uuid: string
   barcode: string | null
   batchNumber: string
@@ -142,6 +144,8 @@ export interface StockDetailSearchResponse {
     uuid: string
     name: string
     unit: string
+    /** Present on the scan / search endpoint. */
+    barcode?: string | null
     shape: { name: string }
     type: { name: string; requiredPrescription: boolean }
   }
@@ -250,4 +254,69 @@ export interface CrossPharmacyStockResponse {
   isLowStock: boolean
   isCriticalStock: boolean
   details: StockDetailResponse[]
+}
+
+interface StockCardMedicine {
+  uuid: string
+  name: string
+  unit: string
+  barcode: string | null
+  shape: string
+  type: string
+  isControlled: boolean
+  requiredPrescription: boolean
+  therapeuticClass: string
+}
+
+/** Everything a printed batch, item or medicine label needs. */
+export interface BatchLabelResponse {
+  pharmacy: { name: string; code: string }
+  medicine: StockCardMedicine
+  batch: {
+    uuid: string
+    batchNumber: string
+    barcode: string
+    expiryDate: Date
+    quantityPieces: number
+    quantityPerBox: number
+    distributor: string
+    location: string | null
+  }
+  reorderLevel: number
+  /** Stock of the medicine across all its batches (for the medicine label). */
+  medicineTotalPieces: number
+  sellingPrice: number
+}
+
+/** One day on a medicine's stock card: everything in and out that day, all batches together. */
+export interface MedicineStockCardDay {
+  /** yyyy-MM-dd in the pharmacy's timezone. */
+  date: string
+  in: number
+  out: number
+  /** Stock at the end of the day. */
+  balance: number
+  /** Invoice, return and disposal numbers of the day. */
+  documents: string[]
+  /** Sale lines (counted, not listed) and manual adjustments of the day. */
+  sales: number
+  adjustments: number
+}
+
+export interface MedicineStockCardResponse {
+  pharmacy: { name: string; code: string }
+  medicine: StockCardMedicine
+  reorderLevel: number
+  totalPieces: number
+  /** Largest box size among the batches in stock (1 when unboxed). */
+  quantityPerBox: number
+  sellingPrice: number
+  /** Batches in stock today, earliest expiry first. */
+  batches: { batchNumber: string; expiryDate: Date; quantityPieces: number; location: string | null }[]
+  period: { from: string; to: string }
+  openingBalance: number
+  closingBalance: number
+  /** Movements after the period's end (so the closing balance differs from today's stock). */
+  movementsAfterPeriod: number
+  days: MedicineStockCardDay[]
 }

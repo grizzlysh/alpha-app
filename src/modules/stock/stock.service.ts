@@ -1,4 +1,6 @@
+import { DateTime } from 'luxon'
 import { prisma } from '@config/db'
+import { getTimezone } from '@utils/generateDocNumbers'
 import { resolveSigner } from '@utils/signer'
 import {
   StockDetailQueryInput,
@@ -8,6 +10,7 @@ import {
   UpdatePriceInput,
   UpdateReorderLevelInput,
   AdjustStockInput,
+  MedicineStockCardQueryInput,
 } from './stock.validation'
 import {
   StockDetailSearchResponse,
@@ -15,6 +18,9 @@ import {
   StockAlertResponse,
   StockMovementResponse,
   CrossPharmacyStockResponse,
+  BatchLabelResponse,
+  MedicineStockCardDay,
+  MedicineStockCardResponse,
 } from './stock.interface'
 import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
@@ -105,17 +111,41 @@ const formatStock = (stock: any, lowStockThreshold: number = 0): StockResponse =
 
 // ── Services ──────────────────────────────────────────
 
+/** Item labels carry the batch code plus "-" and the item number, e.g. 4823519076241835-003. */
+const ITEM_CODE = /^(.+)-(\d{1,4})$/
+
 export const searchStockDetails = async (
   pharmacyId: number,
   query: StockDetailQueryInput
 ): Promise<StockDetailSearchResponse[]> => {
-  const { search, medicineUuid } = query
+  const results = await findStockDetails(pharmacyId, query)
+  const { barcode } = query
+  if (!barcode) return results
+  if (results.length > 0) {
+    return results.map((r) => ({ ...r, scanMatch: r.barcode === barcode ? ('BATCH' as const) : ('MEDICINE' as const) }))
+  }
+  // Not a batch or medicine code: maybe one item of a batch.
+  const item = ITEM_CODE.exec(barcode)
+  if (!item) return []
+  const batch = await findStockDetails(pharmacyId, { ...query, barcode: item[1] })
+  return batch
+    .filter((r) => r.barcode === item[1])
+    .map((r) => ({ ...r, scanMatch: 'ITEM' as const }))
+}
+
+const findStockDetails = async (
+  pharmacyId: number,
+  query: StockDetailQueryInput
+): Promise<StockDetailSearchResponse[]> => {
+  const { search, medicineUuid, barcode } = query
 
   const where: any = {
     stock: { pharmacyId, ...(medicineUuid && { medicine: { uuid: medicineUuid } }) },
     quantityPieces: { gt: 0 },
-    ...(medicineUuid && { expiryDate: { gt: new Date() } }),
-    ...(search && {
+    ...((medicineUuid || barcode) && { expiryDate: { gt: new Date() } }),
+    // A scan: the batch with that code, or every sellable batch of the medicine with that code.
+    ...(barcode && { OR: [{ barcode }, { stock: { medicine: { barcode } } }] }),
+    ...(search && !barcode && {
       OR: [
         { stock: { medicine: { name: { contains: search, mode: 'insensitive' } } } },
         { barcode: { contains: search, mode: 'insensitive' } },
@@ -145,6 +175,7 @@ export const searchStockDetails = async (
               uuid: true,
               name: true,
               unit: true,
+              barcode: true,
               shape: { select: { name: true } },
               type: { select: { name: true, requiredPrescription: true } },
             },
@@ -152,10 +183,9 @@ export const searchStockDetails = async (
         },
       },
     },
-    orderBy: [
-      { stock: { medicine: { name: 'asc' } } },
-      { expiryDate: 'asc' },
-    ],
+    orderBy: barcode
+      ? [{ expiryDate: 'asc' }]
+      : [{ stock: { medicine: { name: 'asc' } } }, { expiryDate: 'asc' }],
     take: 20,
   })
 
@@ -715,4 +745,199 @@ export const getCrossPharmacyStock = async (
     isCriticalStock: false, // cross-pharmacy view does not load per-pharmacy threshold
     details: stock.details,
   }))
+}
+
+/** What a printed batch, item or medicine label needs about one batch. */
+export const getBatchLabel = async (stockDetailUuid: string, pharmacyId: number): Promise<BatchLabelResponse> => {
+  const d = await prisma.stockDetail.findFirst({
+    where: { uuid: stockDetailUuid, stock: { pharmacyId } },
+    select: {
+      uuid: true,
+      batchNumber: true,
+      barcode: true,
+      expiryDate: true,
+      quantityPieces: true,
+      quantityPerBox: true,
+      distributor: { select: { name: true } },
+      bin: { select: { code: true, shelf: { select: { code: true, cabinet: { select: { name: true } } } } } },
+      stock: {
+        select: {
+          reorderLevel: true,
+          totalPieces: true,
+          sellingPrice: true,
+          calculatedPrice: true,
+          pharmacy: { select: { name: true, code: true } },
+          medicine: {
+            select: {
+              uuid: true,
+              name: true,
+              unit: true,
+              barcode: true,
+              shape: { select: { name: true } },
+              type: { select: { name: true, isControlled: true, requiredPrescription: true } },
+              medicineClass: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  })
+  if (!d) throw new NotFoundException('Stock detail not found')
+
+  const med = d.stock.medicine
+  const bin = d.bin
+  return {
+    pharmacy: d.stock.pharmacy,
+    medicine: {
+      uuid: med.uuid,
+      name: med.name,
+      unit: med.unit,
+      barcode: med.barcode,
+      shape: med.shape.name,
+      type: med.type.name,
+      isControlled: med.type.isControlled,
+      requiredPrescription: med.type.requiredPrescription,
+      therapeuticClass: med.medicineClass.name,
+    },
+    batch: {
+      uuid: d.uuid,
+      batchNumber: d.batchNumber,
+      barcode: d.barcode,
+      expiryDate: d.expiryDate,
+      quantityPieces: d.quantityPieces,
+      quantityPerBox: d.quantityPerBox,
+      distributor: d.distributor.name,
+      location: bin ? `${bin.shelf.cabinet.name} · ${bin.shelf.code} · ${bin.code}` : null,
+    },
+    reorderLevel: d.stock.reorderLevel,
+    medicineTotalPieces: d.stock.totalPieces,
+    sellingPrice: getEffectiveSellingPrice(d.stock.sellingPrice, d.stock.calculatedPrice),
+  }
+}
+
+/**
+ * A medicine's stock card over a period, one row per day that had movements
+ * (all batches together). Balances are anchored to today's total stock and
+ * rebuilt backwards, so stock brought in before movements were logged still
+ * shows as the opening balance.
+ */
+export const getMedicineStockCard = async (
+  medicineUuid: string,
+  pharmacyId: number,
+  query: MedicineStockCardQueryInput
+): Promise<MedicineStockCardResponse> => {
+  const stock = await prisma.stock.findFirst({
+    where: { pharmacyId, medicine: { uuid: medicineUuid } },
+    select: {
+      id: true,
+      reorderLevel: true,
+      totalPieces: true,
+      sellingPrice: true,
+      calculatedPrice: true,
+      pharmacy: { select: { name: true, code: true } },
+      medicine: {
+        select: {
+          uuid: true,
+          name: true,
+          unit: true,
+          barcode: true,
+          shape: { select: { name: true } },
+          type: { select: { name: true, isControlled: true, requiredPrescription: true } },
+          medicineClass: { select: { name: true } },
+        },
+      },
+      details: {
+        where: { quantityPieces: { gt: 0 } },
+        orderBy: { expiryDate: 'asc' },
+        select: {
+          batchNumber: true,
+          expiryDate: true,
+          quantityPieces: true,
+          quantityPerBox: true,
+          bin: { select: { code: true, shelf: { select: { code: true, cabinet: { select: { name: true } } } } } },
+        },
+      },
+    },
+  })
+  if (!stock) throw new NotFoundException('Stock not found')
+
+  const zone = await getTimezone()
+  const today = DateTime.now().setZone(zone)
+  const from = query.from ? DateTime.fromISO(query.from, { zone }) : today.startOf('month')
+  const to = query.to ? DateTime.fromISO(query.to, { zone }) : today
+  const start = from.startOf('day').toUTC().toJSDate()
+  const end = to.endOf('day').toUTC().toJSDate()
+
+  const movements = await prisma.stockMovement.findMany({
+    where: { stockId: stock.id, createdAt: { gte: start } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    select: {
+      createdAt: true,
+      type: true,
+      reason: true,
+      quantity: true,
+      invoiceDetail: { select: { invoice: { select: { invoiceNumber: true } } } },
+      stockReturnDetail: { select: { stockReturn: { select: { returnNumber: true } } } },
+      stockDisposalDetail: { select: { stockDisposal: { select: { disposalNumber: true } } } },
+    },
+  })
+  const signed = (m: { type: string; quantity: number }): number => (m.type === 'IN' ? m.quantity : -m.quantity)
+  const inPeriod = movements.filter((m) => m.createdAt <= end)
+  const afterPeriod = movements.length - inPeriod.length
+  const closingBalance = stock.totalPieces - movements.slice(inPeriod.length).reduce((s, m) => s + signed(m), 0)
+  const openingBalance = closingBalance - inPeriod.reduce((s, m) => s + signed(m), 0)
+
+  const days = new Map<string, MedicineStockCardDay>()
+  let balance = openingBalance
+  for (const m of inPeriod) {
+    const key = DateTime.fromJSDate(m.createdAt).setZone(zone).toISODate()!
+    let day = days.get(key)
+    if (!day) {
+      day = { date: key, in: 0, out: 0, balance: 0, documents: [], sales: 0, adjustments: 0 }
+      days.set(key, day)
+    }
+    if (m.type === 'IN') day.in += m.quantity
+    else day.out += m.quantity
+    balance += signed(m)
+    day.balance = balance
+    const doc =
+      m.invoiceDetail?.invoice.invoiceNumber ??
+      m.stockReturnDetail?.stockReturn.returnNumber ??
+      m.stockDisposalDetail?.stockDisposal.disposalNumber
+    if (doc) {
+      if (!day.documents.includes(doc)) day.documents.push(doc)
+    } else if (m.reason === 'SALE') day.sales += 1
+    else day.adjustments += 1
+  }
+
+  const med = stock.medicine
+  return {
+    pharmacy: stock.pharmacy,
+    medicine: {
+      uuid: med.uuid,
+      name: med.name,
+      unit: med.unit,
+      barcode: med.barcode,
+      shape: med.shape.name,
+      type: med.type.name,
+      isControlled: med.type.isControlled,
+      requiredPrescription: med.type.requiredPrescription,
+      therapeuticClass: med.medicineClass.name,
+    },
+    reorderLevel: stock.reorderLevel,
+    totalPieces: stock.totalPieces,
+    quantityPerBox: Math.max(1, ...stock.details.map((d) => d.quantityPerBox)),
+    sellingPrice: getEffectiveSellingPrice(stock.sellingPrice, stock.calculatedPrice),
+    batches: stock.details.map((d) => ({
+      batchNumber: d.batchNumber,
+      expiryDate: d.expiryDate,
+      quantityPieces: d.quantityPieces,
+      location: d.bin ? `${d.bin.shelf.cabinet.name} · ${d.bin.shelf.code} · ${d.bin.code}` : null,
+    })),
+    period: { from: from.toISODate()!, to: to.toISODate()! },
+    openingBalance,
+    closingBalance,
+    movementsAfterPeriod: afterPeriod,
+    days: [...days.values()],
+  }
 }
