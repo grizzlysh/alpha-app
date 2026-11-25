@@ -80,6 +80,22 @@ describe('batch label and stock card', () => {
     expect((await as(f.owner).get('/api/stock/details/00000000-0000-4000-8000-000000000000/label')).status).toBe(404)
   })
 
+  it('labels for many batches: by medicine (in-stock batches, earliest expiry first) or by batch', async () => {
+    const byMedicine = await as(f.owner).post('/api/stock/labels', { medicineUuids: [medicineUuid] })
+    expect(byMedicine.status).toBe(200)
+    const batches = byMedicine.body.data.map((l: { batch: { batchNumber: string } }) => l.batch.batchNumber.toUpperCase())
+    expect(batches).toEqual(['EARLY-1', 'LATE-1'])
+    expect(byMedicine.body.data[0]).toMatchObject({ medicine: { uuid: medicineUuid }, sellingPrice: expect.any(Number) })
+
+    const late = byMedicine.body.data[1].batch.uuid
+    const byBatch = (await as(f.owner).post('/api/stock/labels', { stockDetailUuids: [late] })).body.data
+    expect(byBatch).toHaveLength(1)
+    expect((await as(f.owner).post('/api/stock/labels', {})).status).toBe(422)
+    // Another pharmacy's batch is never returned.
+    const other = await createPharmacy()
+    expect((await as(other.owner).post('/api/stock/labels', { stockDetailUuids: [late] })).body.data).toEqual([])
+  })
+
   it('the medicine card has one row per day over all batches', async () => {
     const token = await enter(cashier.email, NEW_PASSWORD, f.pharmacyUuid)
     const [early, late] = (await as(token).get(`/api/stock/details?barcode=${EAN}`)).body.data

@@ -73,3 +73,15 @@ export type StockMovementQueryInput = z.infer<typeof stockMovementQuerySchema>
 export type UpdatePriceInput = z.infer<typeof updatePriceSchema>
 export type UpdateReorderLevelInput = z.infer<typeof updateReorderLevelSchema>
 export type AdjustStockInput = z.infer<typeof adjustStockSchema>
+
+// Label data for many batches: named batches and/or every in-stock batch of named medicines.
+export const batchLabelsSchema = z
+  .object({
+    stockDetailUuids: z.array(z.string().uuid()).max(300).optional(),
+    medicineUuids: z.array(z.string().uuid()).max(300).optional(),
+  })
+  .refine((v) => (v.stockDetailUuids?.length ?? 0) + (v.medicineUuids?.length ?? 0) > 0, {
+    message: 'Choose at least one batch or medicine',
+  })
+
+export type BatchLabelsInput = z.infer<typeof batchLabelsSchema>

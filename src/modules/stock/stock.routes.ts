@@ -13,6 +13,7 @@ import {
   updateReorderLevelSchema,
   adjustStockSchema,
   medicineStockCardQuerySchema,
+  batchLabelsSchema,
 } from './stock.validation'
 
 const router: Router = Router()
@@ -23,6 +24,7 @@ router.get('/alerts', requirePermission(PERMISSIONS.STOCK_READ), StockController
 router.get('/movements', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockMovementQuerySchema), StockController.getStockMovements)
 router.get('/cross-pharmacy/:medicine_uuid', requirePermission(PERMISSIONS.STOCK_READ), StockController.getCrossPharmacyStock)
 router.get('/details', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockDetailQuerySchema), StockController.getStockDetails)
+router.post('/labels', requirePermission(PERMISSIONS.STOCK_READ), validateBody(batchLabelsSchema), StockController.getBatchLabels)
 router.get('/details/:stock_detail_uuid/label', requirePermission(PERMISSIONS.STOCK_READ), StockController.getBatchLabel)
 router.get('/medicines/:medicine_uuid/card', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(medicineStockCardQuerySchema), StockController.getMedicineStockCard)
 router.get('/catalog', requirePermission(PERMISSIONS.STOCK_READ), validateQuery(stockCatalogQuerySchema), StockController.getStockCatalog)

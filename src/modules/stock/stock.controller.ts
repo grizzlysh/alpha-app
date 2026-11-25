@@ -202,6 +202,15 @@ export const getCrossPharmacyStock = async (
   }
 }
 
+export const getBatchLabels = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const labels = await StockService.getBatchLabels(req.user!.pharmacyId!, req.body)
+    sendSuccess(res, MESSAGE_CODES.STOCK_DETAIL_FETCHED, labels)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export const getBatchLabel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const label = await StockService.getBatchLabel(parseUuid(String(req.params.stock_detail_uuid)), req.user!.pharmacyId!)

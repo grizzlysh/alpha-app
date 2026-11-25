@@ -12,6 +12,7 @@ import {
   UpdateReorderLevelInput,
   AdjustStockInput,
   MedicineStockCardQueryInput,
+  BatchLabelsInput,
 } from './stock.validation'
 import {
   StockDetailSearchResponse,
@@ -27,6 +28,7 @@ import { NotFoundException } from '@exceptions/NotFoundException'
 import { BadRequestException } from '@exceptions/BadRequestException'
 import { PaginationMeta } from '@interfaces/common.interface'
 import { Decimal } from '@prisma/client/runtime/library'
+import { Prisma } from '@prisma/client'
 
 // ── Helpers ───────────────────────────────────────────
 
@@ -773,43 +775,39 @@ export const getCrossPharmacyStock = async (
 }
 
 /** What a printed batch, item or medicine label needs about one batch. */
-export const getBatchLabel = async (stockDetailUuid: string, pharmacyId: number): Promise<BatchLabelResponse> => {
-  const d = await prisma.stockDetail.findFirst({
-    where: { uuid: stockDetailUuid, stock: { pharmacyId } },
+const batchLabelSelect = {
+  uuid: true,
+  batchNumber: true,
+  barcode: true,
+  expiryDate: true,
+  quantityPieces: true,
+  quantityPerBox: true,
+  distributor: { select: { name: true } },
+  bin: { select: { code: true, shelf: { select: { code: true, cabinet: { select: { name: true } } } } } },
+  stock: {
     select: {
-      uuid: true,
-      batchNumber: true,
-      barcode: true,
-      expiryDate: true,
-      quantityPieces: true,
-      quantityPerBox: true,
-      distributor: { select: { name: true } },
-      bin: { select: { code: true, shelf: { select: { code: true, cabinet: { select: { name: true } } } } } },
-      stock: {
+      reorderLevel: true,
+      totalPieces: true,
+      sellingPrice: true,
+      calculatedPrice: true,
+      pharmacy: { select: { name: true, code: true } },
+      medicine: {
         select: {
-          reorderLevel: true,
-          totalPieces: true,
-          sellingPrice: true,
-          calculatedPrice: true,
-          pharmacy: { select: { name: true, code: true } },
-          medicine: {
-            select: {
-              uuid: true,
-              name: true,
-              unit: true,
-              barcode: true,
-              shape: { select: { name: true } },
-              orderLetterKind: true,
-              type: { select: { name: true, isControlled: true, requiredPrescription: true, orderLetterKind: true } },
-              medicineClass: { select: { name: true } },
-            },
-          },
+          uuid: true,
+          name: true,
+          unit: true,
+          barcode: true,
+          shape: { select: { name: true } },
+          orderLetterKind: true,
+          type: { select: { name: true, isControlled: true, requiredPrescription: true, orderLetterKind: true } },
+          medicineClass: { select: { name: true } },
         },
       },
     },
-  })
-  if (!d) throw new NotFoundException('Stock detail not found')
+  },
+} satisfies Prisma.StockDetailSelect
 
+const toBatchLabel = (d: Prisma.StockDetailGetPayload<{ select: typeof batchLabelSelect }>): BatchLabelResponse => {
   const med = d.stock.medicine
   const bin = d.bin
   return {
@@ -840,6 +838,41 @@ export const getBatchLabel = async (stockDetailUuid: string, pharmacyId: number)
     medicineTotalPieces: d.stock.totalPieces,
     sellingPrice: getEffectiveSellingPrice(d.stock.sellingPrice, d.stock.calculatedPrice),
   }
+}
+
+export const getBatchLabel = async (stockDetailUuid: string, pharmacyId: number): Promise<BatchLabelResponse> => {
+  const d = await prisma.stockDetail.findFirst({
+    where: { uuid: stockDetailUuid, stock: { pharmacyId } },
+    select: batchLabelSelect,
+  })
+  if (!d) throw new NotFoundException('Stock detail not found')
+  return toBatchLabel(d)
+}
+
+/** Most batches one label print may cover. */
+export const MAX_LABEL_BATCHES = 300
+
+/**
+ * Label data for many batches at once: the batches named, plus every batch
+ * still in stock of the medicines named. Ordered by medicine, then earliest expiry.
+ */
+export const getBatchLabels = async (
+  pharmacyId: number,
+  data: BatchLabelsInput
+): Promise<BatchLabelResponse[]> => {
+  const or: Prisma.StockDetailWhereInput[] = []
+  if (data.stockDetailUuids?.length) or.push({ uuid: { in: data.stockDetailUuids } })
+  if (data.medicineUuids?.length) {
+    or.push({ quantityPieces: { gt: 0 }, stock: { medicine: { uuid: { in: data.medicineUuids } } } })
+  }
+  if (or.length === 0) return []
+  const rows = await prisma.stockDetail.findMany({
+    where: { stock: { pharmacyId }, OR: or },
+    select: batchLabelSelect,
+    orderBy: [{ stock: { medicine: { name: 'asc' } } }, { expiryDate: 'asc' }],
+    take: MAX_LABEL_BATCHES,
+  })
+  return rows.map(toBatchLabel)
 }
 
 /**
